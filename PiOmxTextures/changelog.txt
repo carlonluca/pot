@@ -1,0 +1,24 @@
+Changelog
+
+Version 4.0
+===========
+1. Integrated omxplayer.
+2. Created new QML elements.
+3. Separated concepts of MediaPlayer and VideoSurface. It is possible to
+   create 2 video surfaces rendering the same video.
+
+Version 3.0
+===========
+1. Implemented QML elements for images and videos.
+2. Implemented sample application.
+3. Refactored OMX wrapper.
+4. Implemented test v4l2 code for camera QML element.
+
+Version 2.0
+===========
+1. Implemented hw decoding of video and rendering into OpenGL texture.
+
+Version 1.0
+===========
+1. Implemented textured cube.
+2. Implemented hardware decoding of images with rendering into OpenGL texture.
