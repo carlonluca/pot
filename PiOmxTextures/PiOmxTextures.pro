@@ -14,9 +14,13 @@ LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
 LIBS += -lavformat -lavcodec -lavutil
 # Internal
 # NOTE: I had issues with versions compiled from recent sources.
-#LIBS += -L$$_PRO_FILE_PWD_/3rdparty/lib -lavformat -lavcodec -lavutil
+LIBS += -L$$_PRO_FILE_PWD_/3rdparty/lib -lavformat -lavcodec -lavutil
+INCLUDEPATH += $$_PRO_FILE_PWD_/3rdparty/lib/include
 # For omxplayer.
 LIBS += -lfreetype -lWFC -lpcre
+INCLUDEPATH += /usr/include/freetype2
+CONFIG += link_pkgconfig
+PKGCONFIG += freetype2
 
 INCLUDEPATH += \
    omx_wrapper \
