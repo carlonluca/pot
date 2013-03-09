@@ -74,8 +74,8 @@ public:
     }
 
 public slots:
-    GLuint instantiateTexture(QSize size);
-    void freeTexture(GLuint textureId);
+    OMX_TextureData* instantiateTexture(QSize size);
+    void freeTexture(OMX_TextureData* textureData);
 
 private:
     GLWidget* m_parent;

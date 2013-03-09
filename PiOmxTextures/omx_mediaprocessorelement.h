@@ -24,11 +24,17 @@
 #ifndef OMX_MEDIAPROCESSORELEMENT_H
 #define OMX_MEDIAPROCESSORELEMENT_H
 
+/*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
 #include <QQuickItem>
 
 #include "omx_mediaprocessor.h"
 
 
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessorElement class
++-----------------------------------------------------------------------------*/
 class OMX_MediaProcessorElement : public QQuickItem
 {
     Q_OBJECT
@@ -52,7 +58,8 @@ public slots:
     Q_INVOKABLE long currentPosition();
 
 signals:
-    void textureReady(const GLuint& textureId);
+    void textureReady(const OMX_TextureData* textureId);
+    void textureInvalidated();
     void sourceChanged(QString filepath);
 
     void playbackStarted();
@@ -62,14 +69,16 @@ protected:
     QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*);
 
 private:
-    bool openMedia(QString filepath);
-
     OMX_MediaProcessor* m_mediaProc;
     OMX_TextureProvider* m_texProvider;
 
-    GLuint m_textureId; // TODO: Other info might be needed.
-
     QString m_source;
+    volatile bool m_pendingOpen;
+    OMX_TextureData* m_textureData;
+
+private slots:
+    void instantiateMediaProcessor();
+    bool openMedia(QString filepath);
 };
 
 #endif // OMX_MEDIAPROCESSORELEMENT_H

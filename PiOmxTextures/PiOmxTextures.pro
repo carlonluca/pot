@@ -11,7 +11,7 @@ TEMPLATE = app
 
 # External
 LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
-LIBS += -lavformat -lavcodec -lavutil
+#LIBS += -lavformat -lavcodec -lavutil
 # Internal
 # NOTE: I had issues with versions compiled from recent sources.
 LIBS += -L$$_PRO_FILE_PWD_/3rdparty/lib -lavformat -lavcodec -lavutil
@@ -31,7 +31,7 @@ INCLUDEPATH += \
    omxplayer_lib/utils \
    omxplayer_lib/linux
 
-VERSION = 4.0
+VERSION = 4.0.1
 
 # Flags used bu hello_pi examples:
 #-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
@@ -58,14 +58,26 @@ DEFINES += __STDC_CONSTANT_MACROS \
    HAVE_OMXLIB \
    STANDALONE
 
+# Macro definitions
 #DEFINES += LOG_LEVEL_DEBUG
 DEFINES += VERBOSE
 DEFINES += ENABLE_VIDEO_TEST
 DEFINES += ENABLE_MEDIA_PROCESSOR
+#ENABLE_SUBTITLES: To enable subtitles.
 
 QMAKE_CXXFLAGS_DEBUG += -rdynamic
 # For omxplayer.
-QMAKE_CXXFLAGS += -std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DTARGET_POSIX -D_LINUX -fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64 -DHAVE_CMAKE_CONFIG -D__VIDEOCORE4__ -U_FORTIFY_SOURCE -Wall -DUSE_EXTERNAL_FFMPEG  -DHAVE_LIBAVCODEC_AVCODEC_H -DHAVE_LIBAVUTIL_OPT_H -DHAVE_LIBAVUTIL_MEM_H -DHAVE_LIBAVUTIL_AVUTIL_H -DHAVE_LIBAVFORMAT_AVFORMAT_H -DHAVE_LIBAVFILTER_AVFILTER_H -DOMX -DOMX_SKIP64BIT -ftree-vectorize -DUSE_EXTERNAL_OMX -DTARGET_RASPBERRY_PI -DUSE_EXTERNAL_LIBBCM_HOST
+QMAKE_CXXFLAGS += -std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS             \
+   -DTARGET_POSIX -D_LINUX -fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE               \
+   -D_FILE_OFFSET_BITS=64 -DHAVE_CMAKE_CONFIG -D__VIDEOCORE4__                          \
+   -U_FORTIFY_SOURCE -DUSE_EXTERNAL_FFMPEG  -DHAVE_LIBAVCODEC_AVCODEC_H           \
+   -DHAVE_LIBAVUTIL_OPT_H -DHAVE_LIBAVUTIL_MEM_H -DHAVE_LIBAVUTIL_AVUTIL_H              \
+   -DHAVE_LIBAVFORMAT_AVFORMAT_H -DHAVE_LIBAVFILTER_AVFILTER_H -DOMX -DOMX_SKIP64BIT    \
+   -ftree-vectorize -DUSE_EXTERNAL_OMX -DTARGET_RASPBERRY_PI -DUSE_EXTERNAL_LIBBCM_HOST \
+   -Wno-deprecated-declarations -Wno-missing-field-initializers -Wno-ignored-qualifiers \
+   -Wno-psabi
+
+# [1]: part of implementation without omxplayer.
 
 SOURCES += \
     main.cpp \
@@ -77,20 +89,20 @@ SOURCES += \
     omx_wrapper/Locker.cpp \
     omx_wrapper/Event.cpp \
     omx_wrapper/OMXComponent.cpp \
-    glwidget.cpp \
-    ilclient/ilcore.c \
-    ilclient/ilclient.c \
+#    glwidget.cpp \
+#    ilclient/ilcore.c \
+#    ilclient/ilclient.c \
 #    video.cpp \
     omx_wrapper/omxtunnel.cpp \
     omx_imageelement.cpp \
     omx_videosurfaceelement.cpp \
-    omx_texturedelement.cpp \
-    omx_videoprocessor.cpp \
+#    omx_texturedelement.cpp \
+#    omx_videoprocessor.cpp \     # [1]
     omx_camerasurfaceelement.cpp \
     omx_textureproviderqquickitem.cpp \
     omx_audioprocessor.cpp \
     omx_mediaprocessor.cpp \
-    omx_videograph.cpp \
+#    omx_videograph.cpp \         # [1]
     omx_wrapper/OMX_Core.cpp \
     omx_mediaprocessorelement.cpp
 
@@ -105,7 +117,7 @@ SOURCES += \
     omxplayer_lib/OMXPlayerVideo.cpp \
     omxplayer_lib/OMXPlayerSubtitles.cpp \
     omxplayer_lib/OMXPlayerAudio.cpp \
-    omxplayer_lib/omxplayer.cpp \
+#    omxplayer_lib/omxplayer.cpp \
     omxplayer_lib/OMXOverlayCodecText.cpp \
     omxplayer_lib/OMXCore.cpp \
     omxplayer_lib/OMXClock.cpp \
@@ -128,14 +140,14 @@ HEADERS  += \
     omx_wrapper/Event.h \
     omx_wrapper/OMXComponent.h \
     omx_wrapper/MyDeleter.h \
-    glwidget.h \
+#    glwidget.h \
     lgl_logging.h \
-    ilclient/ilclient.h \
+#    ilclient/ilclient.h \
     omx_wrapper/omxtunnel.h \
     omx_imageelement.h \
     omx_videosurfaceelement.h \
-    omx_texturedelement.h \
-    omx_videoprocessor.h \
+#    omx_texturedelement.h \    # [1]
+#    omx_videoprocessor.h \
     omx_camerasurfaceelement.h \
     omx_textureproviderqquickitem.h \
     omx_texture.h \
@@ -143,7 +155,7 @@ HEADERS  += \
     omx_audioprocessor.h \
     omx_globals.h \
     omx_mediaprocessor.h \
-    omx_videograph.h \
+#    omx_videograph.h \         # [1]
     omxplayer_lib/DllOMX.h \
     omxplayer_lib/DllAvFormat.h \
     omxplayer_lib/BitstreamConverter.h \

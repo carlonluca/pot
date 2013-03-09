@@ -168,7 +168,6 @@ bool OMX_VideoGraph::getAvailableBuffer(OMX_BUFFERHEADERTYPE** buffer)
     return compDecoder->waitForInputBufferReady(130, *buffer);
 }
 
-extern EGLImageKHR eglImageVideo;
 bool OMX_VideoGraph::playData(OMX_BUFFERHEADERTYPE*& buf)
 {
     if (port_settings_changed == 0 && compDecoder->waitForEvent(OMX_EventPortSettingsChanged, 131, 0, -1)) {

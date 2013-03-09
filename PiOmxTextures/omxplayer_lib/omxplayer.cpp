@@ -542,7 +542,7 @@ int startVideo(OMX_TextureProvider* provider, OMX_VideoSurfaceElement* element)
 
     LOG_VERBOSE(LOG_TAG, "Opening video using OMX...");
     uint textureId;
-    if(m_has_video && !m_player_video->Open(m_hints_video, m_av_clock, textureId, m_Deinterlace,  m_bMpeg,
+    if(m_has_video && !m_player_video->Open(m_hints_video, m_av_clock, text, m_Deinterlace,  m_bMpeg,
                                             m_hdmi_clock_sync, m_thread_player, m_display_aspect))
 #if 0
         goto do_exit;

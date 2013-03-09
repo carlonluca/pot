@@ -579,6 +579,7 @@ void CPCMRemap::ProcessInput(void* data, void* out, unsigned int samples, float 
 
 void CPCMRemap::AddGain(float* buf, unsigned int samples, float gain)
 {
+    (void)buf;
   if (gain != 1.0f) //needs a gain change
   {
     float* ptr = m_buf;

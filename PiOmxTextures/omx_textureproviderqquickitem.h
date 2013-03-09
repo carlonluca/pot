@@ -29,9 +29,61 @@
 +-----------------------------------------------------------------------------*/
 #include <QObject>
 #include <QQuickItem>
+#include <QQuickWindow>
 
 #include <GLES2/gl2.h>
+#define EGL_EGLEXT_PROTOTYPES
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include <assert.h>
 
+#include "lgl_logging.h"
+#include "omx_globals.h"
+
+
+/*------------------------------------------------------------------------------
+|    OMX_TextureData class
++-----------------------------------------------------------------------------*/
+class OMX_TextureData
+{
+public:
+    OMX_TextureData() :
+        m_textureId(0),
+        m_textureData(NULL),
+        m_eglImage(NULL),
+        m_textureSize(QSize(0, 0)) {
+        // Do nothing.
+    }
+
+    OMX_TextureData(const OMX_TextureData& textureData) :
+        m_textureId(textureData.m_textureId),
+        m_textureData(textureData.m_textureData),
+        m_eglImage(textureData.m_eglImage),
+        m_textureSize(textureData.m_textureSize) {
+        // Do nothing.
+    }
+
+    ~OMX_TextureData() {
+        // Do not free.
+    }
+
+    void freeData() {
+        EGLDisplay eglDisplay = get_egl_display();
+
+        // Destroy texture, EGL image and free the buffer.
+        if (eglDestroyImageKHR(eglDisplay, m_eglImage) == EGL_SUCCESS) {
+            EGLint err = eglGetError();
+            LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %d.", err);
+        }
+        glDeleteTextures(1, &m_textureId);
+        delete m_textureData;
+    }
+
+    GLuint      m_textureId;
+    GLubyte*    m_textureData;
+    EGLImageKHR m_eglImage;
+    QSize       m_textureSize;
+};
 
 /*------------------------------------------------------------------------------
 |    OMX_VideoProcessorThread class
@@ -45,8 +97,8 @@ class OMX_TextureProvider : public QObject
 {
     Q_OBJECT
 public slots:
-    virtual GLuint instantiateTexture(QSize size) = 0;
-    virtual void freeTexture(GLuint textureId) = 0;
+    virtual OMX_TextureData* instantiateTexture(QSize size) = 0;
+    virtual void freeTexture(OMX_TextureData* textureData) = 0;
 };
 
 /*------------------------------------------------------------------------------
@@ -63,8 +115,8 @@ public:
     }
 
 public slots:
-    GLuint instantiateTexture(QSize size);
-    void freeTexture(GLuint textureId);
+    OMX_TextureData* instantiateTexture(QSize size);
+    void freeTexture(OMX_TextureData* textureData);
 
 private:
     QQuickItem* m_item;

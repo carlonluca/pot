@@ -123,7 +123,7 @@ void OMXPlayerVideo::UnLockSubtitles()
 bool OMXPlayerVideo::Open(
         COMXStreamInfo &hints,
         OMXClock *av_clock,
-        uint& textureId,
+        OMX_TextureData*& textureData,
         bool deinterlace,
         bool mpeg,
         bool hdmi_clock_sync,
@@ -161,7 +161,7 @@ bool OMXPlayerVideo::Open(
 
   m_FlipTimeStamp = m_av_clock->GetAbsoluteClock();
 
-  if(!OpenDecoder(textureId))
+  if(!OpenDecoder(textureData))
   {
     Close();
     return false;
@@ -519,7 +519,7 @@ bool OMXPlayerVideo::AddPacket(OMXPacket *pkt)
   return ret;
 }
 
-bool OMXPlayerVideo::OpenDecoder(uint& textureId)
+bool OMXPlayerVideo::OpenDecoder(OMX_TextureData*& textureData)
 {
   if (m_hints.fpsrate && m_hints.fpsscale)
     m_fps = DVD_TIME_BASE / OMXReader::NormalizeFrameduration((double)DVD_TIME_BASE * m_hints.fpsscale / m_hints.fpsrate);
@@ -536,7 +536,7 @@ bool OMXPlayerVideo::OpenDecoder(uint& textureId)
 
   m_decoder = new COMXVideo(m_provider);
 
-  if (!m_decoder->Open(m_hints, m_av_clock, textureId, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync))
+  if (!m_decoder->Open(m_hints, m_av_clock, textureData, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync))
   {
     CloseDecoder();
     return false;

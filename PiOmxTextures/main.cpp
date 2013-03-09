@@ -48,9 +48,10 @@ extern "C" {
 
 
 /*----------------------------------------------------------------------
-|    handler
+|    handlerSigsegv
 +---------------------------------------------------------------------*/
-void handler(int sig) {
+void handlerSigsegv(int sig)
+{
   void *array[10];
   size_t size;
   size = backtrace(array, 10);
@@ -62,12 +63,24 @@ void handler(int sig) {
 }
 
 /*----------------------------------------------------------------------
+|    handlerSigterm
++---------------------------------------------------------------------*/
+void handlerSigint(int sig)
+{
+    Q_UNUSED(sig);
+
+    LOG_INFORMATION(LOG_TAG, "Terminating...");
+    qApp->quit();
+}
+
+/*----------------------------------------------------------------------
 |    definitions
 +---------------------------------------------------------------------*/
 int main(int argc, char *argv[])
 {
 #if 0
-    signal(SIGSEGV, handler);
+    signal(SIGSEGV, handlerSigsegv);
+    signal(SIGINT, handlerSigint);
 #endif
 
     QApplication a(argc, argv);
@@ -104,6 +117,7 @@ int main(int argc, char *argv[])
 #elif ENABLE_QML_SAMPLE
 #ifdef ENABLE_VIDEO_TEST
     qRegisterMetaType<GLuint>("GLuint");
+    qRegisterMetaType<OMX_TextureData*>("OMX_TextureData*");
     qmlRegisterType<OMX_ImageElement>("com.luke.qml", 1, 0, "OMXImage");
     qmlRegisterType<OMX_VideoSurfaceElement>("com.luke.qml", 1, 0, "OMXVideoSurface");
     qmlRegisterType<OMX_CameraSurfaceElement>("com.luke.qml", 1, 0, "OMXCameraSurface");

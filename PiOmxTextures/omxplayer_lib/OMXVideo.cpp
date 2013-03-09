@@ -49,8 +49,6 @@
 #endif
 #define CLASSNAME "COMXVideo"
 
-extern EGLImageKHR eglImageVideo;
-
 #if 0
 // TODO: These are Nvidia Tegra2 dependent, need to dynamiclly find the
 // right codec matched to video format.
@@ -83,6 +81,7 @@ extern EGLImageKHR eglImageVideo;
 
 OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer)
 {
+    (void)pAppData;
     assert(pBuffer);
     if (pBuffer->nFlags & OMX_BUFFERFLAG_EOS)
         return OMX_ErrorNone;
@@ -155,8 +154,10 @@ bool COMXVideo::SendDecoderConfig()
     return true;
 }
 
-bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, uint& textureId, float display_aspect, bool deinterlace, bool hdmi_clock_sync)
+bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& textureData, float display_aspect, bool deinterlace, bool hdmi_clock_sync)
 {
+    // TODO: Remove this?
+    (void)display_aspect;
     OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
     std::string decoder_name;
 
@@ -629,23 +630,29 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, uint& textureId, fl
     CLog::Log(LOGDEBUG, "lcarlon: enabling renderer output port...");
     m_omx_render.EnablePort(m_omx_render.GetOutputPort(), false);
 
-    // lcarlon: TODO: Remove the usage of the external variable.
+    // lcarlon: it is important that the generation of the texture is done in the rendering
+    // thread. Beware that BlockingQueuedConnection hardlocks when on the same thread.
     LOG_VERBOSE(LOG_TAG, "Generating texture of size (%d, %d).", hints.width, hints.height);
+#if 0
     QMetaObject::invokeMethod(
                 m_provider,
                 "instantiateTexture",
-                Qt::DirectConnection,
-                Q_RETURN_ARG(GLuint, textureId),
+                Qt::BlockingQueuedConnection,
+                Q_RETURN_ARG(OMX_TextureData*, textureData),
                 Q_ARG(QSize, QSize(hints.width, hints.height)));
+#else
+    textureData = m_provider->instantiateTexture(QSize(hints.width, hints.height));
+#endif
+    LOG_VERBOSE(LOG_TAG, "Generated!");
 
-    omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &m_eglBuffer, 221, NULL, eglImageVideo);
+    omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &m_eglBuffer, 221, NULL, textureData->m_eglImage);
     if (omx_err != OMX_ErrorNone) {
         CLog::Log(LOGERROR, "OpenMAXILTextureLoader::decode - OMX_UseEGLImage - failed with omxErr(0x%x)\n", omx_err);
         return false;
     }
     CLog::Log(LOGDEBUG, "lcarlon: port enabled...");
 
-    LOG_WARNING(LOG_TAG, "Component renderer: %x.", (unsigned int)m_omx_render.GetComponent());
+    LOG_VERBOSE(LOG_TAG, "Component renderer: %x.", (unsigned int)m_omx_render.GetComponent());
     m_omx_render.SetCustomDecoderFillBufferDoneHandler(&fill_buffer_done_callback);
     if ((omx_err = OMX_FillThisBuffer(m_omx_render.GetComponent(), m_eglBuffer)) != OMX_ErrorNone) {
         LOG_ERROR(LOG_TAG, "Error: %x.", (unsigned int)omx_err);
@@ -837,6 +844,7 @@ OMXPacket *COMXVideo::GetText()
 
 int COMXVideo::DecodeText(uint8_t *pData, int iSize, double dts, double pts)
 {
+    (void)dts;
     OMX_ERRORTYPE omx_err;
 
     if (pData || iSize > 0)
@@ -917,6 +925,7 @@ int COMXVideo::DecodeText(uint8_t *pData, int iSize, double dts, double pts)
 
 int COMXVideo::Decode(uint8_t *pData, int iSize, double dts, double pts)
 {
+    (void)dts;
     OMX_ERRORTYPE omx_err;
 
     if (pData || iSize > 0)
@@ -1063,6 +1072,7 @@ bool COMXVideo::Resume()
 ///////////////////////////////////////////////////////////////////////////////////////////
 void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect)
 {
+    (void)SrcRect;
     if(!m_is_open)
         return;
 
@@ -1100,7 +1110,7 @@ void COMXVideo::WaitCompletion()
 
     OMX_ERRORTYPE omx_err = OMX_ErrorNone;
     OMX_BUFFERHEADERTYPE *omx_buffer = m_omx_decoder.GetInputBuffer();
-    struct timespec starttime, endtime;
+    //struct timespec starttime, endtime;
 
     if(omx_buffer == NULL)
     {

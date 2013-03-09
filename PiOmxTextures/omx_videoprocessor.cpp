@@ -53,7 +53,7 @@ protected:
        assert(pBuffer);
        if (pBuffer->nFlags & OMX_BUFFERFLAG_EOS)
            return OMX_ErrorNone;
-       LOG_VERBOSE(LOG_TAG, "FillBufferDoneCallback: %lu!", pBuffer->nFilledLen);
+       LOG_VERBOSE(LOG_TAG, "FillBufferDoneCallback: %ld!", pBuffer->nFilledLen);
        FillThisBuffer(pBuffer);
        return OMX_ErrorNone;
    }
@@ -232,7 +232,6 @@ void OMX_VideoProcessor::videoDecoding()
 /*------------------------------------------------------------------------------
 |    OMX_VideoProcessor::doVideoDecoding
 +-----------------------------------------------------------------------------*/
-extern EGLImageKHR eglImageVideo;
 void OMX_VideoProcessor::doVideoDecoding()
 {
     OMX_VIDEO_PARAM_PORTFORMATTYPE format;

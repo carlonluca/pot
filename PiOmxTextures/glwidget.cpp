@@ -295,9 +295,10 @@ void GLWidget::onTextureChanged(const uint &texture)
         this->textures[i] = texture;
 }
 
-EGLImageKHR eglImageVideo;
-GLuint OMX_TextureProviderQGLWidget::instantiateTexture(QSize size)
+OMX_TextureData* OMX_TextureProviderQGLWidget::instantiateTexture(QSize size)
 {
+    // TODO: Reimplement.
+#if 0
     m_parent->makeCurrent();
     QPlatformNativeInterface* nativeInterface = QGuiApplicationPrivate::platformIntegration()->nativeInterface();
     Q_ASSERT(nativeInterface);
@@ -306,9 +307,11 @@ GLuint OMX_TextureProviderQGLWidget::instantiateTexture(QSize size)
     GLuint texture;
     eglImageVideo = getEGLImage(size.width(), size.height(), eglDisplay, eglContext, texture);
     return texture;
+#endif
+    return 0;
 }
 
-void OMX_TextureProviderQGLWidget::freeTexture(GLuint textureId)
+void OMX_TextureProviderQGLWidget::freeTexture(OMX_TextureData *textureData)
 {
     // TODO: Implementation is missing.
 }

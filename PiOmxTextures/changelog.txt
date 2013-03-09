@@ -1,5 +1,14 @@
 Changelog
 
+Version 4.0.1
+=============
+1. Fixed issues with stop command.
+2. Refactored code.
+3. Changed commands to be completely synchronous.
+4. Fixed cleanup code.
+5. Removed global variable.
+6. Removed outdated classes. Keeping those in for reference.
+
 Version 4.0
 ===========
 1. Integrated omxplayer.

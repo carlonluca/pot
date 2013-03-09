@@ -210,14 +210,14 @@ void OMX_AudioProcessor::play()
 void OMX_AudioProcessor::audioDecoding()
 {
     // 0 = headphones, 1 = hdmi
-    int audioDest  = 1;
+    //int audioDest  = 1;
     int sampleRate = 48000;
     int channels   = 1;
     int bitDepths  = sizeof(float)*8;
     int bufferSize = (sampleRate*bitDepths*channels) >> 3;
-    int phase      = 0;
-    int inc        = 256 << 16;
-    int dinc       = 0;
+    //int phase      = 0;
+    //int inc        = 256 << 16;
+    //int dinc       = 0;
     LOG_DEBUG(LOG_TAG, "Size: %d.", sizeof(float));
     //uint8_t inbuf[AUDIO_INBUF_SIZE + FF_INPUT_BUFFER_PADDING_SIZE];
     uint8_t* inbuf;
@@ -371,7 +371,7 @@ void OMX_AudioProcessor::audioDecoding()
 
 
     // getting the required codec structure
-    AVStream* stream = formatContext->streams[0];
+    //AVStream* stream = formatContext->streams[0];
     AVCodec* codec = avcodec_find_decoder(formatContext->streams[0]->codec->codec_id);
     if (codec == NULL)
         throw std::runtime_error("Codec required by file not available");

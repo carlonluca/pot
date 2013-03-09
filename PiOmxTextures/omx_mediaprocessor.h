@@ -30,6 +30,7 @@
 #include <QString>
 #include <QThread>
 #include <QMutex>
+#include <QWaitCondition>
 
 #include <GLES2/gl2.h>
 #include <stdexcept>
@@ -58,28 +59,28 @@ class OMX_MediaProcessor : public QObject
 {
     Q_OBJECT
 public:
-    enum State {
+    enum OMX_MediaProcessorState {
         STATE_STOPPED,
         STATE_INACTIVE,
         STATE_PAUSED,
         STATE_PLAYING
     };
 
+    enum OMX_MediaProcessorError {
+        ERROR_CANT_OPEN_FILE,
+        ERROR_WRONG_THREAD
+    };
+
     OMX_MediaProcessor(OMX_TextureProvider* provider);
     ~OMX_MediaProcessor();
 
+    bool setFilename(QString filename, OMX_TextureData*& textureData);
     QString filename();
     QStringList streams();
 
-    bool setFilename(QString filename, GLuint& textureId);
-    bool play();
-    bool stop();
-    bool pause();
-    bool seek(long position);
-
     long currentPosition();
 
-    GLuint textureId();
+    OMX_TextureData* textureData();
 
     inline bool hasAudio() {
         return m_has_audio;
@@ -89,46 +90,58 @@ public:
         return m_has_video;
     }
 
+#ifdef ENABLE_SUBTITLES
     inline bool hasSubtitle() {
         return m_has_subtitle;
     }
+#endif
 
-    inline State state() {
+    inline OMX_MediaProcessorState state() {
         return m_state;
     }
 
     COMXStreamInfo    m_hints_audio;
     COMXStreamInfo    m_hints_video;
 
+public slots:
+    bool play();
+    bool stop();
+    bool pause();
+    bool seek(long position);
+
 signals:
     void playbackStarted();
     void playbackCompleted();
-    void textureDestroyed();
+    void textureInvalidated();
+    void textureReady(const OMX_TextureData* textureData);
+    void errorOccurred(OMX_MediaProcessorError error);
 
 private slots:
     void mediaDecoding();
+    void cleanup();
 
 private:
     void setSpeed(int iSpeed);
     bool checkCurrentThread();
-    void cleanup();
 
     OMX_QThread m_thread;
     QString m_filename;
-    GLuint m_textureId;
+    OMX_TextureData* m_textureData;
 
     AVFormatContext* fmt_ctx;
     AVStream* streamVideo;
     AVPacket pkt;
 
-    State m_state;
+    volatile OMX_MediaProcessorState m_state;
 
     QMutex m_sendCmd;
 
     OMXClock*           m_av_clock;
     OMXPlayerVideo*     m_player_video;
     OMXPlayerAudio*     m_player_audio;
+#ifdef ENABLE_SUBTITLES
     OMXPlayerSubtitles* m_player_subtitles;
+#endif
     OMXReader           m_omx_reader;
     OMXPacket*          m_omx_pkt;
 
@@ -138,13 +151,20 @@ private:
     bool m_bMpeg;
     bool m_has_video;
     bool m_has_audio;
+#ifdef ENABLE_SUBTITLES
     bool m_has_subtitle;
+#endif
     bool m_buffer_empty;
+    bool m_pendingStop;
+    bool m_pendingPause;
 
     int m_subtitle_index;
     int m_audio_index;
 
     OMX_TextureProvider* m_provider;
+
+    QMutex m_mutexPending;
+    QWaitCondition m_waitPendingCommand;
 };
 
 #endif // OMX_MEDIAPROCESSOR_H

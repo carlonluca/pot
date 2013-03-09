@@ -148,7 +148,7 @@ void OMXComponent::enablePortBuffers(OMX_U32 portIndex)
     // provided.
     sendCommand(OMX_CommandPortEnable, portIndex, NULL);
 
-    LOG_VERBOSE(LOG_TAG, "Providing %lu buffers...", portdef.nBufferCountActual);
+    LOG_VERBOSE(LOG_TAG, "Providing %u buffers...", portdef.nBufferCountActual);
     for (OMX_U32 i = 0; i < portdef.nBufferCountActual; i++) {
         unsigned char* buf;
         //buf = (unsigned char*)vcos_malloc_aligned(portdef.nBufferSize, portdef.nBufferAlignment, NULL);

@@ -27,15 +27,16 @@
 
 #define CHECK_MEDIA_PROCESSOR                                              \
     if (!m_mediaProc) {                                                    \
-        LOG_WARNING(LOG_TAG, "The media processor is not available yet."); \
-        return false;                                                      \
+    LOG_WARNING(LOG_TAG, "The media processor is not available yet."); \
+    return false;                                                      \
     }
 
 OMX_MediaProcessorElement::OMX_MediaProcessorElement(QQuickItem *parent) :
     QQuickItem(parent),
     m_mediaProc(NULL),
     m_texProvider(NULL),
-    m_textureId(0)
+    m_pendingOpen(false),
+    m_textureData(NULL)
 {
     // I need to set this as a "has-conent" item because I need the updatePaintNode
     // to be invoked.
@@ -46,6 +47,7 @@ OMX_MediaProcessorElement::~OMX_MediaProcessorElement()
 {
     delete m_mediaProc;
     delete m_texProvider;
+    delete m_textureData;
 }
 
 QString OMX_MediaProcessorElement::source()
@@ -59,6 +61,7 @@ void OMX_MediaProcessorElement::setSource(QString source)
 
     // TODO: Handle errors.
     m_source = source;
+#if 0
     if (m_mediaProc) {
         if (openMedia(source))
             m_mediaProc->play();
@@ -69,112 +72,43 @@ void OMX_MediaProcessorElement::setSource(QString source)
     else {
         LOG_VERBOSE(LOG_TAG, "Play delayed.");
     }
+#endif
+    m_pendingOpen = true;
+    update();
 }
 
 QSGNode* OMX_MediaProcessorElement::updatePaintNode(QSGNode*, UpdatePaintNodeData*)
 {
-    if (!m_texProvider) {
-        m_texProvider = new OMX_TextureProviderQQuickItem(this);
-        m_mediaProc   = new OMX_MediaProcessor(m_texProvider);
-        connect(m_mediaProc, SIGNAL(playbackCompleted()), this, SIGNAL(playbackCompleted()));
-        connect(m_mediaProc, SIGNAL(playbackStarted()), this, SIGNAL(playbackStarted()));
+#if 0
+    // The item paints nothing on the screen, but still I need this to instantiate
+    // all the structures needed to provide the video.
+    //if (!m_texProvider) {
+    //LOG_VERBOSE(LOG_TAG, "Instantiating texture provider.");
 
-        // Open if filepath is set.
-        // TODO: Handle errors.
-        if (!m_source.isNull()) {
-            //if (QFile(m_source).exists()) {
-                if (openMedia(m_source))
-                    m_mediaProc->play();
-            //}
-            //else {
-                LOG_WARNING(LOG_TAG, "File does not exist.");
-            //}
-        }
+    // Open if filepath is set.
+    // TODO: Handle errors.
+    LOG_DEBUG(LOG_TAG, "Thread of rendering: %ld.", QThread::currentThreadId());
+    if (!m_source.isNull()) {
+        QMetaObject::invokeMethod(
+                    this,
+                    "openMedia",
+                    Qt::QueuedConnection,
+                    Q_ARG(QString, m_source)
+                    );
+        QMetaObject::invokeMethod(
+                    this,
+                    "play",
+                    Qt::QueuedConnection
+                    );
+    }
+    //}
+#endif
+    if (m_pendingOpen) {
+        openMedia(m_source);
+        m_pendingOpen = false;
     }
 
     return NULL;
-
-#if 0
-    QSGGeometryNode* node = 0;
-    QSGGeometry* geometry = 0;
-
-    if (!oldNode) {
-        // Create the node.
-        node = new QSGGeometryNode;
-        geometry = new QSGGeometry(QSGGeometry::defaultAttributes_TexturedPoint2D(), 4);
-        geometry->setDrawingMode(GL_TRIANGLE_STRIP);
-        node->setGeometry(geometry);
-        node->setFlag(QSGNode::OwnsGeometry);
-
-        // TODO: Who is freeing this?
-        // TODO: I cannot know the texture size here.
-        QSGOpaqueTextureMaterial* material = new QSGOpaqueTextureMaterial;
-        m_sgtexture = new OMX_SGTexture(m_texture, QSize(1920, 1080));
-        material->setTexture(m_sgtexture);
-        node->setMaterial(material);
-        node->setFlag(QSGNode::OwnsMaterial);
-
-#ifdef ENABLE_VIDEO_PROCESSOR
-        QPlatformNativeInterface* nativeInterface =
-                QGuiApplicationPrivate::platformIntegration()->nativeInterface();
-        Q_ASSERT(nativeInterface);
-        EGLDisplay eglDisplay = nativeInterface->nativeResourceForIntegration("egldisplay");
-        EGLContext eglContext = nativeInterface->nativeResourceForContext(
-                    "eglcontext",
-                    QOpenGLContext::currentContext()
-                    );
-#endif
-
-        // Provider MUST be built in this thread.
-        m_provider  = new OMX_TextureProviderQQuickItem(this);
-#ifdef ENABLE_VIDEO_PROCESSOR
-        m_videoProc = new OMX_VideoProcessor(eglDisplay, eglContext, m_provider);
-        connect(m_videoProc, SIGNAL(textureReady(uint)), this, SLOT(onTextureChanged(uint)));
-        if (!m_source.isNull())
-            m_videoProc->setVideoPath(m_source);
-        if (m_playScheduled) {
-            m_timer->start(30);
-            m_videoProc->play();
-        }
-#elif ENABLE_MEDIA_PROCESSOR
-        LOG_VERBOSE(LOG_TAG, "Starting video using media processor...");
-        m_mediaProc = new OMX_MediaProcessor(m_provider);
-        m_mediaProc->setFilename("/home/pi/usb/Cars2.mkv", m_texture);
-        //if (m_playScheduled) {
-            m_timer->start(40);
-            m_mediaProc->play();
-        //}
-#else
-        LOG_VERBOSE(LOG_TAG, "Starting video...");
-        QtConcurrent::run(&startVideo, m_provider, this);
-        m_timer->start(30);
-#endif
-    }
-    else {
-        node = static_cast<QSGGeometryNode*>(oldNode);
-        geometry = node->geometry();
-        geometry->allocate(4);
-
-        // Update texture in the node if needed.
-        QSGOpaqueTextureMaterial* material = (QSGOpaqueTextureMaterial*)node->material();
-        if (m_texture != (GLuint)material->texture()->textureId()) {
-            // TODO: Does setTextureId frees the prev texture?
-            // TODO: I should the given the texture size.
-            LOG_ERROR(LOG_TAG, "Updating texture to %u!", m_texture);
-            material = new QSGOpaqueTextureMaterial;
-            m_sgtexture->setTexture(m_texture, QSize(1920, 1080));
-        }
-    }
-
-    // Create the vertices and map to texture.
-    QRectF bounds = boundingRect();
-    QSGGeometry::TexturedPoint2D* vertices = geometry->vertexDataAsTexturedPoint2D();
-    vertices[0].set(bounds.x(), bounds.y() + bounds.height(), 0.0f, 0.0f);
-    vertices[1].set(bounds.x() + bounds.width(), bounds.y() + bounds.height(), 1.0f, 0.0f);
-    vertices[2].set(bounds.x(), bounds.y(), 0.0f, 1.0f);
-    vertices[3].set(bounds.x() + bounds.width(), bounds.y(), 1.0f, 1.0f);
-    return node;
-#endif
 }
 
 bool OMX_MediaProcessorElement::play()
@@ -207,14 +141,33 @@ long OMX_MediaProcessorElement::currentPosition()
     return m_mediaProc->currentPosition();
 }
 
+void OMX_MediaProcessorElement::instantiateMediaProcessor()
+{
+    if (!m_texProvider)
+        m_texProvider = new OMX_TextureProviderQQuickItem(this);
+    if (!m_mediaProc) {
+        m_mediaProc = new OMX_MediaProcessor(m_texProvider);
+        connect(m_mediaProc, SIGNAL(playbackCompleted()), this, SIGNAL(playbackCompleted()));
+        connect(m_mediaProc, SIGNAL(playbackStarted()), this, SIGNAL(playbackStarted()));
+        connect(m_mediaProc, SIGNAL(textureInvalidated()), this, SIGNAL(textureInvalidated()));
+        connect(m_mediaProc, SIGNAL(textureReady(const OMX_TextureData*)),
+                this, SIGNAL(textureReady(const OMX_TextureData*)));
+    }
+}
+
 bool OMX_MediaProcessorElement::openMedia(QString filepath)
 {
-    if (!m_mediaProc || !m_texProvider)
-        return false;
+    instantiateMediaProcessor();
 
-    if (!m_mediaProc->setFilename(filepath, m_textureId))
+    // I need to do this in the rendering thread.
+    if (m_textureData) {
+        m_textureData->freeData();
+        m_textureData = NULL;
+    }
+    if (!m_mediaProc->setFilename(filepath, m_textureData))
         return false;
-    emit textureReady(m_textureId);
+    if (!play())
+        return false;
 
     return true;
 }

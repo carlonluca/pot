@@ -55,12 +55,7 @@ public:
 
     QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*);
 
-    void setSource(QObject* source) {
-        LOG_VERBOSE(LOG_TAG, "Source was set: %x.", (unsigned int)source);
-        m_source = (OMX_MediaProcessorElement*)source;
-        connect(m_source, SIGNAL(textureReady(GLuint)), this, SLOT(onTextureChanged(GLuint)), Qt::UniqueConnection);
-        emit sourceChanged(source);
-    }
+    void setSource(QObject* source);
 
     QObject* source() {
         return m_source;
@@ -74,10 +69,12 @@ signals:
     void sourceChanged(const QObject* source);
 
 public slots:
-    void onTextureChanged(const GLuint& textureId);
+    void onTextureChanged(const OMX_TextureData* textureData);
+    void onTextureInvalidated();
 
 private:
-    GLuint m_texture;
+    void setTexture();
+
     OMX_MediaProcessorElement* m_source;
 #ifdef ENABLE_VIDEO_PROCESSOR
     OMX_VideoProcessor* m_videoProc;
@@ -85,6 +82,10 @@ private:
     OMX_MediaProcessor* m_mediaProc;
 #endif
     OMX_SGTexture* m_sgtexture;
+
+    QMutex m_mutexTexture; // Use to access texture members.
+    QSize  m_textureSize;
+    GLuint m_textureId;
     QTimer* m_timer;
 };
 

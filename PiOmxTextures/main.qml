@@ -40,6 +40,8 @@ Rectangle {
             mediaProcessor.play();
         else if (event.key === Qt.Key_A)
             mediaProcessor.pause();
+        else if (event.key === Qt.Key_O)
+            mediaProcessor.source = "/home/pi/usb/Cars2.mkv";
     }
 
     Timer {

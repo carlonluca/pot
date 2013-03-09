@@ -30,6 +30,8 @@
 #include <QSize>
 #include <QSGTexture>
 #include <QSGTextureProvider>
+#include <QMutex>
+#include <QMutexLocker>
 
 #define EGL_EGLEXT_PROTOTYPES
 #include <EGL/egl.h>

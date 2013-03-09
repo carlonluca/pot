@@ -25,6 +25,7 @@
 |    includes
 +-----------------------------------------------------------------------------*/
 #include <QStringList>
+#include <QOpenGLContext>
 
 #include <cstring>
 
@@ -32,7 +33,6 @@
 #include "omx_mediaprocessor.h"
 
 #define ENABLE_HDMI_CLOCK_SYNC false
-#define ENABLE_SUBTITLES       false
 #define FONT_PATH              "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
 #define FONT_SIZE              (0.055f)
 #define CENTERED               false
@@ -48,8 +48,12 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
     m_bMpeg(false),
     m_has_video(false),
     m_has_audio(false),
+#ifdef ENABLE_SUBTITLES
     m_has_subtitle(false),
+#endif
     m_buffer_empty(true),
+    m_pendingStop(false),
+    m_pendingPause(false),
     m_subtitle_index(0),
     m_audio_index(0),
     m_provider(provider)
@@ -61,7 +65,9 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
     m_av_clock         = new OMXClock;
     m_player_video     = new OMXPlayerVideo(provider);
     m_player_audio     = new OMXPlayerAudio;
+#ifdef ENABLE_SUBTITLES
     m_player_subtitles = new OMXPlayerSubtitles;
+#endif
 
     // Move to a new thread.
     moveToThread(&m_thread);
@@ -77,7 +83,9 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
     m_RBP.Deinitialize();
 
     delete m_av_clock;
+#ifdef ENABLE_SUBTITLES
     delete m_player_subtitles;
+#endif
     delete m_player_audio;
     delete m_player_video;
 
@@ -105,7 +113,14 @@ QStringList OMX_MediaProcessor::streams()
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::setFilename
 +-----------------------------------------------------------------------------*/
-bool OMX_MediaProcessor::setFilename(QString filename, GLuint& textureId)
+/**
+ * @brief OMX_MediaProcessor::setFilename Sets the filename and returns the texture
+ * data that will be used.
+ * @param filename
+ * @param textureData
+ * @return
+ */
+bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& textureData)
 {
     QMutexLocker locker(&m_sendCmd);
     if (!checkCurrentThread())
@@ -113,23 +128,25 @@ bool OMX_MediaProcessor::setFilename(QString filename, GLuint& textureId)
 
     switch (m_state) {
     case STATE_INACTIVE:
+    case STATE_STOPPED:
         break;
     case STATE_PAUSED:
     case STATE_PLAYING:
-    case STATE_STOPPED:
         return false; // TODO: Reimplement.
     }
 
-    m_filename = filename;
-
     LOG_VERBOSE(LOG_TAG, "Opening video file...");
-    if (!m_omx_reader.Open(m_filename.toStdString(), true))
+    if (!m_omx_reader.Open(filename.toStdString(), true))
         return false;
+
+    m_filename = filename;
 
     m_bMpeg         = m_omx_reader.IsMpegVideo();
     m_has_video     = m_omx_reader.VideoStreamCount();
     m_has_audio     = m_omx_reader.AudioStreamCount();
+#ifdef ENABLE_SUBTITLES
     m_has_subtitle  = m_omx_reader.SubtitleStreamCount();
+#endif
 
     LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
     if (!m_av_clock->OMXInitialize(m_has_video, m_has_audio))
@@ -160,7 +177,7 @@ bool OMX_MediaProcessor::setFilename(QString filename, GLuint& textureId)
         if (!m_player_video->Open(
                     m_hints_video,
                     m_av_clock,
-                    textureId,
+                    textureData,
                     false,                  /* deinterlace */
                     m_bMpeg,
                     ENABLE_HDMI_CLOCK_SYNC,
@@ -168,7 +185,10 @@ bool OMX_MediaProcessor::setFilename(QString filename, GLuint& textureId)
                     1.0                     /* display aspect, unused */
                     ))
             return false;
+    m_textureData = textureData;
+    emit textureReady(textureData);
 
+#ifdef ENABLE_SUBTITLES
     LOG_VERBOSE(LOG_TAG, "Opening subtitles using OMX...");
     if (m_has_subtitle)
         if (!m_player_subtitles->Open(FONT_PATH, FONT_SIZE, CENTERED, m_av_clock))
@@ -180,6 +200,7 @@ bool OMX_MediaProcessor::setFilename(QString filename, GLuint& textureId)
     // then we replace the subtitle index with the maximum value possible.
     if (m_has_subtitle && m_subtitle_index > (m_omx_reader.SubtitleStreamCount() - 1))
         m_subtitle_index = m_omx_reader.SubtitleStreamCount() - 1;
+#endif
 
     m_omx_reader.GetHints(OMXSTREAM_AUDIO, m_hints_audio);
 
@@ -248,18 +269,31 @@ bool OMX_MediaProcessor::stop()
     if (!checkCurrentThread())
         return false;
 
-    // TODO: I should wait for success.
     switch (m_state) {
     case STATE_INACTIVE:
         return false;
     case STATE_PAUSED:
     case STATE_PLAYING:
     case STATE_STOPPED:
+        break;
         m_state = STATE_STOPPED;
         return true;
     default:
         return false;
     }
+
+    m_pendingStop = true;
+    m_state = STATE_STOPPED;
+
+    // Wait for command completion.
+    m_mutexPending.lock();
+    if (m_pendingStop) {
+        LOG_VERBOSE(LOG_TAG, "Waiting for the stop command to finish.");
+        m_waitPendingCommand.wait(&m_mutexPending);
+    }
+    m_mutexPending.unlock();
+    LOG_INFORMATION(LOG_TAG, "Stop command issued.");
+    return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -278,13 +312,24 @@ bool OMX_MediaProcessor::pause()
         return false;
     case STATE_PAUSED:
     case STATE_PLAYING:
-        m_state = STATE_PAUSED;
-        setSpeed(OMX_PLAYSPEED_PAUSE);
-        m_av_clock->OMXPause();
-        return true;
+        break;
     default:
         return false;
     }
+
+    m_state = STATE_PAUSED;
+    setSpeed(OMX_PLAYSPEED_PAUSE);
+    m_av_clock->OMXPause();
+
+    // Wait for command completion.
+    m_mutexPending.lock();
+    if (m_pendingPause) {
+        LOG_VERBOSE(LOG_TAG, "Waiting for the pause command to finish.");
+        m_waitPendingCommand.wait(&m_mutexPending);
+    }
+    m_mutexPending.unlock();
+    LOG_INFORMATION(LOG_TAG, "Pause command issued.");
+    return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -306,9 +351,9 @@ long OMX_MediaProcessor::currentPosition()
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::textureId
 +-----------------------------------------------------------------------------*/
-GLuint OMX_MediaProcessor::textureId()
+OMX_TextureData* OMX_MediaProcessor::textureData()
 {
-    return m_textureId;
+    return m_textureData;
 }
 
 /*------------------------------------------------------------------------------
@@ -320,7 +365,15 @@ void OMX_MediaProcessor::mediaDecoding()
     emit playbackStarted();
 
     struct timespec starttime, endtime;
-    while (m_state != STATE_STOPPED) {
+    while (!m_pendingStop) {
+        // If a request is pending then consider done here.
+        m_mutexPending.lock();
+        if (m_pendingPause) {
+            m_waitPendingCommand.wakeAll();
+            m_pendingPause = false;
+        }
+        m_mutexPending.unlock();
+
         // TODO: Use a semaphore instead.
         if (m_state == STATE_PAUSED) {
             OMXClock::OMXSleep(2);
@@ -434,6 +487,7 @@ void OMX_MediaProcessor::mediaDecoding()
             else
                 OMXClock::OMXSleep(10);
         }
+#ifdef ENABLE_SUBTITLES
         else if (m_omx_pkt && m_omx_reader.IsActive(OMXSTREAM_SUBTITLE, m_omx_pkt->stream_index)) {
             if (m_omx_pkt->size && ENABLE_SUBTITLES &&
                     (m_omx_pkt->hints.codec == CODEC_ID_TEXT ||
@@ -448,6 +502,7 @@ void OMX_MediaProcessor::mediaDecoding()
                 m_omx_pkt = NULL;
             }
         }
+#endif
         else {
             if (m_omx_pkt) {
                 m_omx_reader.FreePacket(m_omx_pkt);
@@ -498,16 +553,16 @@ bool OMX_MediaProcessor::checkCurrentThread()
 /*------------------------------------------------------------------------------
 |    OMX_VideoProcessor::cleanup
 +-----------------------------------------------------------------------------*/
-inline
 void OMX_MediaProcessor::cleanup()
 {
     LOG_INFORMATION(LOG_TAG, "Cleaning up...");
 
-    QMutexLocker locker(&m_sendCmd);
-    if (m_state != STATE_STOPPED /* && !g_abort */) {
+    if (!m_pendingStop /* && !g_abort */) {
+        LOG_VERBOSE(LOG_TAG, "Waiting for audio completion...");
         if (m_has_audio)
             m_player_audio->WaitCompletion();
-        else if (m_has_video)
+        LOG_VERBOSE(LOG_TAG, "Waiting for video completion...");
+        if (m_has_video)
             m_player_video->WaitCompletion();
     }
 
@@ -525,10 +580,14 @@ void OMX_MediaProcessor::cleanup()
     }
 #endif
 
+    LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
     m_av_clock->OMXStop();
     m_av_clock->OMXStateIdle();
 
+    LOG_VERBOSE(LOG_TAG, "Closing players...");
+#ifdef ENABLE_SUBTITLES
     m_player_subtitles->Close();
+#endif
     m_player_video->Close();
     m_player_audio->Close();
 
@@ -537,18 +596,36 @@ void OMX_MediaProcessor::cleanup()
         m_omx_pkt = NULL;
     }
 
+    LOG_VERBOSE(LOG_TAG, "Closing players...");
     m_omx_reader.Close();
 
     vc_tv_show_info(0);
 
-    m_OMX.Deinitialize();
-    m_RBP.Deinitialize();
+    // lcarlon: this should only be done in object destructor.
+    //LOG_VERBOSE(LOG_TAG, "Deinitializing engines...");
+    //m_OMX.Deinitialize();
+    //m_RBP.Deinitialize();
 
     // lcarlon: free the texture.
+    LOG_VERBOSE(LOG_TAG, "Freeing texture...");
+    emit textureInvalidated();
+#if 0
     QMetaObject::invokeMethod(
                 (QObject*)m_provider,
                 "freeTexture",
-                Qt::DirectConnection,
-                Q_ARG(GLuint, m_textureId)
+                Qt::QueuedConnection,
+                Q_ARG(OMX_TextureData*, m_textureData)
                 );
+#endif
+    m_textureData = NULL;
+
+    // Actually change the state here and reset flags.
+    m_state = STATE_STOPPED;
+    m_mutexPending.lock();
+    if (m_pendingStop) {
+        m_pendingStop = false;
+        m_waitPendingCommand.wakeAll();
+    }
+    m_mutexPending.unlock();
+    LOG_INFORMATION(LOG_TAG, "Cleanup done.");
 }

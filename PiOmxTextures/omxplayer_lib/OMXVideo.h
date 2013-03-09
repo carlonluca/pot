@@ -36,6 +36,8 @@
 
 #include "guilib/Geometry.h"
 
+#include "omx_textureproviderqquickitem.h"
+
 class OMX_VideoSurfaceElement;
 class OMX_TextureProvider;
 
@@ -58,7 +60,7 @@ public:
   bool Open(
           COMXStreamInfo &hints,
           OMXClock *clock,
-          uint& textureId,
+          OMX_TextureData*& textureId,
           float display_aspect = 0.0f,
           bool deinterlace = false,
           bool hdmi_clock_sync = false

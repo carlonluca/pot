@@ -21,17 +21,17 @@
  * along with PiOmxTextures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
 #include <QQuickWindow>
 #include <QOpenGLContext>
+#include <QGuiApplication>
 
 // Private headers.
 #include <private/qguiapplication_p.h>
 #include <qpa/qplatformintegration.h>
 #include <qpa/qplatformnativeinterface.h>
-
-#define EGL_EGLEXT_PROTOTYPES
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 
 #include <IL/OMX_Broadcom.h>
 
@@ -39,67 +39,56 @@
 #include "omx_textureproviderqquickitem.h"
 #include "omx_globals.h"
 
+
 /*------------------------------------------------------------------------------
-|    OpenMAXILTextureLoader::getEGLImage
+|    OpenMAXILTextureLoader::instantiateTexture
 +-----------------------------------------------------------------------------*/
-inline
-EGLImageKHR getEGLImage(
-        OMX_U32 width,
-        OMX_U32 height,
-        EGLDisplay eglDisplay,
-        EGLContext eglContext,
-        GLuint& texture
-        )
+OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
 {
+    EGLDisplay eglDisplay = get_egl_display();
+    EGLContext eglContext = get_egl_context();
+
     EGLint attr[] = {EGL_GL_TEXTURE_LEVEL_KHR, 0, EGL_NONE};
 
-    glGenTextures(1, &texture);
-    glBindTexture(GL_TEXTURE_2D, texture);
+    GLuint textureId;
+    glGenTextures(1, &textureId);
+    glBindTexture(GL_TEXTURE_2D, textureId);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-    // TODO: Missing free of pixels.
-    GLubyte* pixel = new GLubyte[width*height*4];
-    memset(pixel, 0x0f, sizeof(GLubyte)*width*height*4);  // to have a grey texture
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
+    // It seems that only 4byte pixels is supported here.
+    GLubyte* pixel = new GLubyte[size.width()*size.height()*4];
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width(), size.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
 
     EGLImageKHR eglImage = eglCreateImageKHR(
                 eglDisplay,
                 eglContext,
                 EGL_GL_TEXTURE_2D_KHR,
-                (EGLClientBuffer)texture,
+                (EGLClientBuffer)textureId,
                 attr
                 );
+
     EGLint eglErr = eglGetError();
-    if(eglErr != EGL_SUCCESS) {
+    if (eglErr != EGL_SUCCESS) {
         LOG_ERROR(LOG_TAG, "Failed to create KHR image: %d.", eglErr);
         return 0;
     }
 
-    return eglImage;
+    OMX_TextureData* textureData = new OMX_TextureData;
+    textureData->m_textureId   = textureId;
+    textureData->m_textureData = pixel;
+    textureData->m_eglImage    = eglImage;
+    textureData->m_textureSize = size;
+    return textureData;
 }
 
-// TODO: Remove this external var!
-extern EGLImageKHR eglImageVideo;
-GLuint OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
+/*------------------------------------------------------------------------------
+|    OpenMAXILTextureLoader::freeTexture
++-----------------------------------------------------------------------------*/
+void OMX_TextureProviderQQuickItem::freeTexture(OMX_TextureData* textureData)
 {
-    m_item->window()->openglContext()->makeCurrent(m_item->window());
-    EGLDisplay eglDisplay = get_egl_display();
-    EGLContext eglContext = get_egl_context();
-
-    // TODO: This must be passed some other way.
-    GLuint texture;
-    eglImageVideo = getEGLImage(size.width(), size.height(), eglDisplay, eglContext, texture);
-    return texture;
-}
-
-void OMX_TextureProviderQQuickItem::freeTexture(GLuint textureId)
-{
-    m_item->window()->openglContext()->makeCurrent(m_item->window());
-    EGLDisplay eglDisplay = get_egl_display();
-
-    glDeleteTextures(1, &textureId);
-    eglDestroyImageKHR(eglDisplay, eglImageVideo);
+    textureData->freeData();
+    delete textureData;
 }

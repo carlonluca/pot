@@ -213,6 +213,7 @@ int CLog::GetLogLevel()
 
 void CLog::OutputDebugString(const std::string& line)
 {
+    (void)line;
 #if defined(_DEBUG) || defined(PROFILE)
   ::OutputDebugString(line.c_str());
   ::OutputDebugString("\n");

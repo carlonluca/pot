@@ -109,7 +109,7 @@ protected:
 public:
   OMXPlayerVideo(OMX_TextureProvider* provider);
   virtual ~OMXPlayerVideo();
-  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, uint& textureId, bool deinterlace, bool mpeg, bool hdmi_clock_sync, bool use_thread, float display_aspect);
+  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMX_TextureData*& textureId, bool deinterlace, bool mpeg, bool hdmi_clock_sync, bool use_thread, float display_aspect);
   bool Close();
   void Output(double pts);
   bool Decode(OMXPacket *pkt);
@@ -117,7 +117,7 @@ public:
   void FlushSubtitles();
   void Flush();
   bool AddPacket(OMXPacket *pkt);
-  bool OpenDecoder(uint& textureId);
+  bool OpenDecoder(OMX_TextureData*& textureData);
   bool CloseDecoder();
   int  GetDecoderBufferSize();
   int  GetDecoderFreeSpace();
