@@ -174,7 +174,6 @@ void OMX_VideoSurfaceElement::setSource(QObject* source)
 +-----------------------------------------------------------------------------*/
 void OMX_VideoSurfaceElement::onTextureChanged(const OMX_TextureData* textureData)
 {
-    LOG_INFORMATION(LOG_TAG, "Not a case!");
     LOG_INFORMATION(LOG_TAG, "Setting new texture %u!", textureData->m_textureId);
 
     QMutexLocker locker(&m_mutexTexture);

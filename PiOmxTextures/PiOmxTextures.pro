@@ -14,8 +14,8 @@ LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
 # NOTE: I had issues with versions compiled from recent sources.
-LIBS += -L$$_PRO_FILE_PWD_/3rdparty/lib -lavformat -lavcodec -lavutil
-INCLUDEPATH += $$_PRO_FILE_PWD_/3rdparty/lib/include
+LIBS += -L$$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample
+INCLUDEPATH += $$_PRO_FILE_PWD_/3rdparty/ffmpeg/include
 # For omxplayer.
 LIBS += -lfreetype -lWFC -lpcre
 INCLUDEPATH += /usr/include/freetype2
@@ -31,7 +31,7 @@ INCLUDEPATH += \
    omxplayer_lib/utils \
    omxplayer_lib/linux
 
-VERSION = 4.0.1
+VERSION = 4.1.1
 
 # Flags used bu hello_pi examples:
 #-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
@@ -70,8 +70,9 @@ QMAKE_CXXFLAGS_DEBUG += -rdynamic
 QMAKE_CXXFLAGS += -std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS             \
    -DTARGET_POSIX -D_LINUX -fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE               \
    -D_FILE_OFFSET_BITS=64 -DHAVE_CMAKE_CONFIG -D__VIDEOCORE4__                          \
-   -U_FORTIFY_SOURCE -DUSE_EXTERNAL_FFMPEG  -DHAVE_LIBAVCODEC_AVCODEC_H           \
-   -DHAVE_LIBAVUTIL_OPT_H -DHAVE_LIBAVUTIL_MEM_H -DHAVE_LIBAVUTIL_AVUTIL_H              \
+   -U_FORTIFY_SOURCE -DUSE_EXTERNAL_FFMPEG  -DHAVE_LIBAVCODEC_AVCODEC_H                 \
+   -DHAVE_LIBAVUTIL_OPT_H -DHAVE_LIBSWRESAMPLE_SWRESAMPLE_H -DHAVE_LIBAVUTIL_MEM_H      \
+   -DHAVE_LIBAVUTIL_AVUTIL_H                                                            \
    -DHAVE_LIBAVFORMAT_AVFORMAT_H -DHAVE_LIBAVFILTER_AVFILTER_H -DOMX -DOMX_SKIP64BIT    \
    -ftree-vectorize -DUSE_EXTERNAL_OMX -DTARGET_RASPBERRY_PI -DUSE_EXTERNAL_LIBBCM_HOST \
    -Wno-deprecated-declarations -Wno-missing-field-initializers -Wno-ignored-qualifiers \
@@ -107,6 +108,7 @@ SOURCES += \
     omx_mediaprocessorelement.cpp
 
 SOURCES += \
+    omxplayer_lib/Srt.cpp \
     omxplayer_lib/Unicode.cpp \
     omxplayer_lib/SubtitleRenderer.cpp \
     omxplayer_lib/OMXVideo.cpp \
@@ -161,8 +163,6 @@ HEADERS  += \
     omxplayer_lib/BitstreamConverter.h \
     omxplayer_lib/OMXSubtitleTagSami.h \
     omx_wrapper/OMX_Core.h \
-    omxplayer_lib/ScopeExit.h \
-    omxplayer_lib/Enforce.h \
     omxplayer_lib/DllSwResample.h \
     omxplayer_lib/DllAvUtil.h \
     omxplayer_lib/DllAvFilter.h \

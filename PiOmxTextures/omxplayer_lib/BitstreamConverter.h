@@ -117,7 +117,7 @@ public:
 
   bool Open(enum CodecID codec, uint8_t *in_extradata, int in_extrasize, bool to_annexb);
   void Close(void);
-  bool NeedConvert(void) { return m_convert_bitstream; }
+  bool NeedConvert(void) { return m_convert_bitstream; };
   bool Convert(uint8_t *pData, int iSize);
   uint8_t *GetConvertBuffer(void);
   int GetConvertSize();

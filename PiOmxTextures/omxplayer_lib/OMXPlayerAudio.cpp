@@ -41,8 +41,6 @@
 #include "settings/Settings.h"
 #endif
 
-#include "lgl_logging.h"
-
 #define MAX_DATA_SIZE    3 * 1024 * 1024
 
 OMXPlayerAudio::OMXPlayerAudio()
@@ -59,6 +57,7 @@ OMXPlayerAudio::OMXPlayerAudio()
   m_pAudioCodec   = NULL;
   m_speed         = DVD_PLAYSPEED_NORMAL;
   m_player_error  = true;
+  m_initialVolume = 0;
 
   pthread_cond_init(&m_packet_cond, NULL);
   pthread_cond_init(&m_audio_cond, NULL);
@@ -101,7 +100,7 @@ void OMXPlayerAudio::UnLockDecoder()
 }
 
 bool OMXPlayerAudio::Open(COMXStreamInfo &hints, OMXClock *av_clock, OMXReader *omx_reader,
-                          std::string device, bool passthrough, bool hw_decode,
+                          std::string device, bool passthrough, long initialVolume, bool hw_decode,
                           bool boost_on_downmix, bool use_thread)
 {
   if(ThreadHandle())
@@ -130,6 +129,7 @@ bool OMXPlayerAudio::Open(COMXStreamInfo &hints, OMXClock *av_clock, OMXReader *
   m_pAudioCodec = NULL;
   m_pChannelMap = NULL;
   m_speed       = DVD_PLAYSPEED_NORMAL;
+  m_initialVolume = initialVolume;
 
   m_error = 0;
   m_errorbuff = 0;
@@ -432,13 +432,14 @@ void OMXPlayerAudio::Process()
 {
   OMXPacket *omx_pkt = NULL;
 
-  while(!m_bStop && !m_bAbort) {
+  while(!m_bStop && !m_bAbort)
+  {
     Lock();
     if(m_packets.empty())
       pthread_cond_wait(&m_packet_cond, &m_lock);
     UnLock();
 
-    if (m_bAbort)
+    if(m_bAbort)
       break;
 
     Lock();
@@ -455,7 +456,7 @@ void OMXPlayerAudio::Process()
       m_packets.pop_front();
     }
     UnLock();
-
+    
     LockDecoder();
     if(m_flush && omx_pkt)
     {
@@ -463,12 +464,10 @@ void OMXPlayerAudio::Process()
       omx_pkt = NULL;
       m_flush = false;
     }
-    else if(omx_pkt)
+    else if(omx_pkt && Decode(omx_pkt))
     {
-        if (Decode(omx_pkt)) {
-            OMXReader::FreePacket(omx_pkt);
-            omx_pkt = NULL;
-        }
+      OMXReader::FreePacket(omx_pkt);
+      omx_pkt = NULL;
     }
     UnLockDecoder();
   }
@@ -617,8 +616,8 @@ bool OMXPlayerAudio::OpenDecoder()
     if(m_passthrough)
       m_hw_decode = false;
     bAudioRenderOpen = m_decoder->Initialize(NULL, m_device.substr(4), m_pChannelMap,
-                                             m_hints, m_av_clock, m_passthrough, 
-                                             m_hw_decode, m_boost_on_downmix);
+                                             m_hints, m_av_clock, m_passthrough,
+                                             m_hw_decode, m_boost_on_downmix, m_initialVolume);
   }
   else
   {
@@ -630,7 +629,7 @@ bool OMXPlayerAudio::OpenDecoder()
 
     bAudioRenderOpen = m_decoder->Initialize(NULL, m_device.substr(4), m_hints.channels, m_pChannelMap,
                                              downmix_channels, m_hints.samplerate, m_hints.bitspersample,
-                                             false, m_boost_on_downmix, false, m_passthrough);
+                                             false, m_boost_on_downmix, false, m_passthrough, m_initialVolume);
   }
 
   m_codec_name = m_omx_reader->GetCodecName(OMXSTREAM_AUDIO);

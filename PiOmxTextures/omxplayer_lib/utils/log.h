@@ -24,14 +24,12 @@
 #include <stdio.h>
 #include <string>
 
-#if 0
 #define LOG_LEVEL_NONE         -1 // nothing at all is logged
 #define LOG_LEVEL_NORMAL        0 // shows notice, error, severe and fatal
 #define LOG_LEVEL_DEBUG         1 // shows all
 #define LOG_LEVEL_DEBUG_FREEMEM 2 // shows all + shows freemem on screen
 #define LOG_LEVEL_DEBUG_SAMBA   3 // shows all + freemem on screen + samba debugging
 #define LOG_LEVEL_MAX           LOG_LEVEL_DEBUG_SAMBA
-#endif
 
 // ones we use in the code
 #define LOGDEBUG   0

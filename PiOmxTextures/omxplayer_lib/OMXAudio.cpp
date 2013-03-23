@@ -153,7 +153,7 @@ COMXAudio::~COMXAudio()
 
 bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, enum PCMChannels *channelMap,
                            COMXStreamInfo &hints, OMXClock *clock, EEncoded bPassthrough, bool bUseHWDecode,
-                           bool boostOnDownmix)
+                           bool boostOnDownmix, long initialVolume)
 {
   m_HWDecode = false;
   m_Passthrough = false;
@@ -181,10 +181,10 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     memcpy(m_extradata, hints.extradata, hints.extrasize);
   }
 
-  return Initialize(pCallback, device, hints.channels, channelMap, hints.channels, hints.samplerate, hints.bitspersample, false, boostOnDownmix, false, bPassthrough);
+  return Initialize(pCallback, device, hints.channels, channelMap, hints.channels, hints.samplerate, hints.bitspersample, false, boostOnDownmix, false, bPassthrough, initialVolume);
 }
 
-bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, int iChannels, enum PCMChannels *channelMap, unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool bResample, bool boostOnDownmix, bool bIsMusic, EEncoded bPassthrough)
+bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, int iChannels, enum PCMChannels *channelMap, unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool bResample, bool boostOnDownmix, bool bIsMusic, EEncoded bPassthrough, long initialVolume)
 {
   std::string deviceuse;
   if(device == "hdmi") {
@@ -218,7 +218,7 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
 
   m_CurrentVolume = g_settings.m_nVolumeLevel; 
 #else
-  m_CurrentVolume = 0;
+  m_CurrentVolume = initialVolume;
 #endif
 
   m_downmix_channels = downmixChannels;
@@ -870,7 +870,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
 
   OMX_BUFFERHEADERTYPE *omx_buffer = NULL;
 
-  while (demuxer_bytes)
+  while(demuxer_bytes)
   {
     // 200ms timeout
     omx_buffer = m_omx_decoder.GetInputBuffer(200);
@@ -938,7 +938,6 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
     while(true)
     {
       omx_err = m_omx_decoder.EmptyThisBuffer(omx_buffer);
-
       if (omx_err == OMX_ErrorNone)
       {
         break;

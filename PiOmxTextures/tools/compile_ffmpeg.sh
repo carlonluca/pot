@@ -12,9 +12,29 @@
 # 1. Copy the script into the <ffmpeg_sources> directory.
 # 2. ./compile_ffmpeg.sh <n>, where n is the number of compilation threads to use.
 
+echo "Downloading ffmpeg sources from git..."
+cd ..
+if [ ! -d "3rdparty" ]; then
+   echo "Dir structure is not correct! Aborting. Bye bye."
+   exit
+fi
+
+cd 3rdparty
+if [ ! -d "ffmpeg" ]; then
+   echo "Dir structure is not correct! Aborting. Bye bye."
+   exit
+fi
+
+cd ffmpeg
+git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg_src
+git checkout master
+git checkout 8c51ea54897c2d8671b38efecc1422ad4ad344f9
+cd ffmpeg_src
+
 echo "Configuring..."
 FLOAT=hard
-export PATH=$PATH:~/raspberrypi-tools-9c3d7b6/arm-bcm2708/gcc-linaro-arm-linux-gnueabihf-raspbian/bin/
+export PATH=$PATH:/opt/rpi/gcc-linaro-arm-linux-gnueabihf-raspbian/bin/
+echo "Prefix to $PWD..."
 ./configure \
    --extra-cflags="-mfpu=vfp -mfloat-abi=$FLOAT -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog" \
    --enable-cross-compile \
@@ -50,3 +70,10 @@ export PATH=$PATH:~/raspberrypi-tools-9c3d7b6/arm-bcm2708/gcc-linaro-arm-linux-g
 echo "Compiling..."
 mkdir $PWD/ffmpeg_compiled
 make -j$1
+make install
+
+echo "Cleaning up..."
+mv ffmpeg_compiled/include ../
+mv ffmpeg_compiled/lib ../
+
+echo "Done! Bye bye! ;-)"
