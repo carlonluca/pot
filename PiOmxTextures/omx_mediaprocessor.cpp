@@ -56,7 +56,8 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
     m_pendingPause(false),
     m_subtitle_index(0),
     m_audio_index(0),
-    m_provider(provider)
+    m_provider(provider),
+    m_incr(0)
 {
     m_RBP.Initialize();
     m_OMX.Initialize();
@@ -336,17 +337,20 @@ bool OMX_MediaProcessor::pause()
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::seek
 +-----------------------------------------------------------------------------*/
-bool OMX_MediaProcessor::seek(long /* position */)
+bool OMX_MediaProcessor::seek(long position)
 {
-    return false;
+    m_incr = 600;
+    return true;
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::currentPosition
 +-----------------------------------------------------------------------------*/
-long OMX_MediaProcessor::currentPosition()
+double OMX_MediaProcessor::streamPosition()
 {
-    return false;
+    if (m_av_clock)
+        return m_player_audio->GetCurrentPTS();
+    return -1;
 }
 
 /*------------------------------------------------------------------------------
@@ -381,7 +385,7 @@ void OMX_MediaProcessor::mediaDecoding()
             continue;
         }
 
-#if 0 // TODO: Reimplement?
+#if 1 // TODO: Reimplement?
         if (m_incr != 0 && !m_bMpeg) {
             int    seek_flags   = 0;
             double seek_pos     = 0;
@@ -396,13 +400,25 @@ void OMX_MediaProcessor::mediaDecoding()
 
             m_incr = 0;
 
-            if(m_omx_reader.SeekTime(seek_pos, seek_flags, &startpts))
-                FlushStreams(startpts);
+            double startpts;
+            if (m_omx_reader.SeekTime(seek_pos, seek_flags, &startpts))
+                flushStreams(startpts);
 
+#if 0
             m_player_video->Close();
-            if(m_has_video && !m_player_video->Open(m_hints_video, m_av_clock, m_Deinterlace,  m_bMpeg,
-                                                    m_hdmi_clock_sync, m_thread_player, m_display_aspect))
-                goto do_exit;
+            if (m_has_video && !m_player_video->Open(
+                        m_hints_video,
+                        m_av_clock,
+                        textureData,
+                        false,                  /* deinterlace */
+                        m_bMpeg,
+                        ENABLE_HDMI_CLOCK_SYNC,
+                        true,                   /* threaded */
+                        1.0                     /* display aspect, unused */
+                        ))
+                //goto do_exit;
+                break;
+#endif
         }
 #endif
 
@@ -536,6 +552,40 @@ void OMX_MediaProcessor::setSpeed(int iSpeed)
         m_state = STATE_PLAYING;
 
     m_av_clock->OMXSpeed(iSpeed);
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::flushStreams
++-----------------------------------------------------------------------------*/
+void OMX_MediaProcessor::flushStreams(double pts)
+{
+    //  if(m_av_clock)
+    //    m_av_clock->OMXPause();
+
+    if (m_has_video)
+        m_player_video->Flush();
+
+    if (m_has_audio)
+        m_player_audio->Flush();
+
+#ifdef ENABLE_SUBTITLES
+    if (m_has_subtitle)
+        m_player_subtitles->Flush();
+#endif
+
+    if (m_omx_pkt) {
+        m_omx_reader.FreePacket(m_omx_pkt);
+        m_omx_pkt = NULL;
+    }
+
+    if (pts != DVD_NOPTS_VALUE)
+        m_av_clock->OMXUpdateClock(pts);
+
+    //  if(m_av_clock)
+    //  {
+    //    m_av_clock->OMXReset();
+    //    m_av_clock->OMXResume();
+    //  }
 }
 
 /*------------------------------------------------------------------------------

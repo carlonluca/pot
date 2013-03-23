@@ -196,7 +196,8 @@ OTHER_FILES += \
     changelog.txt \
     tools/compile_ffmpeg.sh \
     tools/extract_aac_stream.sh \
-    tools/extract_h264_stream.sh
+    tools/extract_h264_stream.sh \
+    omxplayer_lib/omxplayer.cpp
 
 RESOURCES += \
     resources.qrc
