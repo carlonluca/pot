@@ -105,7 +105,7 @@ protected:
   void UnLockDecoder();
   void LockSubtitles();
   void UnLockSubtitles();
-
+private:
 public:
   OMXPlayerVideo(OMX_TextureProvider* provider);
   virtual ~OMXPlayerVideo();
@@ -121,9 +121,9 @@ public:
   bool CloseDecoder();
   int  GetDecoderBufferSize();
   int  GetDecoderFreeSpace();
-  double GetCurrentPTS() { return m_pts; }
-  double GetFPS() { return m_fps; }
-  unsigned int GetCached() { return m_cached_size; }
+  double GetCurrentPTS() { return m_pts; };
+  double GetFPS() { return m_fps; };
+  unsigned int GetCached() { return m_cached_size; };
   void  WaitCompletion();
   void SetDelay(double delay) { m_iVideoDelay = delay; }
   double GetDelay() { return m_iVideoDelay; }

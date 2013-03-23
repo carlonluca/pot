@@ -93,10 +93,10 @@ public:
   COMXCoreComponent();
   ~COMXCoreComponent();
 
-  OMX_HANDLETYPE    GetComponent()   { return m_handle;        }
-  unsigned int      GetInputPort()   { return m_input_port;    }
-  unsigned int      GetOutputPort()  { return m_output_port;   }
-  std::string       GetName()        { return m_componentName; }
+  OMX_HANDLETYPE    GetComponent()   { return m_handle;        };
+  unsigned int      GetInputPort()   { return m_input_port;    };
+  unsigned int      GetOutputPort()  { return m_output_port;   };
+  std::string       GetName()        { return m_componentName; };
 
   OMX_ERRORTYPE DisableAllPorts();
   void          Remove(OMX_EVENTTYPE eEvent, OMX_U32 nData1, OMX_U32 nData2);

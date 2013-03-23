@@ -541,12 +541,14 @@ bool OMXPlayerVideo::OpenDecoder(OMX_TextureData*& textureData)
     CloseDecoder();
     return false;
   }
-
-  printf("Video codec %s width %d height %d profile %d fps %f\n",
-         m_decoder->GetDecoderName().c_str() , m_hints.width, m_hints.height, m_hints.profile, m_fps);
+  else
+  {
+    printf("Video codec %s width %d height %d profile %d fps %f\n",
+        m_decoder->GetDecoderName().c_str() , m_hints.width, m_hints.height, m_hints.profile, m_fps);
+  }
 
   if(m_av_clock)
-      m_av_clock->SetRefreshRate(m_fps);
+    m_av_clock->SetRefreshRate(m_fps);
 
   return true;
 }

@@ -247,9 +247,26 @@ bool OMXReader::Open(std::string filename, bool dump_format)
     }
   }
 
-  printf("file : %s result %d format %s audio streams %d video streams %d chapters %d subtitles %d length %d\n", 
-      m_filename.c_str(), result, m_pFormatContext->iformat->name, m_audio_count, m_video_count, m_chapter_count, m_subtitle_count, GetStreamLength() / 1000);
-
+  // show file info
+  printf("filename         : %s\n", m_filename.c_str());
+  printf("nb_streams       : %d\n", m_pFormatContext->nb_streams);
+  printf("video_streams    : %d\n", m_video_count);
+  printf("audio_streams    : %d\n", m_audio_count);
+  printf("nb_chapters      : %d\n", m_pFormatContext->nb_chapters);
+  printf("nb_chapters      : %d\n", m_chapter_count);
+  printf("nb_subtitles     : %d\n", m_subtitle_count);
+  printf("format_name      : %s\n", m_pFormatContext->iformat->name);
+  if (m_pFormatContext->iformat->long_name)
+    printf("format_long_name : %s\n", m_pFormatContext->iformat->long_name);
+  else
+    printf("format_long_name : unknown\n");
+  printf("start_time       : %lld\n", m_pFormatContext->start_time);
+  printf("duration         : %d\n", GetStreamLength() / 1000);
+  printf("bytelength       : %lld\n", m_pFile ? m_pFile->GetLength() : 0);
+  if (m_pFormatContext->bit_rate > 0)
+    printf("bit_rate         : %d\n", m_pFormatContext->bit_rate);
+  else
+    printf("bit_rate         : N/A\n");
 
   m_speed       = DVD_PLAYSPEED_NORMAL;
 
@@ -500,7 +517,7 @@ OMXPacket *OMXReader::Read()
       pkt.pts = AV_NOPTS_VALUE;
   }
   // we need to get duration slightly different for matroska embedded text subtitels
-  if(m_bMatroska && pStream->codec->codec_id == CODEC_ID_TEXT && pkt.convergence_duration != 0)
+  if(m_bMatroska && pStream->codec->codec_id == AV_CODEC_ID_SUBRIP && pkt.convergence_duration != 0)
     pkt.duration = pkt.convergence_duration;
 
   if(m_bAVI && pStream->codec && pStream->codec->codec_type == AVMEDIA_TYPE_VIDEO)
@@ -660,9 +677,9 @@ void OMXReader::AddStream(int id)
     return;
 
   AVStream *pStream = m_pFormatContext->streams[id];
-  // discard MJPEG/PNG stream as we don't support it, and it stops mp3 files playing with album art
+  // discard PNG stream as we don't support it, and it stops mp3 files playing with album art
   if (pStream->codec->codec_type == AVMEDIA_TYPE_VIDEO && 
-    (pStream->codec->codec_id == CODEC_ID_MJPEG || pStream->codec->codec_id == CODEC_ID_MJPEGB || pStream->codec->codec_id == CODEC_ID_PNG))
+    (pStream->codec->codec_id == CODEC_ID_PNG))
     return;
 
   switch (pStream->codec->codec_type)
@@ -821,9 +838,6 @@ bool OMXReader::GetHints(AVStream *stream, COMXStreamInfo *hints)
   hints->codec         = stream->codec->codec_id;
   hints->extradata     = stream->codec->extradata;
   hints->extrasize     = stream->codec->extradata_size;
-  hints->codec         = stream->codec->codec_id;
-  hints->extradata     = stream->codec->extradata;
-  hints->extrasize     = stream->codec->extradata_size;
   hints->channels      = stream->codec->channels;
   hints->samplerate    = stream->codec->sample_rate;
   hints->blockalign    = stream->codec->block_align;
@@ -863,6 +877,8 @@ bool OMXReader::GetHints(AVStream *stream, COMXStreamInfo *hints)
       hints->aspect = av_q2d(stream->codec->sample_aspect_ratio) * stream->codec->width / stream->codec->height;
     else
       hints->aspect = 0.0f;
+    if (m_bAVI && stream->codec->codec_id == CODEC_ID_H264)
+      hints->ptsinvalid = true;
   }
 
   return true;

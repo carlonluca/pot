@@ -51,8 +51,8 @@ public:
   };
 
   IAudioRenderer() {};
-  virtual ~IAudioRenderer() {}
-  virtual bool Initialize(IAudioCallback* pCallback, const CStdString& device, int iChannels, enum PCMChannels *channelMap, unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool bResample, bool boostOnDownmix, bool bIsMusic=false, EEncoded encoded = ENCODED_NONE) = 0;
+  virtual ~IAudioRenderer() {};
+  virtual bool Initialize(IAudioCallback* pCallback, const CStdString& device, int iChannels, enum PCMChannels *channelMap, unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool bResample, bool boostOnDownmix, bool bIsMusic=false, EEncoded encoded = ENCODED_NONE, long initialVolume = 0) = 0;
   virtual void UnRegisterAudioCallback() = 0;
   virtual void RegisterAudioCallback(IAudioCallback* pCallback) = 0;
   virtual float GetDelay() = 0;
@@ -60,7 +60,7 @@ public:
   virtual float GetCacheTotal() { return 1.0f; }
 
   virtual unsigned int AddPackets(const void* data, unsigned int len) = 0;
-  virtual bool IsResampling() { return false;}
+  virtual bool IsResampling() { return false;};
   virtual unsigned int GetSpace() = 0;
   virtual bool Deinitialize() = 0;
   virtual bool Pause() = 0;
@@ -71,7 +71,7 @@ public:
   virtual long GetCurrentVolume() const = 0;
   virtual void Mute(bool bMute) = 0;
   virtual bool SetCurrentVolume(long nVolume) = 0;
-  virtual void SetDynamicRangeCompression(long /* drc */) {}
+  virtual void SetDynamicRangeCompression(long drc) {};
   virtual float GetCurrentAttenuation() { return m_remap.GetCurrentAttenuation(); }
   virtual int SetPlaySpeed(int iSpeed) = 0;
   virtual void WaitCompletion() = 0;

@@ -212,6 +212,7 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
                     &m_omx_reader,
                     "omx:hdmi",         /* TODO: implement way to change */
                     false,              /* TODO: passthrough */
+                    0,                  /* TODO: initial_volume */
                     false,              /* TODO: hw decode */
                     false,              /* TODO: downmix boost */
                     true                /* threaded */
@@ -251,7 +252,7 @@ bool OMX_MediaProcessor::play()
     case STATE_STOPPED: {
         LOG_VERBOSE(LOG_TAG, "Starting thread.");
         m_state = STATE_PLAYING;
-        m_av_clock->OMXStart();
+        m_av_clock->OMXStart(0.0);
         return QMetaObject::invokeMethod(this, "mediaDecoding");
     }
     default:
