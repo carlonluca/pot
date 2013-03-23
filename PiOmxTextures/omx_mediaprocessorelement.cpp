@@ -135,12 +135,6 @@ bool OMX_MediaProcessorElement::seek(long millis)
     return m_mediaProc->seek(millis);
 }
 
-long OMX_MediaProcessorElement::currentPosition()
-{
-    CHECK_MEDIA_PROCESSOR;
-    return m_mediaProc->currentPosition();
-}
-
 void OMX_MediaProcessorElement::instantiateMediaProcessor()
 {
     if (!m_texProvider)
