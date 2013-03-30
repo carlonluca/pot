@@ -136,9 +136,11 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
         return false; // TODO: Reimplement.
     }
 
-    LOG_VERBOSE(LOG_TAG, "Opening video file...");
-    if (!m_omx_reader.Open(filename.toStdString(), true))
+    LOG_VERBOSE(LOG_TAG, "Opening...");
+    if (!m_omx_reader.Open(filename.toStdString(), true)) {
+        LOG_ERROR(LOG_TAG, "Failed to open source.");
         return false;
+    }
 
     m_filename = filename;
 
@@ -173,8 +175,8 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
     }
 #endif
 
-    LOG_VERBOSE(LOG_TAG, "Opening video using OMX...");
-    if (m_has_video)
+    if (m_has_video) {
+        LOG_VERBOSE(LOG_TAG, "Opening video using OMX...");
         if (!m_player_video->Open(
                     m_hints_video,
                     m_av_clock,
@@ -186,8 +188,10 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
                     1.0                     /* display aspect, unused */
                     ))
             return false;
-    m_textureData = textureData;
-    emit textureReady(textureData);
+
+        m_textureData = textureData;
+        emit textureReady(textureData);
+    }
 
 #ifdef ENABLE_SUBTITLES
     LOG_VERBOSE(LOG_TAG, "Opening subtitles using OMX...");

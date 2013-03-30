@@ -13,6 +13,7 @@ TEMPLATE = app
 LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
+# NOTE: I had issues with versions compiled from recent sources.
 LIBS += -L$$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample
 INCLUDEPATH += $$_PRO_FILE_PWD_/3rdparty/ffmpeg/include
 # For omxplayer.
