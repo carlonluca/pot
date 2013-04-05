@@ -22,8 +22,98 @@
 #include <sys/mman.h>
 #include <linux/videodev2.h>
 #include <libv4l2.h>
+#include <vector>
+#include <QImage>
+#include <lgl_logging.h>
+
+using namespace std;
+
+typedef unsigned char uint8x;
+typedef char int8x;
 
 #define CLEAR(x) memset(&(x), 0, sizeof(x))
+
+enum ImageType {
+    ImageType_RGB24 = 1,
+    ImageType_GRAY8 = 2,
+    ImageType_JPEG  = 3
+};
+
+struct Image {
+    Image() : size_x(0), size_y(0), type(ImageType_GRAY8)
+    {}
+
+    int size_x;
+    int size_y;
+
+    int type; // @see ImageType
+
+    std::vector<uint8x> pixels;
+};
+
+static inline
+void saturate(int& value, int min_val, int max_val)
+{
+  if (value < min_val) value = min_val;
+  if (value > max_val) value = max_val;
+}
+
+void convert_YUYV_to_RGB24(int size_x, int size_y, const uint8x* YUYV_ptr, Image& out)
+{
+  const int K1 = int(1.402f * (1 << 16));
+  const int K2 = int(0.714f * (1 << 16));
+  const int K3 = int(0.334f * (1 << 16));
+  const int K4 = int(1.772f * (1 << 16));
+
+  // convert to RGB24
+  out.size_x = size_x;
+  out.size_y = size_y;
+  out.type = ImageType_RGB24;
+
+  out.pixels.resize(size_x * size_y * 3); // 3 bytes per RGB24 pixel
+
+  typedef uint8x T;
+  T* out_ptr = &out.pixels[0];
+  const int pitch = size_x * 2; // 2 bytes per one YU-YV pixel
+
+  for (int y=0; y<size_y; y++) {
+    const uint8x* src = YUYV_ptr + pitch * y;
+    for (int x=0; x<size_x*2; x+=4) { // Y1 U Y2 V
+      uint8x Y1 = src[x + 0];
+      uint8x U  = src[x + 1];
+      uint8x Y2 = src[x + 2];
+      uint8x V  = src[x + 3];
+
+      int8x uf = U - 128;
+      int8x vf = V - 128;
+
+      int R = Y1 + (K1*vf >> 16);
+      int G = Y1 - (K2*vf >> 16) - (K3*uf >> 16);
+      int B = Y1 + (K4*uf >> 16);
+
+      saturate(R, 0, 255);
+      saturate(G, 0, 255);
+      saturate(B, 0, 255);
+
+      *out_ptr++ = T(R);
+      *out_ptr++ = T(G);
+      *out_ptr++ = T(B);
+
+      R = Y2 + (K1*vf >> 16);
+      G = Y2 - (K2*vf >> 16) - (K3*uf >> 16);
+      B = Y2 + (K4*uf >> 16);
+
+      saturate(R, 0, 255);
+      saturate(G, 0, 255);
+      saturate(B, 0, 255);
+
+      *out_ptr++ = T(R);
+      *out_ptr++ = T(G);
+      *out_ptr++ = T(B);
+    }
+
+  }
+}
 
 struct buffer {
     void   *start;
@@ -138,8 +228,13 @@ int main(int argc, char **argv)
         buf.memory = V4L2_MEMORY_MMAP;
         xioctl(fd, VIDIOC_DQBUF, &buf);
 
-        sprintf(out_name, "out%03d.ppm", i);
-        fout = fopen(out_name, "w");
+        LOG_VERBOSE(LOG_TAG, "Dumping...");
+        Image im;
+        convert_YUYV_to_RGB24(640, 480, (uint8x*)(buffers[buf.index].start), im);
+        QImage image((unsigned char*)&(im.pixels), 640, 480, QImage::Format_RGB888);
+        sprintf(out_name, "out%03d.jpg", i);
+        image.save(QString("/home/pi/") + QString(out_name));
+        /*fout = fopen(out_name, "w");
         if (!fout) {
             perror("Cannot open image");
             exit(EXIT_FAILURE);
@@ -147,7 +242,7 @@ int main(int argc, char **argv)
         fprintf(fout, "P6\n%d %d 255\n",
                 fmt.fmt.pix.width, fmt.fmt.pix.height);
         fwrite(buffers[buf.index].start, buf.bytesused, 1, fout);
-        fclose(fout);
+        fclose(fout);*/
 
         xioctl(fd, VIDIOC_QBUF, &buf);
     }

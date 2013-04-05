@@ -4,21 +4,48 @@
 # Date:    12.03.2012
 #
 
+# Either CONFIG_LIB or CONFIG_APP.
+#DEFINES += CONFIG_LIB
+DEFINES += CONFIG_APP
+
 QT += core core-private gui gui-private opengl quick quick-private
 
 TARGET   = PiOmxTextures
+contains(DEFINES, CONFIG_LIB) {
+TEMPLATE = lib
+
+# Install headers.
+headers.files  = \
+   omx_mediaprocessor.h \
+   omx_qthread.h
+headers.path   = $$OUT_PWD/piomxtextures
+
+omxplayer_headers.files = \
+   omxplayer_lib/OMXStreamInfo.h
+omxplayer_headers.path = $$OUT_PWD/piomxtextures/omxplayer_lib
+
+#omxplayer_linux_headers.files = omxplayer_lib/linux/RBP.h
+#omxplayer_linux_headers.path  = $$OUT_PWD/piomxtextures/omxplayer_lib/linux
+
+INSTALLS += headers omxplayer_headers
+}
+else:contains(DEFINES, CONFIG_APP) {
 TEMPLATE = app
+}
+else {
+error("Either config as app or lib.");
+}
 
 # External
 LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
-# NOTE: I had issues with versions compiled from recent sources.
 LIBS += -L$$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample
 INCLUDEPATH += $$_PRO_FILE_PWD_/3rdparty/ffmpeg/include
 # For omxplayer.
 LIBS += -lfreetype -lWFC -lpcre
 INCLUDEPATH += /usr/include/freetype2
+
 CONFIG += link_pkgconfig
 PKGCONFIG += freetype2
 
@@ -26,6 +53,7 @@ INCLUDEPATH += \
    omx_wrapper \
    ilclient \
    3rdparty/include
+
 INCLUDEPATH += \
    omxplayer_lib \
    omxplayer_lib/utils \
@@ -80,12 +108,16 @@ QMAKE_CXXFLAGS += -std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS     
 
 # [1]: part of implementation without omxplayer.
 
+contains(DEFINES, CONFIG_APP) {
 SOURCES += \
-    main.cpp \
-#    main_ffmpeg.cpp \
-#    main_v4l2.cpp \
-#    main_demux.cpp \
-#    main_omxplayer.cpp \
+   main.cpp \
+#  main_ffmpeg.cpp \
+#  main_v4l2.cpp \
+#  main_demux.cpp \
+#  main_omxplayer.cpp
+}
+
+SOURCES += \
     openmaxiltextureloader.cpp \
     omx_wrapper/Locker.cpp \
     omx_wrapper/Event.cpp \
@@ -199,5 +231,6 @@ OTHER_FILES += \
     tools/extract_h264_stream.sh \
     omxplayer_lib/omxplayer.cpp
 
-RESOURCES += \
-    resources.qrc
+contains(DEFINES, CONFIG_APP) {
+RESOURCES += resources.qrc
+}
