@@ -71,6 +71,7 @@ Rectangle {
 
     OMXMediaProcessor {
         id: mediaProcessor
+        //source: "/home/pi/07 Hail Caesar.mp3"
         source: "/home/pi/usb/Cars2.mkv"
     }
 

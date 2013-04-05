@@ -37,14 +37,28 @@
 
 #include "omx_qthread.h"
 
-// omxplayer lib.
-#include <linux/RBP.h>
-#include <OMXPlayerVideo.h>
-#include <OMXPlayerAudio.h>
-#include <OMXPlayerSubtitles.h>
-#include <DllOMX.h>
-
 using namespace std;
+
+/*------------------------------------------------------------------------------
+|    defintions
++-----------------------------------------------------------------------------*/
+class OMX_TextureData;
+class OMX_TextureProvider;
+class OMXCore;
+class OMXClock;
+class OMXPlayerVideo;
+class OMXPlayerAudio;
+#ifdef ENABLE_SUBTITLES
+class OMXPlayerSubtitles;
+#endif
+class OMXReader;
+class OMXPacket;
+class AVFormatContext;
+class AVStream;
+class AVPacket;
+class CRBP;
+class COMXCore;
+class COMXStreamInfo;
 
 
 /*------------------------------------------------------------------------------
@@ -95,9 +109,6 @@ public:
 
     OMX_MediaProcessorState state();
 
-    COMXStreamInfo m_hints_audio;
-    COMXStreamInfo m_hints_video;
-
 public slots:
     bool play();
     bool stop();
@@ -126,7 +137,7 @@ private:
 
     AVFormatContext* fmt_ctx;
     AVStream* streamVideo;
-    AVPacket pkt;
+    AVPacket* pkt;
 
     volatile OMX_MediaProcessorState m_state;
 
@@ -138,11 +149,11 @@ private:
 #ifdef ENABLE_SUBTITLES
     OMXPlayerSubtitles* m_player_subtitles;
 #endif
-    OMXReader           m_omx_reader;
+    OMXReader*          m_omx_reader;
     OMXPacket*          m_omx_pkt;
 
-    CRBP m_RBP;
-    COMXCore m_OMX;
+    CRBP*     m_RBP;
+    COMXCore* m_OMX;
 
     bool m_bMpeg;
     bool m_has_video;
@@ -163,6 +174,9 @@ private:
     QWaitCondition m_waitPendingCommand;
 
     volatile long m_incr;
+
+    COMXStreamInfo* m_hints_audio;
+    COMXStreamInfo* m_hints_video;
 };
 
 
@@ -185,13 +199,6 @@ inline bool OMX_MediaProcessor::hasVideo() {
 +-----------------------------------------------------------------------------*/
 inline OMX_MediaProcessor::OMX_MediaProcessorState OMX_MediaProcessor::state() {
     return m_state;
-}
-
-/*------------------------------------------------------------------------------
-|    OMX_MediaProcessor::streamLength
-+-----------------------------------------------------------------------------*/
-inline long OMX_MediaProcessor::streamLength() {
-    return m_omx_reader.GetStreamLength();
 }
 
 #endif // OMX_MEDIAPROCESSOR_H
