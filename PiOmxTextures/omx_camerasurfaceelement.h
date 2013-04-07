@@ -33,7 +33,7 @@
 #include <QSemaphore>
 #include <QImage>
 
-#include "omx_textureproviderqquickitem.h"
+#include "omx_textureprovider.h"
 #include "lgl_logging.h"
 
 class OMX_SGTexture;

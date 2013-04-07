@@ -58,7 +58,7 @@ extern "C" {
 
 #include <string>
 
-#include "omx_textureproviderqquickitem.h"
+#include "omx_textureprovider.h"
 #include "omx_videosurfaceelement.h"
 
 enum PCMChannels  *m_pChannelMap        = NULL;

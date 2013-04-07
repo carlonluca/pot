@@ -35,7 +35,6 @@ extern "C" {
 #include "libavformat/avformat.h"
 }
 
-#include "glwidget.h"
 #include "lgl_logging.h"
 #include "omx_imageelement.h"
 #include "omx_videosurfaceelement.h"

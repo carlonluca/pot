@@ -17,7 +17,10 @@ TEMPLATE = lib
 # Install headers.
 headers.files  = \
    omx_mediaprocessor.h \
-   omx_qthread.h
+   omx_textureprovider.h \
+   omx_qthread.h \
+   omx_globals.h \
+   lgl_logging.h
 headers.path   = $$OUT_PWD/piomxtextures
 
 omxplayer_headers.files = \
@@ -132,12 +135,13 @@ SOURCES += \
 #    omx_texturedelement.cpp \
 #    omx_videoprocessor.cpp \     # [1]
     omx_camerasurfaceelement.cpp \
-    omx_textureproviderqquickitem.cpp \
     omx_audioprocessor.cpp \
     omx_mediaprocessor.cpp \
 #    omx_videograph.cpp \         # [1]
     omx_wrapper/OMX_Core.cpp \
-    omx_mediaprocessorelement.cpp
+    omx_mediaprocessorelement.cpp \
+    omx_globals.cpp \
+    omx_textureprovider.cpp
 
 SOURCES += \
     omxplayer_lib/Srt.cpp \
@@ -183,7 +187,6 @@ HEADERS  += \
 #    omx_texturedelement.h \    # [1]
 #    omx_videoprocessor.h \
     omx_camerasurfaceelement.h \
-    omx_textureproviderqquickitem.h \
     omx_texture.h \
     omx_qthread.h \
     omx_audioprocessor.h \
@@ -199,7 +202,8 @@ HEADERS  += \
     omxplayer_lib/DllAvUtil.h \
     omxplayer_lib/DllAvFilter.h \
     omxplayer_lib/DllAvCodec.h \
-    omx_mediaprocessorelement.h
+    omx_mediaprocessorelement.h \
+    omx_textureprovider.h
 
 HEADERS += \
     omxplayer_lib/Unicode.h \

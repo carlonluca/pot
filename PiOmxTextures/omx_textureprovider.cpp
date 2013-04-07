@@ -36,7 +36,7 @@
 #include <IL/OMX_Broadcom.h>
 
 #include "lgl_logging.h"
-#include "omx_textureproviderqquickitem.h"
+#include "omx_textureprovider.h"
 #include "omx_globals.h"
 
 
