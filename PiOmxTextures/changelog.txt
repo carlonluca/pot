@@ -4,6 +4,7 @@ Version 4.1.0
 =============
 1. Merged changes from omxplayer.
 2. Updated ffmpeg reference version.
+3. Added lib target.
 
 Version 4.0.1
 =============

@@ -42,7 +42,7 @@
 
 #include "lgl_logging.h"
 #include "omx_videosurfaceelement.h"
-#include "omx_textureproviderqquickitem.h"
+#include "omx_textureprovider.h"
 
 #ifdef CLASSNAME
 #undef CLASSNAME

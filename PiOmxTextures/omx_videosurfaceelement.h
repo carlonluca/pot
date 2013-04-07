@@ -33,7 +33,7 @@
 
 #include "lgl_logging.h"
 #include "omx_mediaprocessorelement.h"
-#include "omx_textureproviderqquickitem.h"
+#include "omx_textureprovider.h"
 
 /*------------------------------------------------------------------------------
 |    definitions

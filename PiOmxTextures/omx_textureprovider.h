@@ -25,11 +25,10 @@
 #define OMX_TEXTUREPROVIDERQQUICKITEM_H
 
 /*------------------------------------------------------------------------------
-|    OMX_VideoProcessorThread class
+|    includes
 +-----------------------------------------------------------------------------*/
 #include <QObject>
-#include <QQuickItem>
-#include <QQuickWindow>
+#include <QSize>
 
 #include <GLES2/gl2.h>
 #define EGL_EGLEXT_PROTOTYPES
@@ -39,6 +38,11 @@
 
 #include "lgl_logging.h"
 #include "omx_globals.h"
+
+/*------------------------------------------------------------------------------
+|    definitions
++-----------------------------------------------------------------------------*/
+class QQuickItem;
 
 
 /*------------------------------------------------------------------------------
@@ -93,10 +97,10 @@ public:
  * a QQuickItem and passed to a OMX element. It MUST be instantiated in
  * the renderer thread.
  */
-class OMX_TextureProvider : public QObject
+class OMX_TextureProvider
 {
-    Q_OBJECT
-public slots:
+public:
+    virtual ~OMX_TextureProvider() {}
     virtual OMX_TextureData* instantiateTexture(QSize size) = 0;
     virtual void freeTexture(OMX_TextureData* textureData) = 0;
 };
@@ -106,7 +110,6 @@ public slots:
 +-----------------------------------------------------------------------------*/
 class OMX_TextureProviderQQuickItem : public OMX_TextureProvider
 {
-    Q_OBJECT
 public:
     OMX_TextureProviderQQuickItem(QQuickItem* item) :
         OMX_TextureProvider(),
@@ -114,7 +117,6 @@ public:
         // Do nothing.
     }
 
-public slots:
     OMX_TextureData* instantiateTexture(QSize size);
     void freeTexture(OMX_TextureData* textureData);
 

@@ -22,7 +22,7 @@
  */
 
 #include "omx_mediaprocessorelement.h"
-#include "omx_textureproviderqquickitem.h"
+#include "omx_textureprovider.h"
 #include "lgl_logging.h"
 
 #define CHECK_MEDIA_PROCESSOR                                              \

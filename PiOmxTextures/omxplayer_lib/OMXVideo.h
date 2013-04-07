@@ -36,10 +36,9 @@
 
 #include "guilib/Geometry.h"
 
-#include "omx_textureproviderqquickitem.h"
-
 class OMX_VideoSurfaceElement;
 class OMX_TextureProvider;
+class OMX_TextureData;
 
 
 #define VIDEO_BUFFERS 60
