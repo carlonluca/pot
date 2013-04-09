@@ -26,9 +26,9 @@ fi
 
 cd ffmpeg
 git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg_src
+cd ffmpeg_src
 git checkout master
 git checkout 8c51ea54897c2d8671b38efecc1422ad4ad344f9
-cd ffmpeg_src
 
 echo "Configuring..."
 FLOAT=hard
