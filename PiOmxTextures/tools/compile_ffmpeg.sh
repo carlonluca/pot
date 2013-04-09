@@ -9,8 +9,7 @@
 # Configures and builds ffmpeg for the PiOmxTextures project. The result is placed in
 # <ffmpeg_sources>/ffmpeg_compiled. Both static and shared libraries are compiled.
 # Usage:
-# 1. Copy the script into the <ffmpeg_sources> directory.
-# 2. ./compile_ffmpeg.sh <n>, where n is the number of compilation threads to use.
+#    ./compile_ffmpeg.sh <n>, where n is the number of compilation threads to use.
 
 echo "Downloading ffmpeg sources from git..."
 cd ..
