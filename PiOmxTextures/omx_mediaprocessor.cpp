@@ -31,6 +31,7 @@
 
 #include "lgl_logging.h"
 #include "omx_mediaprocessor.h"
+#include "omx_textureprovider.h"
 
 // omxplayer lib.
 #include "omxplayer_lib/linux/RBP.h"
@@ -93,26 +94,38 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
 +-----------------------------------------------------------------------------*/
 OMX_MediaProcessor::~OMX_MediaProcessor()
 {
-    m_OMX->Deinitialize();
-    m_RBP->Deinitialize();
+   stop();
 
-    delete m_hints_audio;
-    delete m_hints_video;
+   LOG_VERBOSE(LOG_TAG, "Freeing hints...");
+   delete m_hints_audio;
+   delete m_hints_video;
 
-    delete m_av_clock;
+   LOG_VERBOSE(LOG_TAG, "Freeing clock...");
+   delete m_av_clock;
+
+   // TODO: Fix this! When freeing players, a lock seems to hang!
+   LOG_VERBOSE(LOG_TAG, "Freeing players...");
+#if 0
 #ifdef ENABLE_SUBTITLES
-    delete m_player_subtitles;
+   delete m_player_subtitles;
 #endif
-    delete m_player_audio;
-    delete m_player_video;
+   delete m_player_audio;
+   delete m_player_video;
+#endif
 
-    delete m_RBP;
-    delete m_OMX;
-    delete m_omx_pkt;
-    delete m_omx_reader;
+   LOG_VERBOSE(LOG_TAG, "Deinitializing hardware libs...");
+   m_OMX->Deinitialize();
+   m_RBP->Deinitialize();
 
-    m_thread.quit();
-    m_thread.wait();
+   LOG_VERBOSE(LOG_TAG, "Freeing OpenMAX structures...");
+   delete m_RBP;
+   delete m_OMX;
+   delete m_omx_pkt;
+   delete m_omx_reader;
+
+   LOG_VERBOSE(LOG_TAG, "Waiting for thread to die...");
+   m_thread.quit();
+   m_thread.wait();
 }
 
 /*------------------------------------------------------------------------------
@@ -301,9 +314,8 @@ bool OMX_MediaProcessor::stop()
         return false;
     case STATE_PAUSED:
     case STATE_PLAYING:
+       break;
     case STATE_STOPPED:
-        break;
-        m_state = STATE_STOPPED;
         return true;
     default:
         return false;
@@ -384,6 +396,26 @@ double OMX_MediaProcessor::streamPosition()
 OMX_TextureData* OMX_MediaProcessor::textureData()
 {
     return m_textureData;
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::setVolume
++-----------------------------------------------------------------------------*/
+void OMX_MediaProcessor::setVolume(int volume)
+{
+   // TODO: I should pass millibel here. What is the parameter? Dcoumentation
+   // doesn't state that.
+   m_player_audio->SetCurrentVolume(volume);
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::volume
++-----------------------------------------------------------------------------*/
+int OMX_MediaProcessor::volume()
+{
+   // TODO: I'm returning millibel here. What should I? Dcoumentation
+   // doesn't state that.
+   return m_player_audio->GetCurrentVolume();
 }
 
 /*------------------------------------------------------------------------------
@@ -677,22 +709,12 @@ void OMX_MediaProcessor::cleanup()
 
     vc_tv_show_info(0);
 
-    // lcarlon: this should only be done in object destructor.
-    //LOG_VERBOSE(LOG_TAG, "Deinitializing engines...");
-    //m_OMX.Deinitialize();
-    //m_RBP.Deinitialize();
-
-    // lcarlon: free the texture.
+    // lcarlon: free the texture. Invoke freeTexture so that it is the user
+    // of the class to do it cause it is commonly required to do it in the
+    // current OpenGL and EGL context.
     LOG_VERBOSE(LOG_TAG, "Freeing texture...");
+    m_provider->freeTexture(m_textureData);
     emit textureInvalidated();
-#if 0
-    QMetaObject::invokeMethod(
-                (QObject*)m_provider,
-                "freeTexture",
-                Qt::QueuedConnection,
-                Q_ARG(OMX_TextureData*, m_textureData)
-                );
-#endif
     m_textureData = NULL;
 
     // Actually change the state here and reset flags.

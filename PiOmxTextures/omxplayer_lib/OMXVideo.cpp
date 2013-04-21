@@ -715,6 +715,10 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& t
 #else
     textureData = m_provider->instantiateTexture(QSize(hints.width, hints.height));
 #endif
+    if (!textureData) {
+       LOG_WARNING(LOG_TAG, "No texture was instantiated. Can't go on.");
+       return false;
+    }
     LOG_VERBOSE(LOG_TAG, "Generated!");
 
     omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &m_eglBuffer, 221, NULL, textureData->m_eglImage);

@@ -5,8 +5,8 @@
 #
 
 # Either CONFIG_LIB or CONFIG_APP.
-#DEFINES += CONFIG_LIB
-DEFINES += CONFIG_APP
+DEFINES += CONFIG_LIB
+#DEFINES += CONFIG_APP
 
 QT += core core-private gui gui-private opengl quick quick-private
 
