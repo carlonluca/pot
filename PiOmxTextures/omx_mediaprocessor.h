@@ -109,6 +109,9 @@ public:
 
     OMX_MediaProcessorState state();
 
+    void setVolume(int volume);
+    int volume();
+
 public slots:
     bool play();
     bool stop();
