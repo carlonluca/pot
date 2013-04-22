@@ -113,9 +113,10 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
    delete m_player_video;
 #endif
 
+   // TODO: This should really be done, but still it seems to sefault sometimes.
    LOG_VERBOSE(LOG_TAG, "Deinitializing hardware libs...");
-   m_OMX->Deinitialize();
-   m_RBP->Deinitialize();
+   //m_OMX->Deinitialize();
+   //m_RBP->Deinitialize();
 
    LOG_VERBOSE(LOG_TAG, "Freeing OpenMAX structures...");
    delete m_RBP;
