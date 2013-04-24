@@ -1,0 +1,521 @@
+/*
+ * Author:  Luca Carlon
+ * Company: -
+ * Date:    04.14.2013
+ * Project: OpenMAXIL QtMultimedia Plugin
+ */
+
+#include "openmaxilplayercontrol.h"
+
+#include <private/qmediaplaylistnavigator_p.h>
+#include <private/qmediaresourcepolicy_p.h>
+#include <private/qmediaresourceset_p.h>
+
+#include <QtCore/qdir.h>
+#include <QtCore/qsocketnotifier.h>
+#include <QtCore/qurl.h>
+#include <QtCore/qdebug.h>
+#include <QtCore/qfiledevice.h>
+#include <QtCore/qtimer.h>
+#include <QtMultimedia/qmediacontent.h>
+#include <QtQuick/qquickview.h>
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+#include <omx_mediaprocessor.h>
+#include <omx_textureprovider.h>
+
+/*------------------------------------------------------------------------------
+|    definitions
++-----------------------------------------------------------------------------*/
+//#define DEBUG_PLAYBIN
+#define DEBUG_PLAYER_CONTROL
+
+#ifndef DEBUG_PLAYER_CONTROL
+#ifdef LOG_DEBUG
+#undef LOG_DEBUG
+#define LOG_DEBUG(...) {(void)0}
+#endif // LOG_DEBUG
+#else
+#include <lgl_logging.h>
+#endif // DEBUG_PLAYER_CONTROL
+
+
+/*------------------------------------------------------------------------------
+|    RPiQuickView class
++-----------------------------------------------------------------------------*/
+class RPiQuickView
+{
+public:
+   static QQuickView* getSingleInstance();
+};
+
+QT_BEGIN_NAMESPACE
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::OpenMAXILPlayerControl
++-----------------------------------------------------------------------------*/
+OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
+   : QMediaPlayerControl(parent)
+   , m_ownStream(false)
+   , m_seekToStartPending(false)
+   , m_pendingSeekPosition(-1)
+   , m_mediaProcessor(new OMX_MediaProcessor(this))
+   , m_textureData(NULL)
+   , m_sceneGraphInitialized(false)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   connect(m_mediaProcessor, SIGNAL(textureReady(const OMX_TextureData*)),
+           this, SIGNAL(textureReady(const OMX_TextureData*)));
+   connect(m_mediaProcessor, SIGNAL(textureInvalidated()),
+           this, SIGNAL(textureInvalidated()));
+
+   QQuickView* view = RPiQuickView::getSingleInstance();
+   connect(view, SIGNAL(sceneGraphInitialized()),
+           this, SLOT(onSceneGraphInitialized()), Qt::DirectConnection);
+   connect(view, SIGNAL(beforeRendering()),
+           this, SLOT(onBeforeRendering()), Qt::DirectConnection);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::~OpenMAXILPlayerControl
++-----------------------------------------------------------------------------*/
+OpenMAXILPlayerControl::~OpenMAXILPlayerControl()
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   delete m_mediaProcessor;
+   m_mediaProcessor = NULL;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::play
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::play()
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   LOG_VERBOSE(LOG_TAG, "Deferring play() command...");
+   PlayerCommandPlay* play = new PlayerCommandPlay;
+   play->m_playerCommandType = PLAYER_COMMAND_TYPE_PLAY;
+   appendCommand(play);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::playInt
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::playInt()
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // Can be done in any thread.
+   assert(m_mediaProcessor);
+   m_mediaProcessor->play();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::pause
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::pause()
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   PlayerCommandPause* pause = new PlayerCommandPause;
+   pause->m_playerCommandType = PLAYER_COMMAND_TYPE_PAUSE;
+   appendCommand(pause);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::pauseInt
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::pauseInt()
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   assert(m_mediaProcessor);
+   m_mediaProcessor->pause();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::stop
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::stop()
+{
+   LOG_DEBUG("%s", Q_FUNC_INFO);
+
+   assert(m_mediaProcessor);
+   m_mediaProcessor->stop();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::onSceneGraphInitialized
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::onSceneGraphInitialized()
+{
+   LOG_DEBUG(LOG_TAG, "Renderer thread is: 0x%x.", (unsigned int)QThread::currentThread());
+
+   m_sceneGraphInitialized = true;
+   processCommands();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::onBeforeRendering
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::onBeforeRendering()
+{
+   processCommands();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::update
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::requestProcessPendingCommands()
+{
+   // This triggers an invokation of beforeRendering(). It can be used to perform
+   // actions on the rendering thread, which has an OpenGL context and a EGL
+   // context setup.
+   RPiQuickView::getSingleInstance()->setClearBeforeRendering(false);
+   RPiQuickView::getSingleInstance()->update();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::appendCommand
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::appendCommand(PlayerCommand* command)
+{
+   QMutexLocker locker(&m_pendingCommandsMutex);
+   m_pendingCommands.append(command);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::pendingCommands
++-----------------------------------------------------------------------------*/
+inline
+void OpenMAXILPlayerControl::processCommands()
+{
+   QMutexLocker locker(&m_pendingCommandsMutex);
+
+   // Go through all the commands and execute.
+   for (int i = 0; i < m_pendingCommands.size(); i++) {
+      PlayerCommand* command = m_pendingCommands.at(i);
+
+      if (command->m_playerCommandType == PLAYER_COMMAND_TYPE_SET_MEDIA) {
+         LOG_VERBOSE(LOG_TAG, "Processing post setMedia()...");
+         PlayerCommandSetMedia* setMediaCommand = dynamic_cast<PlayerCommandSetMedia*>(command);
+         this->setMediaInt(setMediaCommand->m_mediaContent);
+      }
+
+      if (command->m_playerCommandType == PLAYER_COMMAND_TYPE_PLAY) {
+         LOG_VERBOSE(LOG_TAG, "Processing post play()...");
+         this->playInt();
+      }
+
+      if (command->m_playerCommandType == PLAYER_COMMAND_TYPE_PAUSE) {
+         LOG_VERBOSE(LOG_TAG, "Processing post pause()...");
+         this->pauseInt();
+      }
+
+      if (command->m_playerCommandType == PLAYER_COMMAND_TYPE_STOP) {
+         LOG_VERBOSE(LOG_TAG, "Processing post stop()...");
+         this->stopInt();
+      }
+
+      if (command->m_playerCommandType == PLAYER_COMMAND_TYPE_FREE_TEXTURE_DATA) {
+         LOG_VERBOSE(LOG_TAG, "Processing post freeTexture()...");
+         PlayerCommandFreeTextureData* freeTextureCommand =
+               dynamic_cast<PlayerCommandFreeTextureData*>(command);
+         this->freeTextureInt(freeTextureCommand->m_textureData);
+      }
+   }
+
+   qDeleteAll(m_pendingCommands);
+   m_pendingCommands.clear();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::instantiateTexture
++-----------------------------------------------------------------------------*/
+/**
+ * @brief OpenMAXILPlayerControl::instantiateTexture is invoked by the OMX_MediaProcessor
+ * when a texture is requested. The thread the code is run on is the same as the thread
+ * running the setFilename method: in this case the renderer thread. This makes it possible
+ * to make it work correctly.
+ * @param size The size of the texture to instantiate.
+ * @return The OMX_TextureData containing the data.
+ */
+OMX_TextureData* OpenMAXILPlayerControl::instantiateTexture(QSize size)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   OMX_TextureProviderQQuickItem provider(NULL);
+   m_textureData = provider.instantiateTexture(size);
+   return m_textureData;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::freeTexture
++-----------------------------------------------------------------------------*/
+/**
+ * @brief OpenMAXILPlayerControl::freeTexture must free textureData content. To do this
+ * it is necessary to be in the renderer thread.
+ * @param textureData
+ */
+void OpenMAXILPlayerControl::freeTexture(OMX_TextureData* textureData)
+{
+   LOG_DEBUG("%s", Q_FUNC_INFO);
+
+   PlayerCommandFreeTextureData* command = new PlayerCommandFreeTextureData;
+   command->m_playerCommandType = PLAYER_COMMAND_TYPE_FREE_TEXTURE_DATA;
+   command->m_textureData       = textureData;
+   appendCommand(command);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::freeTextureInt
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::freeTextureInt(OMX_TextureData* textureData)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   OMX_TextureProviderQQuickItem provider(NULL);
+   provider.freeTexture(textureData);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::setMedia
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::setMedia(const QMediaContent& content, QIODevice* stream)
+{
+   Q_UNUSED(stream);
+
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   LOG_DEBUG(LOG_TAG; "Media: %s.", qPrintable(content.canonicalUrl().path()));
+   LOG_DEBUG(LOG_TAG, "setMedia thread is: 0x%x.", (unsigned int)QThread::currentThread());
+
+   LOG_VERBOSE(LOG_TAG, "Deferring setMedia()...");
+   if (!QFile(content.canonicalUrl().path()).exists()) {
+      LOG_DEBUG(LOG_TAG, "Does not exist!");
+      return;
+   }
+
+   PlayerCommandSetMedia* setMedia = new PlayerCommandSetMedia;
+   setMedia->m_playerCommandType = PLAYER_COMMAND_TYPE_SET_MEDIA;
+   setMedia->m_mediaContent = content;
+   appendCommand(setMedia);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::setMediaInt
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::setMediaInt(const QMediaContent& mediaContent)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   if (!m_mediaProcessor->setFilename(mediaContent.canonicalUrl().path(), m_textureData))
+       return;
+   m_currentResource = mediaContent;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::media
++-----------------------------------------------------------------------------*/
+QMediaContent OpenMAXILPlayerControl::media() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   return m_currentResource;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::mediaStream
++-----------------------------------------------------------------------------*/
+const QIODevice* OpenMAXILPlayerControl::mediaStream() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+   return NULL;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::isAudioAvailable
++-----------------------------------------------------------------------------*/
+bool OpenMAXILPlayerControl::isAudioAvailable() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   return m_mediaProcessor->hasAudio();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::isVideoAvailable
++-----------------------------------------------------------------------------*/
+bool OpenMAXILPlayerControl::isVideoAvailable() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   return m_mediaProcessor->hasVideo();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::availablePlaybackRanges
++-----------------------------------------------------------------------------*/
+QMediaTimeRange OpenMAXILPlayerControl::availablePlaybackRanges() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+   return QMediaTimeRange();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::bufferStatus
++-----------------------------------------------------------------------------*/
+int OpenMAXILPlayerControl::bufferStatus() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+   return 0;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::duration
++-----------------------------------------------------------------------------*/
+qint64 OpenMAXILPlayerControl::duration() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   return m_mediaProcessor->streamLength();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::isMuted
++-----------------------------------------------------------------------------*/
+bool OpenMAXILPlayerControl::isMuted() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement mute.
+   return false;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::isSeekable
++-----------------------------------------------------------------------------*/
+bool OpenMAXILPlayerControl::isSeekable() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+   return false;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::mediaStatus
++-----------------------------------------------------------------------------*/
+QMediaPlayer::MediaStatus OpenMAXILPlayerControl::mediaStatus() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+   return QMediaPlayer::UnknownMediaStatus;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::playbackRate
++-----------------------------------------------------------------------------*/
+qreal OpenMAXILPlayerControl::playbackRate() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   return 1.0;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::setPlaybackRate
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::setPlaybackRate(qreal rate)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::setPosition
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::setPosition(qint64 position)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::setVolume
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::setVolume(int volume)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::state
++-----------------------------------------------------------------------------*/
+QMediaPlayer::State OpenMAXILPlayerControl::state() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   assert(m_mediaProcessor);
+   switch (m_mediaProcessor->state()) {
+   case OMX_MediaProcessor::STATE_STOPPED:
+      return QMediaPlayer::StoppedState;
+   case OMX_MediaProcessor::STATE_INACTIVE:
+      return QMediaPlayer::StoppedState;
+   case OMX_MediaProcessor::STATE_PAUSED:
+      return QMediaPlayer::PausedState;
+   case OMX_MediaProcessor::STATE_PLAYING:
+      return QMediaPlayer::PlayingState;
+   }
+   return QMediaPlayer::StoppedState;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::state
++-----------------------------------------------------------------------------*/
+int OpenMAXILPlayerControl::volume() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+   return 0;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::position
++-----------------------------------------------------------------------------*/
+qint64 OpenMAXILPlayerControl::position() const
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   return m_mediaProcessor->streamPosition();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::setMuted
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::setMuted(bool muted)
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // TODO: Implement.
+}
+
+QT_END_NAMESPACE

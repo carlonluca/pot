@@ -1,0 +1,194 @@
+diff --git a/examples/multimedia/video/qmlvideo/main.cpp b/examples/multimedia/video/qmlvideo/main.cpp
+index 1a9c523..dd15bac 100644
+--- a/examples/multimedia/video/qmlvideo/main.cpp
++++ b/examples/multimedia/video/qmlvideo/main.cpp
+@@ -56,6 +56,17 @@
+ static const QString DefaultFileName1 = "";
+ static const QString DefaultFileName2 = "";
+ 
++class RPiQuickView
++{
++public:
++   static QQuickView* getSingleInstance();
++};
++
++Q_DECL_EXPORT QQuickView* RPiQuickView::getSingleInstance() {
++   static QQuickView instance;
++   return &instance;
++}
++
+ int main(int argc, char *argv[])
+ {
+     QGuiApplication app(argc, argv);
+@@ -109,7 +120,8 @@ int main(int argc, char *argv[])
+             url2 = QUrl::fromLocalFile(source2);
+     }
+ 
+-    QQuickView viewer;
++    QQuickView* pViewer = RPiQuickView::getSingleInstance();
++    QQuickView& viewer  = *pViewer;
+     viewer.setSource(QUrl("qrc:///qml/qmlvideo/main.qml"));
+     QObject::connect(viewer.engine(), SIGNAL(quit()), &viewer, SLOT(close()));
+ 
+diff --git a/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml b/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml
+index 1b3a241..7621f16 100644
+--- a/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml
++++ b/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml
+@@ -43,8 +43,8 @@ import QtQuick 2.0
+ 
+ Rectangle {
+     id: root
+-    width: 640
+-    height: 360
++    width: 1920
++    height: 1080
+     color: "black"
+ 
+     property string source1
+diff --git a/examples/multimedia/video/qmlvideo/qmlvideo.pro b/examples/multimedia/video/qmlvideo/qmlvideo.pro
+index 3ea513d..8af5742 100644
+--- a/examples/multimedia/video/qmlvideo/qmlvideo.pro
++++ b/examples/multimedia/video/qmlvideo/qmlvideo.pro
+@@ -9,6 +9,7 @@ LOCAL_HEADERS = trace.h
+ SOURCES += $$LOCAL_SOURCES
+ HEADERS += $$LOCAL_HEADERS
+ RESOURCES += qmlvideo.qrc
++QMAKE_LFLAGS += -rdynamic
+ 
+ SNIPPETS_PATH = ../snippets
+ include($$SNIPPETS_PATH/performancemonitor/performancemonitordeclarative.pri)
+diff --git a/examples/multimedia/video/qmlvideofx/main.cpp b/examples/multimedia/video/qmlvideofx/main.cpp
+index ab613da..962bea5 100644
+--- a/examples/multimedia/video/qmlvideofx/main.cpp
++++ b/examples/multimedia/video/qmlvideofx/main.cpp
+@@ -58,6 +58,18 @@
+ #include "performancemonitordeclarative.h"
+ #endif
+ 
++
++class RPiQuickView
++{
++public:
++   static QQuickView* getSingleInstance();
++};
++
++Q_DECL_EXPORT QQuickView* RPiQuickView::getSingleInstance() {
++   static QQuickView instance;
++   return &instance;
++}
++
+ int main(int argc, char *argv[])
+ {
+     QGuiApplication app(argc, argv);
+@@ -97,7 +109,8 @@ int main(int argc, char *argv[])
+         }
+     }
+ 
+-    QQuickView viewer;
++    QQuickView* pViewer = RPiQuickView::getSingleInstance();
++    QQuickView& viewer  = *pViewer;
+ 
+     viewer.setSource(QLatin1String("qrc:///qml/qmlvideofx/") + MainQmlFile);
+     QQuickItem *rootObject = viewer.rootObject();
+diff --git a/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml b/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml
+index 63a0a01..0af4224 100644
+--- a/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml
++++ b/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml
+@@ -45,6 +45,8 @@ Rectangle {
+     id: root
+     width: 900
+     height: 600
++    x: 510
++    y: 285
+     color: "grey"
+     property string fileName
+     property alias volume: content.volume
+diff --git a/examples/multimedia/video/qmlvideofx/qmlvideofx.pro b/examples/multimedia/video/qmlvideofx/qmlvideofx.pro
+index d62ade8..64f27fd 100644
+--- a/examples/multimedia/video/qmlvideofx/qmlvideofx.pro
++++ b/examples/multimedia/video/qmlvideofx/qmlvideofx.pro
+@@ -5,6 +5,7 @@ QT += quick
+ 
+ SOURCES += filereader.cpp main.cpp
+ HEADERS += filereader.h trace.h
++QMAKE_LFLAGS += -rdynamic
+ 
+ RESOURCES += qmlvideofx.qrc
+ 
+diff --git a/src/plugins/plugins.pro b/src/plugins/plugins.pro
+index 8f751ae..cf6f6a8 100644
+--- a/src/plugins/plugins.pro
++++ b/src/plugins/plugins.pro
+@@ -30,7 +30,11 @@ win32 {
+ }
+ 
+ unix:!mac {
+-    config_gstreamer {
++    // lcarlon: specify when qmaking.
++    raspberry {
++        SUBDIRS += openmaxil
++    }
++    else:config_gstreamer {
+        SUBDIRS += gstreamer
+     } else {
+         SUBDIRS += audiocapture
+diff --git a/src/qtmultimediaquicktools/qsgvideonode_p.cpp b/src/qtmultimediaquicktools/qsgvideonode_p.cpp
+index b958180..08e630d 100644
+--- a/src/qtmultimediaquicktools/qsgvideonode_p.cpp
++++ b/src/qtmultimediaquicktools/qsgvideonode_p.cpp
+@@ -85,37 +85,39 @@ void QSGVideoNode::setTexturedRectGeometry(const QRectF &rect, const QRectF &tex
+     qSetGeom(v + 3, rect.bottomRight());
+ 
+     // and then texture coordinates
++    // lcarlon: for some reason, the texture coming out from OpenMAX IL must be mapped
++    // differently.
+     switch (orientation) {
+         default:
+             // tl, bl, tr, br
+-            qSetTex(v + 0, textureRect.topLeft());
+-            qSetTex(v + 1, textureRect.bottomLeft());
+-            qSetTex(v + 2, textureRect.topRight());
+-            qSetTex(v + 3, textureRect.bottomRight());
++            qSetTex(v + 0, textureRect.bottomLeft());
++            qSetTex(v + 1, textureRect.topLeft());
++            qSetTex(v + 2, textureRect.bottomRight());
++            qSetTex(v + 3, textureRect.topRight());
+             break;
+ 
+         case 90:
+             // tr, tl, br, bl
+-            qSetTex(v + 0, textureRect.topRight());
+-            qSetTex(v + 1, textureRect.topLeft());
+-            qSetTex(v + 2, textureRect.bottomRight());
+-            qSetTex(v + 3, textureRect.bottomLeft());
++            qSetTex(v + 0, textureRect.bottomRight());
++            qSetTex(v + 1, textureRect.bottomLeft());
++            qSetTex(v + 2, textureRect.topRight());
++            qSetTex(v + 3, textureRect.topLeft());
+             break;
+ 
+         case 180:
+             // br, tr, bl, tl
+-            qSetTex(v + 0, textureRect.bottomRight());
+-            qSetTex(v + 1, textureRect.topRight());
+-            qSetTex(v + 2, textureRect.bottomLeft());
+-            qSetTex(v + 3, textureRect.topLeft());
++            qSetTex(v + 0, textureRect.topRight());
++            qSetTex(v + 1, textureRect.bottomRight());
++            qSetTex(v + 2, textureRect.topLeft());
++            qSetTex(v + 3, textureRect.bottomLeft());
+             break;
+ 
+         case 270:
+             // bl, br, tl, tr
+-            qSetTex(v + 0, textureRect.bottomLeft());
+-            qSetTex(v + 1, textureRect.bottomRight());
+-            qSetTex(v + 2, textureRect.topLeft());
+-            qSetTex(v + 3, textureRect.topRight());
++            qSetTex(v + 0, textureRect.topLeft());
++            qSetTex(v + 1, textureRect.topRight());
++            qSetTex(v + 2, textureRect.bottomLeft());
++            qSetTex(v + 3, textureRect.bottomRight());
+             break;
+     }
+ 
