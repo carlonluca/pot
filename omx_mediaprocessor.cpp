@@ -71,7 +71,11 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
     m_provider(provider),
     m_incr(0),
     m_hints_audio(new COMXStreamInfo),
-    m_hints_video(new COMXStreamInfo)
+    m_hints_video(new COMXStreamInfo),
+    m_audio_fifo_size(0.0f), // zero means use default
+    m_video_fifo_size(0.0f),
+    m_audio_queue_size(0.0f),
+    m_video_queue_size(0.0f)
 {
     m_RBP->Initialize();
     m_OMX->Initialize();
@@ -95,6 +99,10 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
 OMX_MediaProcessor::~OMX_MediaProcessor()
 {
    stop();
+
+   m_av_clock->Deinitialize();
+   if (m_av_clock)
+      delete m_av_clock;
 
    LOG_VERBOSE(LOG_TAG, "Freeing hints...");
    delete m_hints_audio;
@@ -220,7 +228,8 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
                     m_bMpeg,
                     ENABLE_HDMI_CLOCK_SYNC,
                     true,                   /* threaded */
-                    1.0                     /* display aspect, unused */
+                    1.0,                    /* display aspect, unused */
+                    m_video_queue_size, m_video_fifo_size
                     ))
             return false;
 
@@ -244,6 +253,16 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
 
     m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
 
+#if 0
+    if ((m_hints_audio.codec == CODEC_ID_AC3 || m_hints_audio.codec == CODEC_ID_EAC3) &&
+        m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eAC3, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
+       m_passthrough = false;
+    if (m_hints_audio.codec == CODEC_ID_DTS &&
+        m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eDTS, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
+       m_passthrough = false;
+#endif
+
+
     LOG_VERBOSE(LOG_TAG, "Opening audio using OMX...");
     if (m_has_audio)
         if (!m_player_audio->Open(
@@ -255,7 +274,8 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
                     0,                  /* TODO: initial_volume */
                     false,              /* TODO: hw decode */
                     false,              /* TODO: downmix boost */
-                    true                /* threaded */
+                    true,               /* threaded */
+                    m_audio_queue_size, m_audio_fifo_size
                     ))
             return false;
 
@@ -507,7 +527,7 @@ void OMX_MediaProcessor::mediaDecoding()
 
         /* when the audio buffer runs under 0.1 seconds we buffer up */
         if (m_has_audio) {
-            if (m_player_audio->GetDelay() < 0.1f && !m_buffer_empty) {
+            if (m_player_audio->GetDelay() < min(0.1f, 0.1f*(m_audio_fifo_size ? 2.0f:m_audio_fifo_size)) && !m_buffer_empty) {
                 if (!m_av_clock->OMXIsPaused()) {
                     m_av_clock->OMXPause();
 
@@ -516,7 +536,7 @@ void OMX_MediaProcessor::mediaDecoding()
                     clock_gettime(CLOCK_REALTIME, &starttime);
                 }
             }
-            if (m_player_audio->GetDelay() > (AUDIO_BUFFER_SECONDS * 0.75f) && m_buffer_empty) {
+            if (m_player_audio->GetDelay() > m_player_audio->GetCacheTotal() * 0.75f && m_buffer_empty) {
                 if (m_av_clock->OMXIsPaused()) {
                     m_av_clock->OMXResume();
 
@@ -546,14 +566,22 @@ void OMX_MediaProcessor::mediaDecoding()
 
 #if 0 // TODO: Reimplement?
             if(m_tv_show_info)
-            {
-                char response[80];
-                vc_gencmd(response, sizeof response, "render_bar 4 video_fifo %d %d %d %d",
-                          m_player_video->GetDecoderBufferSize()-m_player_video->GetDecoderFreeSpace(),
-                          0 , 0, m_player_video->GetDecoderBufferSize());
-                vc_gencmd(response, sizeof response, "render_bar 5 audio_fifo %d %d %d %d",
-                          (int)(100.0*m_player_audio->GetDelay()), 0, 0, 100*AUDIO_BUFFER_SECONDS);
-            }
+                  {
+                    static unsigned count;
+                    if ((count++ & 15) == 0)
+                    {
+                      char response[80];
+                      vc_gencmd(response, sizeof response, "render_bar 4 video_fifo %d %d %d %d",
+                            m_player_video.GetDecoderBufferSize()-m_player_video.GetDecoderFreeSpace(),
+                            0 , 0, m_player_video.GetDecoderBufferSize());
+                      vc_gencmd(response, sizeof response, "render_bar 5 audio_fifo %d %d %d %d",
+                            (int)(100.0*m_player_audio.GetDelay()), 0, 0, (int)(100.0f * m_player_audio.GetCacheTotal()));
+                      vc_gencmd(response, sizeof response, "render_bar 6 video_queue %d %d %d %d",
+                            m_player_video.GetLevel(), 0, 0, 100);
+                      vc_gencmd(response, sizeof response, "render_bar 7 audio_queue %d %d %d %d",
+                            m_player_audio.GetLevel(), 0, 0, 100);
+                    }
+                  }
 #endif
         }
         else if (m_has_audio && m_omx_pkt && m_omx_pkt->codec_type == AVMEDIA_TYPE_AUDIO) {

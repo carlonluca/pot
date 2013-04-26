@@ -64,6 +64,7 @@ public:
           float display_aspect = 0.0f,
           bool deinterlace = false,
           bool hdmi_clock_sync = false
+          , float fifo_size = 0.0f
           );
   void Close(void);
   unsigned int GetFreeSpace();

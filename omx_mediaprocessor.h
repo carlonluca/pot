@@ -180,6 +180,11 @@ private:
 
     COMXStreamInfo* m_hints_audio;
     COMXStreamInfo* m_hints_video;
+
+    float m_audio_fifo_size; // zero means use default
+    float m_video_fifo_size;
+    float m_audio_queue_size;
+    float m_video_queue_size;
 };
 
 
