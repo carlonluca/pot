@@ -29,7 +29,7 @@ static FILE*       m_file           = NULL;
 static int         m_repeatCount    = 0;
 static int         m_repeatLogLevel = -1;
 static std::string m_repeatLine     = "";
-static int         m_logLevel       = LOG_LEVEL_DEBUG;
+static int         m_logLevel       = LOG_LEVEL_NONE;
 
 static pthread_mutex_t   m_log_mutex;
 

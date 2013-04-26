@@ -64,6 +64,8 @@ OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProvider* provider)
   m_iSubtitleDelay = 0;
   m_pSubtitleCodec = NULL;
   m_provider       = provider;
+  m_max_data_size = 10 * 1024 * 1024;
+  m_fifo_size     = (float)80*1024*60 / (1024*1024);
 
   pthread_cond_init(&m_packet_cond, NULL);
   pthread_cond_init(&m_picture_cond, NULL);
@@ -128,7 +130,9 @@ bool OMXPlayerVideo::Open(
         bool mpeg,
         bool hdmi_clock_sync,
         bool use_thread,
-        float display_aspect
+        float display_aspect,
+        float queue_size,
+        float fifo_size
         )
 {
   if (!m_dllAvUtil.Load() || !m_dllAvCodec.Load() || !m_dllAvFormat.Load() || !av_clock)
@@ -158,6 +162,10 @@ bool OMXPlayerVideo::Open(
   m_speed       = DVD_PLAYSPEED_NORMAL;
   m_iSubtitleDelay = 0;
   m_pSubtitleCodec = NULL;
+  if (queue_size != 0.0)
+    m_max_data_size = queue_size * 1024 * 1024;
+  if (fifo_size != 0.0)
+    m_fifo_size = fifo_size;
 
   m_FlipTimeStamp = m_av_clock->GetAbsoluteClock();
 
@@ -265,10 +273,12 @@ void OMXPlayerVideo::Output(double pts)
   m_FlipTimeStamp += max(0.0, iSleepTime);
   m_FlipTimeStamp += iFrameDuration;
 
+#ifndef ENABLE_IMPROVED_BUFFERING
   while(m_av_clock->GetAbsoluteClock(false) < (iCurrentClock + iSleepTime + DVD_MSEC_TO_TIME(500)) )
   {
     OMXClock::OMXSleep(10);
   }
+#endif
 
   /*
   printf("iPlayingClock %f iCurrentClock %f iClockSleep %f iFrameSleep %f iFrameDuration %f WaitAbsolut %f m_FlipTimeStamp %f pts %f\n", 
@@ -280,7 +290,9 @@ void OMXPlayerVideo::Output(double pts)
 
   //g_renderManager.FlipPage(CThread::m_bStop, (iCurrentClock + iSleepTime) / DVD_TIME_BASE, -1, mDisplayField);
 
+#ifndef ENABLE_IMPROVED_BUFFERING
   m_av_clock->WaitAbsoluteClock((iCurrentClock + iSleepTime));
+#endif
 
   // guess next frame pts. iDuration is always valid
   if (m_speed != 0)
@@ -388,6 +400,11 @@ bool OMXPlayerVideo::Decode(OMXPacket *pkt)
 
     ret = true;
   }
+#ifdef ENABLE_IMPROVED_BUFFERING
+  else
+    // video fifo is full, allow other tasks to run
+    OMXClock::OMXSleep(10);
+#endif
 
   return ret;
 }
@@ -506,7 +523,7 @@ bool OMXPlayerVideo::AddPacket(OMXPacket *pkt)
   if(m_bStop || m_bAbort)
     return ret;
 
-  if((m_cached_size + pkt->size) < MAX_DATA_SIZE)
+  if((m_cached_size + pkt->size) < m_max_data_size)
   {
     Lock();
     m_cached_size += pkt->size;
@@ -536,7 +553,7 @@ bool OMXPlayerVideo::OpenDecoder(OMX_TextureData*& textureData)
 
   m_decoder = new COMXVideo(m_provider);
 
-  if (!m_decoder->Open(m_hints, m_av_clock, textureData, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync))
+  if (!m_decoder->Open(m_hints, m_av_clock, textureData, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync, m_fifo_size))
   {
     CloseDecoder();
     return false;

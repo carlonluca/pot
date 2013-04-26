@@ -72,7 +72,8 @@ Rectangle {
     OMXMediaProcessor {
         id: mediaProcessor
         //source: "/home/pi/07 Hail Caesar.mp3"
-        source: "/home/pi/usb/Cars2.mkv"
+        //source: "/home/pi/usb/Cars2.mkv"
+        source: "/home/pi/usb/big_buck_bunny_1080p_h264.mov"
     }
 
     Flipable {

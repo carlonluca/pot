@@ -11,6 +11,12 @@
 # PiOmxTextures/openmaxil_backend/3rdparty.
 # First, remember to run the compile_ffmpeg.sh script to download and build ffmpeg.
 
+# Check the user provided the number of threads to use when building.
+if [ $# -ne 1 ]; then
+   echo "Illegal arguments. Please provide just one parameter with the number of parallel threads to use when building."
+   exit
+fi
+
 echo "This script will automatically download and build the dependencies..."
 
 if [ ! -d ../3rdparty/ffmpeg/lib ] || [ ! -d ../3rdparty/ffmpeg/include ]; then
@@ -40,7 +46,7 @@ read -p "Please enter the absolute path to the qmake to use... " qmake_bin
 echo "Ok, about to compile PiOmxTextures..."
 mkdir build-PiOmxTextures
 cd build-PiOmxTextures
-$qmake_bin ../../..
+$qmake_bin "DEFINES+=CONFIG_LIB" ../../..
 make -j$1
 make install
 

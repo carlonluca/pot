@@ -27,6 +27,10 @@
 
 #include "OMXClock.h"
 
+#ifdef ENABLE_IMPROVED_BUFFERING
+#define OMX_PRE_ROLL 200
+#endif
+
 int64_t OMXClock::m_systemOffset;
 int64_t OMXClock::m_systemFrequency;
 bool    OMXClock::m_ismasterclock;
@@ -281,10 +285,14 @@ bool OMXClock::OMXInitialize(bool has_video, bool has_audio)
   if(!m_omx_clock.Initialize(componentName, OMX_IndexParamOtherInit))
     return false;
 
+#ifndef ENABLE_IMPROVED_BUFFERING
   OMX_TIME_CONFIG_CLOCKSTATETYPE clock;
   OMX_INIT_STRUCTURE(clock);
 
   clock.eState = OMX_TIME_ClockStateWaitingForStartTime;
+#ifdef ENABLE_IMPROVED_BUFFERING
+  clock.nOffset   = ToOMXTime(-1000LL * OMX_PRE_ROLL);
+#endif
 
   if(m_has_audio)
   {
@@ -302,7 +310,7 @@ bool OMXClock::OMXInitialize(bool has_video, bool has_audio)
     CLog::Log(LOGERROR, "OMXClock::Initialize error setting OMX_IndexConfigTimeClockState\n");
     return false;
   }
-
+#endif // ENABLE_IMPROVED_BUFFERING
   OMX_TIME_CONFIG_ACTIVEREFCLOCKTYPE refClock;
   OMX_INIT_STRUCTURE(refClock);
 
@@ -487,6 +495,10 @@ bool OMXClock::OMXReset(bool lock /* = true */)
     OMXStop(false);
 
     clock.eState    = OMX_TIME_ClockStateWaitingForStartTime;
+#ifdef ENABLE_IMPROVED_BUFFERING
+    clock.nOffset   = ToOMXTime(-1000LL * OMX_PRE_ROLL);
+#endif
+
     if(m_has_audio)
     {
       clock.nWaitMask |= OMX_CLOCKPORT0;
@@ -705,6 +717,9 @@ bool OMXClock::OMXWaitStart(double pts, bool lock /* = true */)
   else
   {
     clock.eState = OMX_TIME_ClockStateWaitingForStartTime;
+#ifdef ENABLE_IMPROVED_BUFFERING
+    clock.nOffset   = ToOMXTime(-1000LL * OMX_PRE_ROLL);
+#endif
 
     if(m_has_audio)
     {

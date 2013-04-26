@@ -5,8 +5,11 @@
 #
 
 # Either CONFIG_LIB or CONFIG_APP.
-DEFINES += CONFIG_LIB
+#DEFINES += CONFIG_LIB
 #DEFINES += CONFIG_APP
+!contains(DEFINES, CONFIG_APP):!contains(DEFINES, CONFIG_LIB) {
+error("Either add CONFIG_APP or CONFIG_LIB to DEFINES.")
+}
 
 QT += core core-private gui gui-private opengl quick quick-private
 
@@ -233,7 +236,8 @@ OTHER_FILES += \
     tools/compile_ffmpeg.sh \
     tools/extract_aac_stream.sh \
     tools/extract_h264_stream.sh \
-    omxplayer_lib/omxplayer.cpp
+    omxplayer_lib/omxplayer.cpp \
+    omxplater_lib/OMXPLAYER_VERSION
 
 contains(DEFINES, CONFIG_APP) {
 RESOURCES += resources.qrc

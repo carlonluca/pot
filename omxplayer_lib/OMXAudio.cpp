@@ -139,6 +139,7 @@ COMXAudio::COMXAudio() :
   m_eEncoding       (OMX_AUDIO_CodingPCM),
   m_extradata       (NULL   ),
   m_extrasize       (0      ),
+  m_fifo_size       (0.0    ),
   m_visBufferLength (0      ),
   m_last_pts        (DVD_NOPTS_VALUE)
 {
@@ -153,7 +154,7 @@ COMXAudio::~COMXAudio()
 
 bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, enum PCMChannels *channelMap,
                            COMXStreamInfo &hints, OMXClock *clock, EEncoded bPassthrough, bool bUseHWDecode,
-                           bool boostOnDownmix, long initialVolume)
+                           bool boostOnDownmix, long initialVolume, float fifo_size)
 {
   m_HWDecode = false;
   m_Passthrough = false;
@@ -181,10 +182,11 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     memcpy(m_extradata, hints.extradata, hints.extrasize);
   }
 
-  return Initialize(pCallback, device, hints.channels, channelMap, hints.channels, hints.samplerate, hints.bitspersample, false, boostOnDownmix, false, bPassthrough, initialVolume);
+  return Initialize(pCallback, device, hints.channels, channelMap, hints.channels, hints.samplerate, hints.bitspersample,
+              false, boostOnDownmix, false, bPassthrough, initialVolume, fifo_size);
 }
 
-bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, int iChannels, enum PCMChannels *channelMap, unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool bResample, bool boostOnDownmix, bool bIsMusic, EEncoded bPassthrough, long initialVolume)
+bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, int iChannels, enum PCMChannels *channelMap, unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool bResample, bool boostOnDownmix, bool bIsMusic, EEncoded bPassthrough, long initialVolume, float fifo_size)
 {
   std::string deviceuse;
   if(device == "hdmi") {
@@ -197,6 +199,7 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     return false;
 
   m_Passthrough = false;
+  m_fifo_size = fifo_size;
 
   if(bPassthrough != IAudioRenderer::ENCODED_NONE)
     m_Passthrough =true;
@@ -244,7 +247,10 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
   m_wave_header.dwChannelMask     = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
 
   // set the input format, and get the channel layout so we know what we need to open
-  enum PCMChannels *outLayout = m_remap.SetInputFormat (iChannels, channelMap, uiBitsPerSample / 8, uiSamplesPerSec);;
+  enum PCMChannels *outLayout = NULL;
+
+  if (!m_Passthrough && channelMap)
+    outLayout = m_remap.SetInputFormat (iChannels, channelMap, uiBitsPerSample / 8, uiSamplesPerSec);;
 
   if (!m_Passthrough && channelMap && outLayout)
   {
@@ -296,7 +302,7 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
   m_pcm_output.eNumData            = OMX_NumericalDataSigned;
   m_pcm_output.eEndian             = OMX_EndianLittle;
   m_pcm_output.bInterleaved        = OMX_TRUE;
-  m_pcm_output.nBitPerSample       = uiBitsPerSample;
+  m_pcm_output.nBitPerSample       = 16;
   m_pcm_output.ePCMMode            = OMX_AUDIO_PCMModeLinear;
   m_pcm_output.nChannels           = m_OutputChannels;
   m_pcm_output.nSamplingRate       = uiSamplesPerSec;
@@ -304,19 +310,27 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
   m_SampleRate    = uiSamplesPerSec;
   m_BitsPerSample = uiBitsPerSample;
   m_BufferLen     = m_BytesPerSec = uiSamplesPerSec * (uiBitsPerSample >> 3) * m_InputChannels;
+#if 0
   m_BufferLen     *= AUDIO_BUFFER_SECONDS;
   // lcarlon: it seems OMX_EmptyThisBuffer takes quite some time
   // to complete, and a small buffer might require more than one
   // call to OMX_EmptyThisBuffer.
+  // lcarlon: 04.26.2013: it seems the new setup from omxplayer is ok as
+  // well.
   m_ChunkLen      = 20000;
-  //m_ChunkLen      = 6144;
-  ///m_ChunkLen      = 2048;
+  //m_ChunkLen    = 6144;
+  //m_ChunkLen    = 2048;
+#else
+  m_BufferLen     *= m_fifo_size;
+  m_ChunkLen      = 2048 * (uiBitsPerSample >> 3) * m_InputChannels;
+#endif
 
   m_wave_header.Samples.wValidBitsPerSample = uiBitsPerSample;
   m_wave_header.Samples.wSamplesPerBlock    = 0;
   m_wave_header.Format.nChannels            = m_InputChannels;
   m_wave_header.Format.nBlockAlign          = m_InputChannels * (uiBitsPerSample >> 3);
-  m_wave_header.Format.wFormatTag           = WAVE_FORMAT_PCM;
+  // Custom format interpreted by GPU as WAVE_FORMAT_IEEE_FLOAT_PLANAR
+  m_wave_header.Format.wFormatTag           = 0x8000;
   m_wave_header.Format.nSamplesPerSec       = uiSamplesPerSec;
   m_wave_header.Format.nAvgBytesPerSec      = m_BytesPerSec;
   m_wave_header.Format.wBitsPerSample       = uiBitsPerSample;
@@ -970,15 +984,12 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
 
       if(!m_Passthrough)
       {
-        if(m_HWDecode)
+        OMX_INIT_STRUCTURE(m_pcm_input);
+        m_pcm_input.nPortIndex      = m_omx_decoder.GetOutputPort();
+        omx_err = m_omx_decoder.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_input);
+        if(omx_err != OMX_ErrorNone)
         {
-          OMX_INIT_STRUCTURE(m_pcm_input);
-          m_pcm_input.nPortIndex      = m_omx_decoder.GetOutputPort();
-          omx_err = m_omx_decoder.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_input);
-          if(omx_err != OMX_ErrorNone)
-          {
-            CLog::Log(LOGERROR, "COMXAudio::AddPackets error GetParameter 1 omx_err(0x%08x)\n", omx_err);
-          }
+          CLog::Log(LOGERROR, "COMXAudio::AddPackets error GetParameter 1 omx_err(0x%08x)\n", omx_err);
         }
 
         /* setup mixer input */
@@ -1024,10 +1035,6 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
       }
       else
       {
-        m_pcm_output.nPortIndex      = m_omx_decoder.GetOutputPort();
-        m_omx_decoder.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
-        PrintPCM(&m_pcm_output);
-
         OMX_AUDIO_PARAM_PORTFORMATTYPE formatType;
         OMX_INIT_STRUCTURE(formatType);
         formatType.nPortIndex = m_omx_render.GetInputPort();
@@ -1055,7 +1062,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
 
           m_ddParam.nPortIndex      = m_omx_render.GetInputPort();
 
-          m_ddParam.nChannels       = m_InputChannels; //(m_InputChannels == 6) ? 8 : m_InputChannels;
+          m_ddParam.nChannels       = m_InputChannels;
           m_ddParam.nSampleRate     = m_SampleRate;
           m_ddParam.eBitStreamId    = OMX_AUDIO_DDPBitStreamIdAC3;
           m_ddParam.nBitRate        = 0;
@@ -1076,7 +1083,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
         {
           m_dtsParam.nPortIndex      = m_omx_render.GetInputPort();
 
-          m_dtsParam.nChannels       = m_InputChannels; //(m_InputChannels == 6) ? 8 : m_InputChannels;
+          m_dtsParam.nChannels       = m_InputChannels;
           m_dtsParam.nBitRate        = 0;
 
           for(unsigned int i = 0; i < OMX_MAX_CHANNELS; i++)
@@ -1186,7 +1193,6 @@ void COMXAudio::WaitCompletion()
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
   OMX_BUFFERHEADERTYPE *omx_buffer = m_omx_decoder.GetInputBuffer();
-  struct timespec starttime, endtime;
 
   if(omx_buffer == NULL)
   {
@@ -1207,18 +1213,10 @@ void COMXAudio::WaitCompletion()
     return;
   }
 
-  // clock_gettime(CLOCK_REALTIME, &starttime);
-
   while(true)
   {
     if(m_omx_render.IsEOS())
       break;
-    // clock_gettime(CLOCK_REALTIME, &endtime);
-    // if((endtime.tv_sec - starttime.tv_sec) > 2)
-    // {
-    //   CLog::Log(LOGERROR, "%s::%s - wait for eos timed out\n", CLASSNAME, __func__);
-    //   break;
-    // }
     OMXClock::OMXSleep(50);
   }
 

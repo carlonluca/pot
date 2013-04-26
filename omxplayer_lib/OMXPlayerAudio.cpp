@@ -58,6 +58,8 @@ OMXPlayerAudio::OMXPlayerAudio()
   m_speed         = DVD_PLAYSPEED_NORMAL;
   m_player_error  = true;
   m_initialVolume = 0;
+  m_max_data_size = 3 * 1024 * 1024;
+  m_fifo_size     = 2.0f;
 
   pthread_cond_init(&m_packet_cond, NULL);
   pthread_cond_init(&m_audio_cond, NULL);
@@ -101,7 +103,7 @@ void OMXPlayerAudio::UnLockDecoder()
 
 bool OMXPlayerAudio::Open(COMXStreamInfo &hints, OMXClock *av_clock, OMXReader *omx_reader,
                           std::string device, bool passthrough, long initialVolume, bool hw_decode,
-                          bool boost_on_downmix, bool use_thread)
+                          bool boost_on_downmix, bool use_thread, float queue_size, float fifo_size)
 {
   if(ThreadHandle())
     Close();
@@ -130,6 +132,10 @@ bool OMXPlayerAudio::Open(COMXStreamInfo &hints, OMXClock *av_clock, OMXReader *
   m_pChannelMap = NULL;
   m_speed       = DVD_PLAYSPEED_NORMAL;
   m_initialVolume = initialVolume;
+  if (queue_size != 0.0)
+    m_max_data_size = queue_size * 1024 * 1024;
+  if (fifo_size != 0.0)
+    m_fifo_size = fifo_size;
 
   m_error = 0;
   m_errorbuff = 0;
@@ -310,13 +316,6 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
 
   int channels = pkt->hints.channels;
 
-  /* 6 channel have to be mapped to 8 for PCM */
-  if(!m_passthrough && !m_hw_decode)
-  {
-    if(channels == 6)
-      channels = 8;
-  }
- 
   unsigned int old_bitrate = m_hints.bitrate;
   unsigned int new_bitrate = pkt->hints.bitrate;
 
@@ -357,10 +356,10 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
 
   }
 
-  if(!((unsigned long)m_decoder->GetSpace() > pkt->size))
+  if(!((int)m_decoder->GetSpace() > pkt->size))
     OMXClock::OMXSleep(10);
 
-  if((unsigned long)m_decoder->GetSpace() > pkt->size)
+  if((int)m_decoder->GetSpace() > pkt->size)
   {
     if(pkt->dts != DVD_NOPTS_VALUE)
       m_iCurrentPts = pkt->dts;
@@ -402,7 +401,7 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
           printf("error ret %d decoded_size %d\n", ret, decoded_size);
         }
 
-        int n = (m_hints.channels * m_hints.bitspersample * m_hints.samplerate)>>3;
+        int n = (m_hints.channels * 32 * m_hints.samplerate)>>3;
         if (n > 0 && m_iCurrentPts != DVD_NOPTS_VALUE)
           m_iCurrentPts += ((double)decoded_size * DVD_TIME_BASE) / n;
 
@@ -506,7 +505,7 @@ bool OMXPlayerAudio::AddPacket(OMXPacket *pkt)
   if(m_bStop || m_bAbort)
     return ret;
 
-  if((m_cached_size + pkt->size) < MAX_DATA_SIZE)
+  if((m_cached_size + pkt->size) < m_max_data_size)
   {
     Lock();
     m_cached_size += pkt->size;
@@ -617,19 +616,15 @@ bool OMXPlayerAudio::OpenDecoder()
       m_hw_decode = false;
     bAudioRenderOpen = m_decoder->Initialize(NULL, m_device.substr(4), m_pChannelMap,
                                              m_hints, m_av_clock, m_passthrough,
-                                             m_hw_decode, m_boost_on_downmix, m_initialVolume);
+                                             m_hw_decode, m_boost_on_downmix, m_initialVolume, m_fifo_size);
   }
   else
   {
     unsigned int downmix_channels = m_hints.channels;
 
-    /* omx needs 6 channels packed into 8 for PCM */
-    if(m_hints.channels == 6)
-      m_hints.channels = 8;
-
     bAudioRenderOpen = m_decoder->Initialize(NULL, m_device.substr(4), m_hints.channels, m_pChannelMap,
-                                             downmix_channels, m_hints.samplerate, m_hints.bitspersample,
-                                             false, m_boost_on_downmix, false, m_passthrough, m_initialVolume);
+                                             downmix_channels, m_hints.samplerate, m_passthrough ? 16:32,
+                                             false, m_boost_on_downmix, false, m_passthrough, m_initialVolume, m_fifo_size);
   }
 
   m_codec_name = m_omx_reader->GetCodecName(OMXSTREAM_AUDIO);
@@ -644,8 +639,13 @@ bool OMXPlayerAudio::OpenDecoder()
   {
     if(m_passthrough)
     {
-      printf("Audio codec %s channels %d samplerate %d bitspersample %d\n",
-        m_codec_name.c_str(), 2, m_hints.samplerate, m_hints.bitspersample);
+#ifndef ENABLE_IMPROVED_BUFFERING
+       printf("Audio codec %s passthrough channels %d samplerate %d bitspersample %d\n",
+               m_codec_name.c_str(), m_hints.channels, m_hints.samplerate, m_hints.bitspersample);
+#else
+      printf("Audio codec %s passthrough channels %d samplerate %d bitspersample %d\n",
+        m_codec_name.c_str(), m_hints.channels, m_hints.samplerate, m_hints.bitspersample);
+#endif
     }
     else
     {
@@ -677,6 +677,14 @@ double OMXPlayerAudio::GetCacheTime()
 {
   if(m_decoder)
     return m_decoder->GetCacheTime();
+  else
+    return 0;
+}
+
+double OMXPlayerAudio::GetCacheTotal()
+{
+  if(m_decoder)
+    return m_decoder->GetCacheTotal();
   else
     return 0;
 }
