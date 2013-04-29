@@ -13,18 +13,11 @@
 
 echo "Downloading ffmpeg sources from git..."
 cd ..
-if [ ! -d "3rdparty" ]; then
-   echo "Dir structure is not correct! Aborting. Bye bye."
-   exit
+if [ ! -d "3rdparty/ffmpeg" ]; then
+   mkdir -p 3rdparty/ffmpeg
 fi
 
-cd 3rdparty
-if [ ! -d "ffmpeg" ]; then
-   echo "Dir structure is not correct! Aborting. Bye bye."
-   exit
-fi
-
-cd ffmpeg
+cd 3rdparty/ffmpeg
 git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg_src
 cd ffmpeg_src
 git checkout master
