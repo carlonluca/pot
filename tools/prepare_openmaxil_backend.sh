@@ -34,17 +34,19 @@ while true; do
 done
 
 echo "Preparing 3rdparty dir..."
-cd ../openmaxil_backend/3rdparty
-if [  $? -ne 0 ]; then
-   echo "Wrong dir structure. Aborting."
-   exit
+cd ..
+if [ ! -d openmaxil_backend/3rdparty ]; then
+   mkdir -p openmaxil_backend/3rdparty
 fi
+cd openmaxil_backend/3rdparty
 rm -rf PiOmxTextures
 rm -rf ffmpeg
 
 read -p "Please enter the absolute path to the qmake to use... " qmake_bin
 echo "Ok, about to compile PiOmxTextures..."
-mkdir build-PiOmxTextures
+if [ ! -d build-PiOmxTextures ]; then
+   mkdir build-PiOmxTextures
+fi
 cd build-PiOmxTextures
 $qmake_bin "DEFINES+=CONFIG_LIB" ../../..
 make -j$1

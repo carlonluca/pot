@@ -11,6 +11,12 @@
 # Usage:
 #    ./compile_ffmpeg.sh <n>, where n is the number of compilation threads to use.
 
+# Check the user provided the number of threads to use when building.
+if [ $# -ne 1 ]; then
+   echo "Illegal arguments. Please provide just one parameter with the number of parallel threads to use when building."
+   exit
+fi
+
 echo "Downloading ffmpeg sources from git..."
 cd ..
 if [ ! -d "3rdparty/ffmpeg" ]; then
