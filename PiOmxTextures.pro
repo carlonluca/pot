@@ -236,6 +236,7 @@ OTHER_FILES += \
     tools/compile_ffmpeg.sh \
     tools/extract_aac_stream.sh \
     tools/extract_h264_stream.sh \
+    tools/prepare_openmaxil_backend.sh \
     omxplayer_lib/omxplayer.cpp \
     omxplater_lib/OMXPLAYER_VERSION
 
