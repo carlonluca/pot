@@ -315,6 +315,7 @@ void OpenMAXILPlayerControl::setMediaInt(const QMediaContent& mediaContent)
 {
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
+   m_mediaProcessor->stop();
    if (!m_mediaProcessor->setFilename(mediaContent.canonicalUrl().path(), m_textureData))
        return;
    m_currentResource = mediaContent;
