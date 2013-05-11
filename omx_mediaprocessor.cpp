@@ -100,20 +100,13 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
 {
    stop();
 
-   m_av_clock->Deinitialize();
-   if (m_av_clock)
-      delete m_av_clock;
-
-   LOG_VERBOSE(LOG_TAG, "Freeing hints...");
-   delete m_hints_audio;
-   delete m_hints_video;
-
-   LOG_VERBOSE(LOG_TAG, "Freeing clock...");
-   delete m_av_clock;
+   LOG_VERBOSE(LOG_TAG, "Waiting for thread to die...");
+   m_thread.quit();
+   m_thread.wait();
 
    // TODO: Fix this! When freeing players, a lock seems to hang!
    LOG_VERBOSE(LOG_TAG, "Freeing players...");
-#if 0
+#if 1
 #ifdef ENABLE_SUBTITLES
    delete m_player_subtitles;
 #endif
@@ -121,20 +114,23 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
    delete m_player_video;
 #endif
 
+   LOG_VERBOSE(LOG_TAG, "Freeing clock...");
+   delete m_av_clock;
+
    // TODO: This should really be done, but still it seems to sefault sometimes.
    LOG_VERBOSE(LOG_TAG, "Deinitializing hardware libs...");
-   //m_OMX->Deinitialize();
-   //m_RBP->Deinitialize();
+   m_OMX->Deinitialize();
+   m_RBP->Deinitialize();
+
+   LOG_VERBOSE(LOG_TAG, "Freeing hints...");
+   delete m_hints_audio;
+   delete m_hints_video;
 
    LOG_VERBOSE(LOG_TAG, "Freeing OpenMAX structures...");
    delete m_RBP;
    delete m_OMX;
    delete m_omx_pkt;
    delete m_omx_reader;
-
-   LOG_VERBOSE(LOG_TAG, "Waiting for thread to die...");
-   m_thread.quit();
-   m_thread.wait();
 }
 
 /*------------------------------------------------------------------------------
@@ -720,6 +716,7 @@ void OMX_MediaProcessor::cleanup()
     LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
     m_av_clock->OMXStop();
     m_av_clock->OMXStateIdle();
+    m_av_clock->Deinitialize();
 
     LOG_VERBOSE(LOG_TAG, "Closing players...");
 #ifdef ENABLE_SUBTITLES
@@ -738,12 +735,8 @@ void OMX_MediaProcessor::cleanup()
 
     vc_tv_show_info(0);
 
-    // lcarlon: free the texture. Invoke freeTexture so that it is the user
-    // of the class to do it cause it is commonly required to do it in the
-    // current OpenGL and EGL context.
-    LOG_VERBOSE(LOG_TAG, "Freeing texture...");
-    m_provider->freeTexture(m_textureData);
-    emit textureInvalidated();
+    // Keep an handle to the texture data that will be freed.
+    OMX_TextureData* textureData = m_textureData;
     m_textureData = NULL;
 
     // Actually change the state here and reset flags.
@@ -755,6 +748,16 @@ void OMX_MediaProcessor::cleanup()
     }
     m_mutexPending.unlock();
     LOG_INFORMATION(LOG_TAG, "Cleanup done.");
+
+    // lcarlon: free the texture. Invoke freeTexture so that it is the user
+    // of the class to do it cause it is commonly required to do it in the
+    // current OpenGL and EGL context. Do it here, after the stop command is
+    // considered finished: this is needed to avoid hardlock in case the
+    // used wants to free the texture in his own thread, which would still
+    // be blocked waiting for the stop command to finish.
+    LOG_VERBOSE(LOG_TAG, "Freeing texture...");
+    m_provider->freeTexture(textureData);
+    emit textureInvalidated();
 }
 
 /*------------------------------------------------------------------------------

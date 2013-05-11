@@ -45,9 +45,12 @@
 +-----------------------------------------------------------------------------*/
 OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
 {
+    LOG_DEBUG(LOG_TAG, "Getting EGL display...");
     EGLDisplay eglDisplay = get_egl_display();
+    LOG_DEBUG(LOG_TAG, "Getting OpenGL context...");
     EGLContext eglContext = get_egl_context();
 
+    LOG_DEBUG(LOG_TAG, "Enjoying with OpenGL structures...");
     EGLint attr[] = {EGL_GL_TEXTURE_LEVEL_KHR, 0, EGL_NONE};
 
     GLuint textureId;
