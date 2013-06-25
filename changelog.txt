@@ -4,6 +4,8 @@ Version 4.2.0
 =============
 1. Merged changes from omxplayer.
 2. Updated ffmpeg linked version.
+3. Changed access to the scene graph thread by providing the QMediaPlayer class
+   with a reference to the QQuickWindow.
 
 Version 4.1.0
 =============

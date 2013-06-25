@@ -10,6 +10,8 @@ PLUGIN_TYPE = mediaservice
 PLUGIN_CLASS_NAME = OpenMAXILPlayerServicePlugin
 load(qt_plugin)
 
+QT += quick
+
 include(../common.pri)
 
 message($$_PRO_FILE_PWD_)
@@ -21,8 +23,6 @@ LIBS += \
    -lEGL \
    -L$$_PRO_FILE_PWD_/../3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample \
    -L$$_PRO_FILE_PWD_/../3rdparty/PiOmxTextures/lib -lPiOmxTextures
-QMAKE_LFLAGS += -Wl,-unresolved-symbols=ignore-all
-QMAKE_LFLAGS -= -Wl,--no-undefined
 
 HEADERS += \
     $$PWD/openmaxilplayercontrol.h \

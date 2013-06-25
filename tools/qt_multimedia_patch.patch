@@ -1,122 +1,175 @@
-diff --git a/examples/multimedia/video/qmlvideo/main.cpp b/examples/multimedia/video/qmlvideo/main.cpp
-index 1a9c523..dd15bac 100644
---- a/examples/multimedia/video/qmlvideo/main.cpp
-+++ b/examples/multimedia/video/qmlvideo/main.cpp
-@@ -56,6 +56,17 @@
- static const QString DefaultFileName1 = "";
- static const QString DefaultFileName2 = "";
+diff --git a/src/imports/multimedia/qdeclarativeaudio.cpp b/src/imports/multimedia/qdeclarativeaudio.cpp
+index 1bd992d..44555aa 100644
+--- a/src/imports/multimedia/qdeclarativeaudio.cpp
++++ b/src/imports/multimedia/qdeclarativeaudio.cpp
+@@ -39,6 +39,8 @@
+ **
+ ****************************************************************************/
+ #include <QtQml/qqmlinfo.h>
++#include <QtQuick/qquickitem.h>
++#include <QtGui/qwindow.h>
  
-+class RPiQuickView
+ #include "qdeclarativeaudio_p.h"
+ 
+@@ -105,8 +107,8 @@ void QDeclarativeAudio::_q_availabilityChanged(QMultimedia::AvailabilityStatus)
+     emit availabilityChanged(availability());
+ }
+ 
+-QDeclarativeAudio::QDeclarativeAudio(QObject *parent)
+-    : QObject(parent)
++QDeclarativeAudio::QDeclarativeAudio(QQuickItem *parent)
++    : QQuickItem(parent)
+     , m_autoPlay(false)
+     , m_autoLoad(true)
+     , m_loaded(false)
+@@ -738,6 +740,13 @@ void QDeclarativeAudio::_q_statusChanged()
+     }
+ }
+ 
++// lcarlon
++void QDeclarativeAudio::itemChange(ItemChange change, const ItemChangeData& value)
 +{
-+public:
-+   static QQuickView* getSingleInstance();
-+};
-+
-+Q_DECL_EXPORT QQuickView* RPiQuickView::getSingleInstance() {
-+   static QQuickView instance;
-+   return &instance;
++    printf("QDeclarativeAudio::itemChange\n");
++    m_player->onItemChanged(change, value);
 +}
 +
- int main(int argc, char *argv[])
+ /*!
+     \qmlproperty string QtMultimedia5::Audio::errorString
+ 
+diff --git a/src/imports/multimedia/qdeclarativeaudio_p.h b/src/imports/multimedia/qdeclarativeaudio_p.h
+index b8a75c6..7087f29 100644
+--- a/src/imports/multimedia/qdeclarativeaudio_p.h
++++ b/src/imports/multimedia/qdeclarativeaudio_p.h
+@@ -56,6 +56,7 @@
+ #include <QtCore/qbasictimer.h>
+ #include <QtQml/qqmlparserstatus.h>
+ #include <QtQml/qqml.h>
++#include <QtQuick/qquickitem.h>
+ 
+ #include <qmediaplayer.h>
+ 
+@@ -70,7 +71,7 @@ class QDeclarativeMediaBaseAnimation;
+ class QDeclarativeMediaMetaData;
+ class QMediaAvailabilityControl;
+ 
+-class QDeclarativeAudio : public QObject, public QQmlParserStatus
++class QDeclarativeAudio : public QQuickItem
  {
-     QGuiApplication app(argc, argv);
-@@ -109,7 +120,8 @@ int main(int argc, char *argv[])
-             url2 = QUrl::fromLocalFile(source2);
+     Q_OBJECT
+     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
+@@ -142,7 +143,7 @@ public:
+         ResourceMissing = QMultimedia::ResourceError
+     };
+ 
+-    QDeclarativeAudio(QObject *parent = 0);
++    QDeclarativeAudio(QQuickItem *parent = 0);
+     ~QDeclarativeAudio();
+ 
+     bool hasAudio() const;
+@@ -199,6 +200,9 @@ public Q_SLOTS:
+     void stop();
+     void seek(int position);
+ 
++    // lcarlon
++    void itemSceneChanged();
++
+ Q_SIGNALS:
+     void sourceChanged();
+     void autoLoadChanged();
+@@ -233,6 +237,9 @@ Q_SIGNALS:
+ 
+     void mediaObjectChanged();
+ 
++protected:
++    void itemChange(ItemChange change, const ItemChangeData& value);
++
+ private Q_SLOTS:
+     void _q_error(QMediaPlayer::Error);
+     void _q_availabilityChanged(QMultimedia::AvailabilityStatus);
+diff --git a/src/multimedia/controls/qmediaplayercontrol.h b/src/multimedia/controls/qmediaplayercontrol.h
+index aed5183..73b45f6 100644
+--- a/src/multimedia/controls/qmediaplayercontrol.h
++++ b/src/multimedia/controls/qmediaplayercontrol.h
+@@ -60,6 +60,9 @@ class Q_MULTIMEDIA_EXPORT QMediaPlayerControl : public QMediaControl
+ public:
+     ~QMediaPlayerControl();
+ 
++    // lcarlon
++    virtual void setMediaPlayer(QMediaPlayer* mediaPlayer) {}
++
+     virtual QMediaPlayer::State state() const = 0;
+ 
+     virtual QMediaPlayer::MediaStatus mediaStatus() const = 0;
+diff --git a/src/multimedia/playback/qmediaplayer.cpp b/src/multimedia/playback/qmediaplayer.cpp
+index eaac828..4392cb1 100644
+--- a/src/multimedia/playback/qmediaplayer.cpp
++++ b/src/multimedia/playback/qmediaplayer.cpp
+@@ -494,6 +494,9 @@ QMediaPlayer::QMediaPlayer(QObject *parent, QMediaPlayer::Flags flags):
+         d->error = ServiceMissingError;
+     } else {
+         d->control = qobject_cast<QMediaPlayerControl*>(d->service->requestControl(QMediaPlayerControl_iid));
++        //if (dynamic_cast<QQuickItem*>(parent))
++        //    printf("Parent is a QQuickItem.\n");
++        d->control->setMediaPlayer(this);
+         d->networkAccessControl = qobject_cast<QMediaNetworkAccessControl*>(d->service->requestControl(QMediaNetworkAccessControl_iid));
+         if (d->control != 0) {
+             connect(d->control, SIGNAL(mediaChanged(QMediaContent)), SIGNAL(currentMediaChanged(QMediaContent)));
+@@ -1012,6 +1015,13 @@ void QMediaPlayer::setVideoOutput(QAbstractVideoSurface *surface)
      }
+ }
  
--    QQuickView viewer;
-+    QQuickView* pViewer = RPiQuickView::getSingleInstance();
-+    QQuickView& viewer  = *pViewer;
-     viewer.setSource(QUrl("qrc:///qml/qmlvideo/main.qml"));
-     QObject::connect(viewer.engine(), SIGNAL(quit()), &viewer, SLOT(close()));
- 
-diff --git a/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml b/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml
-index 1b3a241..7621f16 100644
---- a/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml
-+++ b/examples/multimedia/video/qmlvideo/qml/qmlvideo/main.qml
-@@ -43,8 +43,8 @@ import QtQuick 2.0
- 
- Rectangle {
-     id: root
--    width: 640
--    height: 360
-+    width: 1920
-+    height: 1080
-     color: "black"
- 
-     property string source1
-diff --git a/examples/multimedia/video/qmlvideo/qmlvideo.pro b/examples/multimedia/video/qmlvideo/qmlvideo.pro
-index 3ea513d..8af5742 100644
---- a/examples/multimedia/video/qmlvideo/qmlvideo.pro
-+++ b/examples/multimedia/video/qmlvideo/qmlvideo.pro
-@@ -9,6 +9,7 @@ LOCAL_HEADERS = trace.h
- SOURCES += $$LOCAL_SOURCES
- HEADERS += $$LOCAL_HEADERS
- RESOURCES += qmlvideo.qrc
-+QMAKE_LFLAGS += -rdynamic
- 
- SNIPPETS_PATH = ../snippets
- include($$SNIPPETS_PATH/performancemonitor/performancemonitordeclarative.pri)
-diff --git a/examples/multimedia/video/qmlvideofx/main.cpp b/examples/multimedia/video/qmlvideofx/main.cpp
-index ab613da..962bea5 100644
---- a/examples/multimedia/video/qmlvideofx/main.cpp
-+++ b/examples/multimedia/video/qmlvideofx/main.cpp
-@@ -58,6 +58,18 @@
- #include "performancemonitordeclarative.h"
- #endif
- 
-+
-+class RPiQuickView
++// lcarlon
++void QMediaPlayer::onItemChanged(QQuickItem::ItemChange change, const QQuickItem::ItemChangeData& value)
 +{
-+public:
-+   static QQuickView* getSingleInstance();
-+};
-+
-+Q_DECL_EXPORT QQuickView* RPiQuickView::getSingleInstance() {
-+   static QQuickView instance;
-+   return &instance;
++    printf("QMediaPlayer::onItemChanged\n");
++    emit itemSceneChanged();
 +}
 +
- int main(int argc, char *argv[])
+ /*! \reimp */
+ QMultimedia::AvailabilityStatus QMediaPlayer::availability() const
  {
-     QGuiApplication app(argc, argv);
-@@ -97,7 +109,8 @@ int main(int argc, char *argv[])
-         }
-     }
+diff --git a/src/multimedia/playback/qmediaplayer.h b/src/multimedia/playback/qmediaplayer.h
+index 3195ae0..de3b8f1 100644
+--- a/src/multimedia/playback/qmediaplayer.h
++++ b/src/multimedia/playback/qmediaplayer.h
+@@ -48,6 +48,8 @@
  
--    QQuickView viewer;
-+    QQuickView* pViewer = RPiQuickView::getSingleInstance();
-+    QQuickView& viewer  = *pViewer;
+ #include <QtNetwork/qnetworkconfiguration.h>
  
-     viewer.setSource(QLatin1String("qrc:///qml/qmlvideofx/") + MainQmlFile);
-     QQuickItem *rootObject = viewer.rootObject();
-diff --git a/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml b/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml
-index 63a0a01..0af4224 100644
---- a/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml
-+++ b/examples/multimedia/video/qmlvideofx/qml/qmlvideofx/main-largescreen.qml
-@@ -45,6 +45,8 @@ Rectangle {
-     id: root
-     width: 900
-     height: 600
-+    x: 510
-+    y: 285
-     color: "grey"
-     property string fileName
-     property alias volume: content.volume
-diff --git a/examples/multimedia/video/qmlvideofx/qmlvideofx.pro b/examples/multimedia/video/qmlvideofx/qmlvideofx.pro
-index d62ade8..64f27fd 100644
---- a/examples/multimedia/video/qmlvideofx/qmlvideofx.pro
-+++ b/examples/multimedia/video/qmlvideofx/qmlvideofx.pro
-@@ -5,6 +5,7 @@ QT += quick
++#include <QtQuick/qquickitem.h>
++
+ QT_BEGIN_NAMESPACE
  
- SOURCES += filereader.cpp main.cpp
- HEADERS += filereader.h trace.h
-+QMAKE_LFLAGS += -rdynamic
  
- RESOURCES += qmlvideofx.qrc
+@@ -176,6 +178,8 @@ public Q_SLOTS:
+     void setNetworkConfigurations(const QList<QNetworkConfiguration> &configurations);
  
+ Q_SIGNALS:
++    void itemSceneChanged();
++
+     void mediaChanged(const QMediaContent &media);
+     void currentMediaChanged(const QMediaContent &media);
+ 
+@@ -203,6 +207,8 @@ public:
+     virtual void unbind(QObject *);
+ 
+ private:
++    void onItemChanged(QQuickItem::ItemChange change, const QQuickItem::ItemChangeData& value);
++
+     Q_DISABLE_COPY(QMediaPlayer)
+     Q_DECLARE_PRIVATE(QMediaPlayer)
+     Q_PRIVATE_SLOT(d_func(), void _q_stateChanged(QMediaPlayer::State))
+@@ -212,6 +218,8 @@ private:
+     Q_PRIVATE_SLOT(d_func(), void _q_playlistDestroyed())
+     Q_PRIVATE_SLOT(d_func(), void _q_handlePlaylistLoaded())
+     Q_PRIVATE_SLOT(d_func(), void _q_handlePlaylistLoadFailed())
++
++    friend class QDeclarativeAudio;
+ };
+ 
+ QT_END_NAMESPACE
 diff --git a/src/plugins/plugins.pro b/src/plugins/plugins.pro
-index 8f751ae..cf6f6a8 100644
+index 8f751ae..737e7ae 100644
 --- a/src/plugins/plugins.pro
 +++ b/src/plugins/plugins.pro
 @@ -30,7 +30,11 @@ win32 {
@@ -124,7 +177,7 @@ index 8f751ae..cf6f6a8 100644
  
  unix:!mac {
 -    config_gstreamer {
-+    // lcarlon: specify when qmaking.
++    # lcarlon: specify when qmaking.
 +    raspberry {
 +        SUBDIRS += openmaxil
 +    }
