@@ -19,6 +19,7 @@
 #include <QtCore/qtimer.h>
 #include <QtMultimedia/qmediacontent.h>
 #include <QtQuick/qquickview.h>
+#include <QtQuick/qquickitem.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -44,15 +45,6 @@
 #endif // DEBUG_PLAYER_CONTROL
 
 
-/*------------------------------------------------------------------------------
-|    RPiQuickView class
-+-----------------------------------------------------------------------------*/
-class RPiQuickView
-{
-public:
-   static QQuickView* getSingleInstance();
-};
-
 QT_BEGIN_NAMESPACE
 
 /*------------------------------------------------------------------------------
@@ -66,6 +58,7 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    , m_mediaProcessor(new OMX_MediaProcessor(this))
    , m_textureData(NULL)
    , m_sceneGraphInitialized(false)
+   , m_quickItem(NULL)
 {
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
@@ -73,12 +66,6 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
            this, SIGNAL(textureReady(const OMX_TextureData*)));
    connect(m_mediaProcessor, SIGNAL(textureInvalidated()),
            this, SIGNAL(textureInvalidated()));
-
-   QQuickView* view = RPiQuickView::getSingleInstance();
-   connect(view, SIGNAL(sceneGraphInitialized()),
-           this, SLOT(onSceneGraphInitialized()), Qt::DirectConnection);
-   connect(view, SIGNAL(beforeRendering()),
-           this, SLOT(onBeforeRendering()), Qt::DirectConnection);
 }
 
 /*------------------------------------------------------------------------------
@@ -90,6 +77,25 @@ OpenMAXILPlayerControl::~OpenMAXILPlayerControl()
 
    delete m_mediaProcessor;
    m_mediaProcessor = NULL;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::setMediaPlayer
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::setMediaPlayer(QMediaPlayer* mediaPlayer)
+{
+   LOG_DEBUG(LOG_TAG, "Setting QMediaPlayer...");
+   m_quickItem = dynamic_cast<QQuickItem*>(mediaPlayer->parent());
+   if (!m_quickItem) {
+      LOG_ERROR(LOG_TAG, "Failed to get declarative media player.");
+      return;
+   }
+
+   connect(mediaPlayer, SIGNAL(itemSceneChanged()), this, SLOT(onItemSceneChanged()));
+
+   // Immediately set if already available.
+   if (m_quickItem->window())
+      onItemSceneChanged();
 }
 
 /*------------------------------------------------------------------------------
@@ -152,6 +158,18 @@ void OpenMAXILPlayerControl::stop()
 }
 
 /*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::stopInt
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::stopInt()
+{
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+
+   // Can be done in any thread.
+   assert(m_mediaProcessor); 
+   m_mediaProcessor->stop();
+}
+
+/*------------------------------------------------------------------------------
 |    OpenMAXILPlayerControl::onSceneGraphInitialized
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::onSceneGraphInitialized()
@@ -171,15 +189,21 @@ void OpenMAXILPlayerControl::onBeforeRendering()
 }
 
 /*------------------------------------------------------------------------------
-|    OpenMAXILPlayerControl::update
+|    OpenMAXILPlayerControl::onItemSceneChanged
 +-----------------------------------------------------------------------------*/
-void OpenMAXILPlayerControl::requestProcessPendingCommands()
+void OpenMAXILPlayerControl::onItemSceneChanged()
 {
-   // This triggers an invokation of beforeRendering(). It can be used to perform
-   // actions on the rendering thread, which has an OpenGL context and a EGL
-   // context setup.
-   RPiQuickView::getSingleInstance()->setClearBeforeRendering(false);
-   RPiQuickView::getSingleInstance()->update();
+   LOG_DEBUG(LOG_TAG, "Getting window...");
+   QQuickWindow* window = m_quickItem->window();
+   if (!window) {
+      LOG_ERROR(LOG_TAG, "Failed to get QQuickWindow.");
+      return;
+   }
+
+   connect(window, SIGNAL(sceneGraphInitialized()),
+           this, SLOT(onSceneGraphInitialized()), Qt::DirectConnection);
+   connect(window, SIGNAL(beforeRendering()),
+           this, SLOT(onBeforeRendering()), Qt::DirectConnection);
 }
 
 /*------------------------------------------------------------------------------
@@ -317,7 +341,7 @@ void OpenMAXILPlayerControl::setMediaInt(const QMediaContent& mediaContent)
 
    m_mediaProcessor->stop();
    if (!m_mediaProcessor->setFilename(mediaContent.canonicalUrl().path(), m_textureData))
-       return;
+      return;
    m_currentResource = mediaContent;
 }
 

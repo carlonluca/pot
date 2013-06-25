@@ -50,9 +50,9 @@ QGstreamerPlayerService::QGstreamerPlayerService(QObject *parent):
 {
     qDebug("Instantiating QMediaService...");
 
-    m_control = new OpenMAXILPlayerControl(this);
-    m_metaData = new QGstreamerMetaDataProvider(this);
-    m_streamsControl = new QGstreamerStreamsControl(this);
+    m_control             = new OpenMAXILPlayerControl(this);
+    m_metaData            = new QGstreamerMetaDataProvider(this);
+    m_streamsControl      = new QGstreamerStreamsControl(this);
     m_availabilityControl = new OpenMAXILAvailabilityControl(this);
 
 #if defined(Q_WS_MAEMO_6) && defined(__arm__)

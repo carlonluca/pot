@@ -15,10 +15,10 @@
 #include <QtCore/qstack.h>
 #include <QtCore/qsemaphore.h>
 #include <QtCore/qmutex.h>
-#include <QtMultimedia/qmediacontent.h>
 
-#include <qmediaplayercontrol.h>
+#include <qmediacontent.h>
 #include <qmediaplayer.h>
+#include <qmediaplayercontrol.h>
 
 #include <limits.h>
 
@@ -110,6 +110,7 @@ public:
     OpenMAXILPlayerControl(QObject* parent = 0);
     ~OpenMAXILPlayerControl();
 
+    void setMediaPlayer(QMediaPlayer* mediaPlayer);
     QMediaPlayer::State state() const;
     QMediaPlayer::MediaStatus mediaStatus() const;
 
@@ -158,7 +159,7 @@ signals:
     void textureInvalidated();
 
 private slots:
-    void requestProcessPendingCommands();
+    void onItemSceneChanged();
     void playInt();
     void pauseInt();
     void stopInt();
@@ -184,6 +185,9 @@ private:
     QList<PlayerCommand*> m_pendingCommands;
     QMutex                m_pendingCommandsMutex;
     bool                  m_sceneGraphInitialized;
+
+    QMediaPlayer* m_mediaPlayer;
+    QQuickItem*   m_quickItem;
 };
 
 QT_END_NAMESPACE

@@ -65,7 +65,7 @@ INCLUDEPATH += \
    omxplayer_lib/utils \
    omxplayer_lib/linux
 
-VERSION = 4.1.1
+VERSION = 4.2.0
 
 # Flags used bu hello_pi examples:
 #-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
