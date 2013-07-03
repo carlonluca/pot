@@ -48,6 +48,8 @@ LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
 # Internal
 LIBS += -L$$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample
 INCLUDEPATH += $$_PRO_FILE_PWD_/3rdparty/ffmpeg/include
+# Add this if building with old firmware.
+INCLUDEPATH += /opt/rpi/sysroot/opt/vc/include/interface/vmcs_host/linux
 # For omxplayer.
 LIBS += -lfreetype -lWFC -lpcre
 INCLUDEPATH += /usr/include/freetype2

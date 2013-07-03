@@ -83,6 +83,11 @@ QSGNode* OMX_VideoSurfaceElement::updatePaintNode(QSGNode* oldNode, UpdatePaintN
     QSGGeometryNode* node = 0;
     QSGGeometry* geometry = 0;
 
+#ifdef ENABLE_PROFILING
+    static QElapsedTimer timer;
+    LOG_DEBUG(LOG_TAG, "Elapsed: %lld.", timer.restart());
+#endif // ENABLE_PROFILING
+
     if (!oldNode) {
         // Create the node.
         node = new QSGGeometryNode;
@@ -127,13 +132,16 @@ QSGNode* OMX_VideoSurfaceElement::updatePaintNode(QSGNode* oldNode, UpdatePaintN
     else {
         node = static_cast<QSGGeometryNode*>(oldNode);
         geometry = node->geometry();
-        geometry->allocate(4);
+        //geometry->allocate(4);
 
         // Texture has changed. Change the texture item for the scene graph.
         if ((GLuint)m_sgtexture->textureId() != m_textureId) {
             QMutexLocker locker(&m_mutexTexture);
             m_sgtexture->setTexture(m_textureId, m_textureSize);
         }
+
+        // This is needed since Qt 5.1.1.
+        node->markDirty(QSGNode::DirtyMaterial);
     }
 
     // Create the vertices and map to texture.
