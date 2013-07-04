@@ -8,4 +8,4 @@ TEMPLATE = subdirs
 QT       += quick declarative
 
 SUBDIRS     += mediaplayer
-OTHER_FILES += gstreamer.json
+OTHER_FILES += openmaxil.json

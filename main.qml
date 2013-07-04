@@ -41,7 +41,7 @@ Rectangle {
         else if (event.key === Qt.Key_A)
             mediaProcessor.pause();
         else if (event.key === Qt.Key_O)
-            mediaProcessor.source = "/home/pi/usb/Cars2.mkv";
+            mediaProcessor.source = "/home/pi/Cars2.mkv";
         else if (event.key === Qt.Key_K)
             mediaProcessor.seek(1000);
     }
@@ -73,7 +73,7 @@ Rectangle {
         id: mediaProcessor
         //source: "/home/pi/07 Hail Caesar.mp3"
         //source: "/home/pi/usb/Cars2.mkv"
-        source: "/home/pi/usb/big_buck_bunny_1080p_h264.mov"
+        source: "/home/pi/big_buck_bunny_1080p_h264.mov"
     }
 
     Flipable {
