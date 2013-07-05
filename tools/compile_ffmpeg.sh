@@ -24,10 +24,12 @@ if [ ! -d "3rdparty/ffmpeg" ]; then
 fi
 
 cd 3rdparty/ffmpeg
-git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg_src
+#git clone git://source.ffmpeg.org/ffmpeg.git ffmpeg_src
+git clone git://git.videolan.org/ffmpeg.git ffmpeg_src
 cd ffmpeg_src
 git checkout master
-git checkout e820e3a2591a0d544925ff1522d2a688a647f1b0
+#git checkout e820e3a2591a0d544925ff1522d2a688a647f1b0
+git checkout 8c51ea54897c2d8671b38efecc1422ad4ad344f9
 
 echo "Configuring..."
 FLOAT=hard
@@ -65,7 +67,7 @@ echo "Prefix to $PWD..."
    --cross-prefix=arm-linux-gnueabihf- \
    --prefix=$PWD/ffmpeg_compiled
 
-echo "Compiling..."
+echo "Building..."
 mkdir $PWD/ffmpeg_compiled
 make -j$1
 make install
@@ -73,5 +75,6 @@ make install
 echo "Cleaning up..."
 mv ffmpeg_compiled/include ../
 mv ffmpeg_compiled/lib ../
+rmdir ffmpeg_compiled
 
 echo "Done! Bye bye! ;-)"
