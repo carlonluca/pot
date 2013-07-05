@@ -316,6 +316,13 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
 
   int channels = pkt->hints.channels;
 
+  /* 6 channel have to be mapped to 8 for PCM */
+  if(!m_passthrough && !m_hw_decode)
+  {
+    if(channels == 6)
+      channels = 8;
+  }
+ 
   unsigned int old_bitrate = m_hints.bitrate;
   unsigned int new_bitrate = pkt->hints.bitrate;
 
@@ -356,10 +363,10 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
 
   }
 
-  if(!((int)m_decoder->GetSpace() > pkt->size))
+  if(!((unsigned long)m_decoder->GetSpace() > pkt->size))
     OMXClock::OMXSleep(10);
 
-  if((int)m_decoder->GetSpace() > pkt->size)
+  if((unsigned long)m_decoder->GetSpace() > pkt->size)
   {
     if(pkt->dts != DVD_NOPTS_VALUE)
       m_iCurrentPts = pkt->dts;
@@ -401,7 +408,7 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
           printf("error ret %d decoded_size %d\n", ret, decoded_size);
         }
 
-        int n = (m_hints.channels * 32 * m_hints.samplerate)>>3;
+        int n = (m_hints.channels * m_hints.bitspersample * m_hints.samplerate)>>3;
         if (n > 0 && m_iCurrentPts != DVD_NOPTS_VALUE)
           m_iCurrentPts += ((double)decoded_size * DVD_TIME_BASE) / n;
 
@@ -622,8 +629,12 @@ bool OMXPlayerAudio::OpenDecoder()
   {
     unsigned int downmix_channels = m_hints.channels;
 
+    /* omx needs 6 channels packed into 8 for PCM */
+    if(m_hints.channels == 6)
+      m_hints.channels = 8;
+
     bAudioRenderOpen = m_decoder->Initialize(NULL, m_device.substr(4), m_hints.channels, m_pChannelMap,
-                                             downmix_channels, m_hints.samplerate, m_passthrough ? 16:32,
+                                             downmix_channels, m_hints.samplerate, m_hints.bitspersample,
                                              false, m_boost_on_downmix, false, m_passthrough, m_initialVolume, m_fifo_size);
   }
 
@@ -639,13 +650,8 @@ bool OMXPlayerAudio::OpenDecoder()
   {
     if(m_passthrough)
     {
-#ifndef ENABLE_IMPROVED_BUFFERING
-       printf("Audio codec %s passthrough channels %d samplerate %d bitspersample %d\n",
-               m_codec_name.c_str(), m_hints.channels, m_hints.samplerate, m_hints.bitspersample);
-#else
-      printf("Audio codec %s passthrough channels %d samplerate %d bitspersample %d\n",
-        m_codec_name.c_str(), m_hints.channels, m_hints.samplerate, m_hints.bitspersample);
-#endif
+      printf("Audio codec %s channels %d samplerate %d bitspersample %d\n",
+        m_codec_name.c_str(), 2, m_hints.samplerate, m_hints.bitspersample);
     }
     else
     {
