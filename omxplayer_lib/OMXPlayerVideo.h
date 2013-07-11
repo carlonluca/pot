@@ -31,11 +31,7 @@
 #include "OMXClock.h"
 #include "OMXStreamInfo.h"
 #include "OMXVideo.h"
-#ifdef STANDALONE
 #include "OMXThread.h"
-#else
-#include "threads/Thread.h"
-#endif
 
 #include <deque>
 #include <sys/types.h>
@@ -53,11 +49,7 @@ class OMX_VideoSurfaceElement;
 
 using namespace std;
 
-#ifdef STANDALONE
 class OMXPlayerVideo : public QObject, public OMXThread
-#else
-class OMXPlayerVideo : public CThread
-#endif
 {
     Q_OBJECT
 protected:
@@ -82,9 +74,8 @@ protected:
   COMXVideo                 *m_decoder;
   float                     m_fps;
   double                    m_frametime;
-  bool                      m_Deinterlace;
+  int                       m_Deinterlace;
   float                     m_display_aspect;
-  bool                      m_bMpeg;
   bool                      m_bAbort;
   bool                      m_use_thread;
   bool                      m_flush;
@@ -93,10 +84,6 @@ protected:
   float                     m_fifo_size;
   bool                      m_hdmi_clock_sync;
   double                    m_iVideoDelay;
-  double                    m_pts;
-  bool                      m_syncclock;
-  int                       m_speed;
-  double                    m_FlipTimeStamp; // time stamp of last flippage. used to play at a forced framerate
   double                    m_iSubtitleDelay;
   COMXOverlayCodec          *m_pSubtitleCodec;
   OMX_TextureProvider*      m_provider;
@@ -111,9 +98,8 @@ private:
 public:
   OMXPlayerVideo(OMX_TextureProvider* provider);
   virtual ~OMXPlayerVideo();
-  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMX_TextureData*& textureId, bool deinterlace, bool mpeg, bool hdmi_clock_sync, bool use_thread, float display_aspect, float queue_size, float fifo_size);
+  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMX_TextureData*& textureId, bool deinterlace, bool hdmi_clock_sync, bool use_thread, float display_aspect, float queue_size, float fifo_size);
   bool Close();
-  void Output(double pts);
   bool Decode(OMXPacket *pkt);
   void Process();
   void FlushSubtitles();
@@ -123,15 +109,15 @@ public:
   bool CloseDecoder();
   int  GetDecoderBufferSize();
   int  GetDecoderFreeSpace();
-  double GetCurrentPTS() { return m_pts; };
+  double GetCurrentPTS() { return m_iCurrentPts; };
   double GetFPS() { return m_fps; };
   unsigned int GetCached() { return m_cached_size; };
   unsigned int GetMaxCached() { return m_max_data_size; };
   unsigned int GetLevel() { return m_max_data_size ? 100 * m_cached_size / m_max_data_size : 0; };
-  void  WaitCompletion();
+  void SubmitEOS();
+  bool IsEOS();
   void SetDelay(double delay) { m_iVideoDelay = delay; }
   double GetDelay() { return m_iVideoDelay; }
-  void SetSpeed(int iSpeed);
   double GetSubtitleDelay()                                { return m_iSubtitleDelay; }
   void SetSubtitleDelay(double delay)                      { m_iSubtitleDelay = delay; }
   std::string GetText();

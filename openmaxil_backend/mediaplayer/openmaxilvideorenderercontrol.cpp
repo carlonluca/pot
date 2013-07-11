@@ -66,7 +66,7 @@ OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(QObject *parent) :
    m_textureId(0),
    m_updateTimer(new QTimer(this))
 {
-   m_updateTimer->setInterval(30);
+   m_updateTimer->setInterval(40);
    m_updateTimer->setSingleShot(false);
    connect(m_updateTimer, SIGNAL(timeout()), this, SLOT(onUpdateTriggered()));
    m_updateTimer->start();

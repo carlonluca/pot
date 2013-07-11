@@ -34,11 +34,7 @@
 #include "OMXStreamInfo.h"
 #include "OMXAudio.h"
 #include "OMXAudioCodecOMX.h"
-#ifdef STANDALONE
 #include "OMXThread.h"
-#else
-#include "threads/Thread.h"
-#endif
 
 #include <deque>
 #include <string>
@@ -46,11 +42,7 @@
 
 using namespace std;
 
-#ifdef STANDALONE
 class OMXPlayerAudio : public OMXThread
-#else
-class OMXPlayerAudio : public CThread
-#endif
 {
 protected:
   AVStream                  *m_pStream;
@@ -73,10 +65,9 @@ protected:
   std::string               m_device;
   bool                      m_use_passthrough;
   bool                      m_use_hw_decode;
-  IAudioRenderer::EEncoded  m_passthrough;
+  COMXAudio::EEncoded       m_passthrough;
   bool                      m_hw_decode;
   bool                      m_boost_on_downmix;
-  bool                      m_bMpeg;
   bool                      m_bAbort;
   bool                      m_use_thread; 
   bool                      m_flush;
@@ -85,23 +76,8 @@ protected:
   unsigned int              m_max_data_size;
   float                     m_fifo_size;
   COMXAudioCodecOMX         *m_pAudioCodec;
-  int                       m_speed;
   long                      m_initialVolume;
-  double m_error;    //last average error
-
-  int64_t m_errortime; //timestamp of last time we measured
-  int64_t m_freq;
-
-  void   HandleSyncError(double duration, double pts);
-  double m_errorbuff; //place to store average errors
-  int    m_errorcount;//number of errors stored
-  bool   m_syncclock;
-
   bool   m_player_error;
-
-  double m_integral; //integral correction for resampler
-  int    m_skipdupcount; //counter for skip/duplicate synctype
-  bool   m_prevskipped;
 
   void Lock();
   void UnLock();
@@ -110,7 +86,7 @@ protected:
 private:
 public:
   OMXPlayerAudio();
-  virtual ~OMXPlayerAudio();
+  ~OMXPlayerAudio();
   bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMXReader *omx_reader,
             std::string device, bool passthrough, long initialVolume, bool hw_decode,
             bool boost_on_downmix, bool use_thread, float queue_size, float fifo_size);
@@ -121,23 +97,21 @@ public:
   bool AddPacket(OMXPacket *pkt);
   bool OpenAudioCodec();
   void CloseAudioCodec();      
-  IAudioRenderer::EEncoded IsPassthrough(COMXStreamInfo hints);
+  COMXAudio::EEncoded IsPassthrough(COMXStreamInfo hints);
   bool OpenDecoder();
   bool CloseDecoder();
   double GetDelay();
   double GetCacheTime();
   double GetCacheTotal();
   double GetCurrentPTS() { return m_iCurrentPts; };
+  void SubmitEOS();
+  bool IsEOS();
   void WaitCompletion();
   unsigned int GetCached() { return m_cached_size; };
   unsigned int GetMaxCached() { return m_max_data_size; };
   unsigned int GetLevel() { return m_max_data_size ? 100 * m_cached_size / m_max_data_size : 0; };
-  void  RegisterAudioCallback(IAudioCallback* pCallback);
-  void  UnRegisterAudioCallback();
-  void  DoAudioWork();
   void SetCurrentVolume(long nVolume);
   long GetCurrentVolume();
-  void SetSpeed(int iSpeed);
   bool Error() { return !m_player_error; };
 };
 #endif

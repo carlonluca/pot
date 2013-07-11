@@ -98,17 +98,17 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
  */
 COMXVideo::COMXVideo(OMX_TextureProvider* provider)
 {
-    m_is_open           = false;
-    m_Pause             = false;
-    m_setStartTime      = true;
-    m_setStartTimeText  = true;
-    m_extradata         = NULL;
-    m_extrasize         = 0;
-    m_video_codec_name  = "";
-    m_deinterlace       = false;
-    m_hdmi_clock_sync   = false;
-    m_first_text        = true;
-    m_provider          = provider;
+  m_is_open           = false;
+  m_Pause             = false;
+  m_setStartTime      = true;
+  m_setStartTimeText  = true;
+  m_extradata         = NULL;
+  m_extrasize         = 0;
+  m_video_codec_name  = "";
+  m_deinterlace       = false;
+  m_hdmi_clock_sync   = false;
+  m_first_text        = true;
+  m_provider          = provider;
 }
 
 COMXVideo::~COMXVideo()
@@ -154,7 +154,7 @@ bool COMXVideo::SendDecoderConfig()
   return true;
 }
 
-bool COMXVideo::NaluFormatStartCodes(enum CodecID codec, uint8_t *in_extradata, int in_extrasize)
+bool COMXVideo::NaluFormatStartCodes(enum AVCodecID codec, uint8_t *in_extradata, int in_extrasize)
 {
   switch(codec)
   {
@@ -174,16 +174,16 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& t
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
   std::string decoder_name;
 
-    m_video_codec_name      = "";
-    m_codingType            = OMX_VIDEO_CodingUnused;
+  m_video_codec_name      = "";
+  m_codingType            = OMX_VIDEO_CodingUnused;
 
-    m_decoded_width  = hints.width;
-    m_decoded_height = hints.height;
+  m_decoded_width  = hints.width;
+  m_decoded_height = hints.height;
 
-    m_hdmi_clock_sync = hdmi_clock_sync;
+  m_hdmi_clock_sync = hdmi_clock_sync;
 
-    if(!m_decoded_width || !m_decoded_height)
-        return false;
+  if(!m_decoded_width || !m_decoded_height)
+    return false;
 
   if(hints.extrasize > 0 && hints.extradata != NULL)
   {
@@ -315,9 +315,9 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& t
   if(!m_omx_decoder.Initialize(componentName, OMX_IndexParamVideoInit))
     return false;
 
-    componentName = "OMX.broadcom.egl_render";
-    if(!m_omx_render.Initialize(componentName, OMX_IndexParamVideoInit))
-        return false;
+  componentName = "OMX.broadcom.egl_render";
+  if(!m_omx_render.Initialize(componentName, OMX_IndexParamVideoInit))
+    return false;
 
   componentName = "OMX.broadcom.video_scheduler";
   if(!m_omx_sched.Initialize(componentName, OMX_IndexParamVideoInit))
@@ -391,8 +391,7 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& t
   omx_err = m_omx_decoder.SetParameter(OMX_IndexParamVideoPortFormat, &formatType);
   if(omx_err != OMX_ErrorNone)
     return false;
-
-  // lcarlon: this is needed for the port settings changed event.
+  
   OMX_PARAM_PORTDEFINITIONTYPE portParam;
   OMX_INIT_STRUCTURE(portParam);
   portParam.nPortIndex = m_omx_decoder.GetInputPort();
@@ -648,31 +647,6 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& t
     return false;
   }
 
-#if 0
-    LOG_WARNING(LOG_TAG, "Port settings changed!");
-    m_omx_decoder.DisablePort(m_omx_decoder.GetOutputPort(), false);
-    m_omx_sched.DisablePort(m_omx_sched.GetInputPort(), false);
-
-    //m_omx_image_fx.DisablePort(m_omx_image_fx.GetOutputPort(), false);
-    //m_omx_image_fx.DisablePort(m_omx_image_fx.GetInputPort(), false);
-    m_omx_render.DisablePort(m_omx_render.GetOutputPort(), false);
-#endif
-
-    //port_image.nPortIndex = m_omx_image_fx.GetInputPort();
-
-    //omx_err = m_omx_image_fx.SetParameter(OMX_IndexParamPortDefinition, &port_image);
-    //if(omx_err != OMX_ErrorNone)
-    //{
-    //  CLog::Log(LOGERROR, "%s::%s - error OMX_IndexParamPortDefinition 2 omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
-    //}
-
-    //port_image.nPortIndex = m_omx_image_fx.GetOutputPort();
-    //omx_err = m_omx_image_fx.SetParameter(OMX_IndexParamPortDefinition, &port_image);
-    //if(omx_err != OMX_ErrorNone)
-    //{
-    //  CLog::Log(LOGERROR, "%s::%s - error OMX_IndexParamPortDefinition 3 omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
-    //}
-
     // Query output buffer requirements for renderer and provide the native display
     // the renderer will use.
     OMX_PARAM_PORTDEFINITIONTYPE portdef;
@@ -828,6 +802,9 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& t
     m_deinterlace, m_hdmi_clock_sync);
 
   m_first_text    = true;
+  // start from assuming all recent frames had valid pts
+  m_history_valid_pts = ~0;
+
   return true;
 }
 
@@ -992,6 +969,14 @@ int COMXVideo::DecodeText(uint8_t *pData, int iSize, double dts, double pts)
   return false;
 }
 
+static unsigned count_bits(int32_t value)
+{
+  unsigned bits = 0;
+  for(;value;++bits)
+    value &= value - 1;
+  return bits;
+}
+
 int COMXVideo::Decode(uint8_t *pData, int iSize, double dts, double pts)
 {
   OMX_ERRORTYPE omx_err;
@@ -1021,22 +1006,26 @@ int COMXVideo::Decode(uint8_t *pData, int iSize, double dts, double pts)
 
       omx_buffer->nFlags = 0;
       omx_buffer->nOffset = 0;
-
-      uint64_t val  = (uint64_t)(pts == DVD_NOPTS_VALUE) ? 0 : pts;
+      // some packed bitstream AVI files set almost all pts values to DVD_NOPTS_VALUE, but have a scattering of real pts values.
+      // the valid pts values match the dts values.
+      // if a stream has had more than 4 valid pts values in the last 16, the use UNKNOWN, otherwise use dts
+      m_history_valid_pts = (m_history_valid_pts << 1) | (pts != DVD_NOPTS_VALUE);
+      if(pts == DVD_NOPTS_VALUE && count_bits(m_history_valid_pts & 0xffff) < 4)
+        pts = dts;
 
       if(m_setStartTime)
       {
-        omx_buffer->nFlags = OMX_BUFFERFLAG_STARTTIME;
+        // only send dts on first frame to get nearly correct starttime
+        if(pts == DVD_NOPTS_VALUE)
+          pts = dts;
+        omx_buffer->nFlags |= OMX_BUFFERFLAG_STARTTIME;
+        CLog::Log(LOGDEBUG, "OMXVideo::Decode VDec : setStartTime %f\n", (pts == DVD_NOPTS_VALUE ? 0.0 : pts) / DVD_TIME_BASE);
         m_setStartTime = false;
       }
-      else
-      {
-        if(pts == DVD_NOPTS_VALUE)
-          omx_buffer->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
-      }
+      if(pts == DVD_NOPTS_VALUE)
+        omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_UNKNOWN;
 
-      omx_buffer->nTimeStamp = ToOMXTime(val);
-
+      omx_buffer->nTimeStamp = ToOMXTime(pts == DVD_NOPTS_VALUE ? 0 : pts);
       omx_buffer->nFilledLen = (demuxer_bytes > omx_buffer->nAllocLen) ? omx_buffer->nAllocLen : demuxer_bytes;
       memcpy(omx_buffer->pBuffer, demuxer_content, omx_buffer->nFilledLen);
 
@@ -1179,7 +1168,7 @@ int COMXVideo::GetInputBufferSize()
   return m_omx_decoder.GetInputBufferSize();
 }
 
-void COMXVideo::WaitCompletion()
+void COMXVideo::SubmitEOS()
 {
   if(!m_is_open)
     return;
@@ -1205,13 +1194,11 @@ void COMXVideo::WaitCompletion()
     CLog::Log(LOGERROR, "%s::%s - OMX_EmptyThisBuffer() failed with result(0x%x)\n", CLASSNAME, __func__, omx_err);
     return;
   }
+}
 
-  while(true)
-  {
-    if(m_omx_render.IsEOS())
-      break;
-    OMXClock::OMXSleep(50);
-  }
-
-  return;
+bool COMXVideo::IsEOS()
+{
+  if(!m_is_open)
+    return true;
+  return m_omx_render.IsEOS();
 }

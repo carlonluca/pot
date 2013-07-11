@@ -27,20 +27,12 @@
 #include "DllAvFilter.h"
 #include "DllAvCodec.h"
 #include "OMXStreamInfo.h"
-#ifdef STANDALONE
 #include "OMXThread.h"
-#else
-#include "threads/Thread.h"
-#endif
 #include <queue>
 
 #include "OMXStreamInfo.h"
 
-#ifdef STANDALONE
 #include "File.h"
-#else
-#include "xbmc/filesystem/File.h"
-#endif
 
 #include <sys/types.h>
 #include <string>
@@ -51,9 +43,6 @@ using namespace std;
 #define MAX_OMX_CHAPTERS 64
 
 #define MAX_OMX_STREAMS        100
-
-#define OMX_PLAYSPEED_PAUSE  0
-#define OMX_PLAYSPEED_NORMAL 1
 
 #ifndef FFMPEG_FILE_BUFFER_SIZE
 #define FFMPEG_FILE_BUFFER_SIZE   32768 // default reading size for ffmpeg
@@ -122,7 +111,6 @@ protected:
   std::string               m_filename;
   bool                      m_bMatroska;
   bool                      m_bAVI;
-  bool                      m_bMpeg;
   XFILE::CFile              *m_pFile;
   AVFormatContext           *m_pFormatContext;
   AVIOContext               *m_ioContext;
@@ -133,10 +121,6 @@ protected:
   double                    m_iCurrentPts;
   int                       m_speed;
   unsigned int              m_program;
-//#ifdef STANDALONE
-//  void flush_packet_queue(AVFormatContext *s);
-//  void av_read_frame_flush(AVFormatContext *s);
-//#endif
   pthread_mutex_t           m_lock;
   void Lock();
   void UnLock();
@@ -150,7 +134,7 @@ public:
   void ClearStreams();
   bool Close();
   //void FlushRead();
-  bool SeekTime(int64_t seek_ms, int seek_flags, double *startpts);
+  bool SeekTime(int time, bool backwords, double *startpts);
   AVMediaType PacketType(OMXPacket *pkt);
   OMXPacket *Read();
   void Process();
@@ -173,7 +157,6 @@ public:
   void SetSpeed(int iSpeed);
   void UpdateCurrentPTS();
   double ConvertTimestamp(int64_t pts, int den, int num);
-  double ConvertTimestamp(int64_t pts, AVRational *time_base);
   int GetChapter();
   void GetChapterName(std::string& strChapterName);
   bool SeekChapter(int chapter, double* startpts);
@@ -188,7 +171,6 @@ public:
   
   int GetStreamLength();
   static double NormalizeFrameduration(double frameduration);
-  bool IsMpegVideo() { return m_bMpeg; };
   bool IsMatroska() { return m_bMatroska; };
   std::string GetCodecName(OMXStreamType type);
   std::string GetCodecName(OMXStreamType type, unsigned int index);
@@ -197,8 +179,5 @@ public:
   std::string GetStreamName(OMXStreamType type, unsigned int index);
   std::string GetStreamType(OMXStreamType type, unsigned int index);
   bool CanSeek();
-#ifndef STANDALONE
-  int GetSourceBitrate();
-#endif
 };
 #endif

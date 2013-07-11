@@ -91,16 +91,32 @@ DEFINES += __STDC_CONSTANT_MACROS \
    HAVE_LIBBCM_HOST \
    USE_EXTERNAL_LIBBCM_HOST \
    USE_VCHIQ_ARM \
-   HAVE_OMXLIB \
-   STANDALONE
+   HAVE_OMXLIB
 
 # Macro definitions
 #DEFINES += LOG_LEVEL_DEBUG
 DEFINES += VERBOSE
 DEFINES += ENABLE_VIDEO_TEST
 DEFINES += ENABLE_MEDIA_PROCESSOR
-#DEFINES += ENABLE_IMPROVED_BUFFERING
-#ENABLE_SUBTITLES: To enable subtitles.
+
+# This is related to modifications to omxplayer merged to PiOmxTextures that seemed
+# to perform badly. After some revisions these seem to be acceptable and were kept
+# to keep sources in sync with omxplayer code.
+DEFINES += ENABLE_IMPROVED_BUFFERING
+
+# To enable subtitles.
+#DEFINES += ENABLE_SUBTITLES
+
+# Enable this to monitor performance of the main loop in omx_mediaprocessor.h. Can
+# also be enabled in omx_mediaprocessor.h.
+#DEFINES += ENABLE_PROFILE_MAIN_LOOP
+
+# This enables pause/resume implmentation in the main loop in omx_mediaprocessor.h.
+# This code was removed because too much computation in that loop seems to cause
+# too much CPU load which causes repeated pause/resume. A couple of ms are spared
+# avoiding the computation and only small interruptions seem to give a better result.
+# Can also be enabled in omx_mediaprocessor.h.
+#DEFINES += ENABLE_PAUSE_FOR_BUFFERING
 
 QMAKE_CXXFLAGS_DEBUG += -rdynamic
 # For omxplayer.
@@ -241,7 +257,7 @@ OTHER_FILES += \
     tools/extract_h264_stream.sh \
     tools/prepare_openmaxil_backend.sh \
     omxplayer_lib/omxplayer.cpp \
-    omxplater_lib/OMXPLAYER_VERSION
+    omxplayer_lib/OMXPLAYER_VERSION
 
 contains(DEFINES, CONFIG_APP) {
 RESOURCES += resources.qrc
