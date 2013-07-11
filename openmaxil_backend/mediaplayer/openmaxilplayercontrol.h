@@ -152,7 +152,7 @@ public Q_SLOTS:
     void setMuted(bool muted);
 
     void onSceneGraphInitialized();
-    void onBeforeRendering();
+    void onAfterRendering();
 
 signals:
     void textureReady(const OMX_TextureData* textureData);

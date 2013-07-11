@@ -183,7 +183,7 @@ void OpenMAXILPlayerControl::onSceneGraphInitialized()
 /*------------------------------------------------------------------------------
 |    OpenMAXILPlayerControl::onBeforeRendering
 +-----------------------------------------------------------------------------*/
-void OpenMAXILPlayerControl::onBeforeRendering()
+void OpenMAXILPlayerControl::onAfterRendering()
 {
    processCommands();
 }
@@ -202,8 +202,9 @@ void OpenMAXILPlayerControl::onItemSceneChanged()
 
    connect(window, SIGNAL(sceneGraphInitialized()),
            this, SLOT(onSceneGraphInitialized()), Qt::DirectConnection);
-   connect(window, SIGNAL(beforeRendering()),
-           this, SLOT(onBeforeRendering()), Qt::DirectConnection);
+   connect(window, SIGNAL(afterRendering()),
+           this, SLOT(onAfterRendering()), Qt::DirectConnection);
+   window->update();
 }
 
 /*------------------------------------------------------------------------------
