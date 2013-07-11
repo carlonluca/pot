@@ -158,7 +158,6 @@ private:
     CRBP*     m_RBP;
     COMXCore* m_OMX;
 
-    bool m_bMpeg;
     bool m_has_video;
     bool m_has_audio;
 #ifdef ENABLE_SUBTITLES
@@ -185,6 +184,10 @@ private:
     float m_video_fifo_size;
     float m_audio_queue_size;
     float m_video_queue_size;
+    int m_playspeedCurrent;
+    bool m_seekFlush;
+    bool m_packetAfterSeek;
+    double startpts;
 };
 
 

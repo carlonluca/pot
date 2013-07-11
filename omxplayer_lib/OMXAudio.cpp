@@ -31,14 +31,6 @@
 
 #include "linux/XMemUtils.h"
 
-#ifndef STANDALONE
-#include "guilib/AudioContext.h"
-#include "settings/AdvancedSettings.h"
-#include "settings/GUISettings.h"
-#include "settings/Settings.h"
-#include "guilib/LocalizeStrings.h"
-#endif
-
 #ifndef VOLUME_MINIMUM
 #define VOLUME_MINIMUM -6000  // -60dB
 #endif
@@ -113,10 +105,7 @@ const float downmixing_coefficients_8[16] = {
 //////////////////////////////////////////////////////////////////////
 //***********************************************************************************************
 COMXAudio::COMXAudio() :
-  m_pCallback       (NULL   ),
   m_Initialized     (false  ),
-  m_Pause           (false  ),
-  m_CanPause        (false  ),
   m_CurrentVolume   (0      ),
   m_Passthrough     (false  ),
   m_HWDecode        (false  ),
@@ -130,18 +119,15 @@ COMXAudio::COMXAudio() :
   m_BitsPerSample   (0      ),
   m_omx_clock       (NULL   ),
   m_av_clock        (NULL   ),
-  m_external_clock  (false  ),
   m_setStartTime    (false  ),
   m_SampleSize      (0      ),
-  m_first_frame     (true   ),
   m_LostSync        (true   ),
   m_SampleRate      (0      ),
   m_eEncoding       (OMX_AUDIO_CodingPCM),
   m_extradata       (NULL   ),
   m_extrasize       (0      ),
   m_fifo_size       (0.0    ),
-  m_visBufferLength (0      ),
-  m_last_pts        (DVD_NOPTS_VALUE)
+  m_settings_changed(false  )
 {
 }
 
@@ -152,14 +138,117 @@ COMXAudio::~COMXAudio()
 }
 
 
-bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, enum PCMChannels *channelMap,
+bool COMXAudio::PortSettingsChanged()
+{
+  OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
+
+  if (m_settings_changed)
+  {
+    m_omx_decoder.DisablePort(m_omx_decoder.GetOutputPort(), true);
+    m_omx_decoder.EnablePort(m_omx_decoder.GetOutputPort(), true);
+    return true;
+  }
+
+  if(!m_Passthrough)
+  {
+    if(!m_omx_mixer.Initialize("OMX.broadcom.audio_mixer", OMX_IndexParamAudioInit))
+      return false;
+  }
+
+  if(!m_omx_render.Initialize("OMX.broadcom.audio_render", OMX_IndexParamAudioInit))
+    return false;
+
+  m_omx_tunnel_clock.Initialize(m_omx_clock, m_omx_clock->GetInputPort(), &m_omx_render, m_omx_render.GetInputPort()+1);
+
+  omx_err = m_omx_tunnel_clock.Establish(false);
+  if(omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "COMXAudio::Initialize m_omx_tunnel_clock.Establish\n");
+    return false;
+  }
+
+  omx_err = m_omx_clock->SetStateForComponent(OMX_StateExecuting);
+  if (omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "COMXAudio::Initialize m_omx_clock.SetStateForComponent\n");
+    return false;
+  }
+
+  m_omx_render.ResetEos();
+
+  // lcarlon: seems to make the video start a little late.
+  //OMX_CONFIG_BOOLEANTYPE configBool;
+  //OMX_INIT_STRUCTURE(configBool);
+  //configBool.bEnabled = OMX_FALSE;
+
+  //omx_err = m_omx_render.SetConfig(OMX_IndexConfigBrcmClockReferenceSource, &configBool);
+  //if (omx_err != OMX_ErrorNone)
+  //   return false;
+
+  OMX_CONFIG_BRCMAUDIODESTINATIONTYPE audioDest;
+  OMX_INIT_STRUCTURE(audioDest);
+  strncpy((char *)audioDest.sName, m_deviceuse.c_str(), strlen(m_deviceuse.c_str()));
+
+  omx_err = m_omx_render.SetConfig(OMX_IndexConfigBrcmAudioDestination, &audioDest);
+  if (omx_err != OMX_ErrorNone)
+    return false;
+
+  if(!m_Passthrough)
+  {
+    m_omx_tunnel_decoder.Initialize(&m_omx_decoder, m_omx_decoder.GetOutputPort(), &m_omx_mixer, m_omx_mixer.GetInputPort());
+    m_omx_tunnel_mixer.Initialize(&m_omx_mixer, m_omx_mixer.GetOutputPort(), &m_omx_render, m_omx_render.GetInputPort());
+        printf("A:PortSettingsChanged: bits:%d mode:%d channels:%d srate:%d nopassthrough\n",
+            (int)m_pcm_input.nBitPerSample, m_pcm_input.ePCMMode, (int)m_pcm_input.nChannels, (int)m_pcm_input.nSamplingRate);
+  }
+  else
+  {
+    m_omx_tunnel_decoder.Initialize(&m_omx_decoder, m_omx_decoder.GetOutputPort(), &m_omx_render, m_omx_render.GetInputPort());
+        printf("A:PortSettingsChanged: bits:%d mode:%d channels:%d srate:%d passthrough\n",
+            0, 0, 0, 0);
+  }
+
+  SetCurrentVolume(m_CurrentVolume);
+
+  omx_err = m_omx_tunnel_decoder.Establish(false);
+  if(omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "COMXAudio::Initialize - Error m_omx_tunnel_decoder.Establish 0x%08x", omx_err);
+    return false;
+  }
+  if(!m_Passthrough)
+  {
+    omx_err = m_omx_mixer.SetStateForComponent(OMX_StateExecuting);
+    if(omx_err != OMX_ErrorNone) {
+      CLog::Log(LOGERROR, "COMXAudio::Initialize - Error setting m_omx_mixer OMX_StateExecuting 0x%08x", omx_err);
+      return false;
+    }
+    omx_err = m_omx_tunnel_mixer.Establish(false);
+    if(omx_err != OMX_ErrorNone)
+    {
+      CLog::Log(LOGERROR, "COMXAudio::Initialize - Error m_omx_tunnel_decoder.Establish 0x%08x", omx_err);
+      return false;
+    }
+  }
+
+  omx_err = m_omx_render.SetStateForComponent(OMX_StateExecuting);
+  if(omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "COMXAudio::Initialize - Error setting m_omx_render OMX_StateExecuting 0x%08x", omx_err);
+    return false;
+  }
+
+  m_settings_changed = true;
+  return true;
+}
+
+bool COMXAudio::Initialize(const CStdString& device, enum PCMChannels *channelMap,
                            COMXStreamInfo &hints, OMXClock *clock, EEncoded bPassthrough, bool bUseHWDecode,
                            bool boostOnDownmix, long initialVolume, float fifo_size)
 {
   m_HWDecode = false;
   m_Passthrough = false;
 
-  if(bPassthrough != IAudioRenderer::ENCODED_NONE)
+  if(bPassthrough != ENCODED_NONE)
   {
     m_Passthrough = true;
     SetCodingType(hints.codec);
@@ -173,8 +262,6 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     SetCodingType(CODEC_ID_PCM_S16LE);
   }
 
-  SetClock(clock);
-
   if(hints.extrasize > 0 && hints.extradata != NULL)
   {
     m_extrasize = hints.extrasize;
@@ -182,47 +269,36 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     memcpy(m_extradata, hints.extradata, hints.extrasize);
   }
 
-  return Initialize(pCallback, device, hints.channels, channelMap, hints.channels, hints.samplerate, hints.bitspersample,
-              false, boostOnDownmix, false, bPassthrough, initialVolume, fifo_size);
+  return Initialize(device, hints.channels, channelMap, hints.channels, hints.samplerate, hints.bitspersample,
+              boostOnDownmix, clock, bPassthrough, initialVolume, fifo_size);
 }
 
-bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, int iChannels, enum PCMChannels *channelMap, unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool bResample, bool boostOnDownmix, bool bIsMusic, EEncoded bPassthrough, long initialVolume, float fifo_size)
+bool COMXAudio::Initialize(const CStdString& device, int iChannels, enum PCMChannels *channelMap,
+                           unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool boostOnDownmix,
+                           OMXClock *clock, EEncoded bPassthrough, long initialVolume, float fifo_size)
 {
-  std::string deviceuse;
   if(device == "hdmi") {
-    deviceuse = "hdmi";
+    m_deviceuse = "hdmi";
   } else {
-    deviceuse = "local";
+    m_deviceuse = "local";
   }
 
   if(!m_dllAvUtil.Load())
     return false;
 
+  m_av_clock = clock;
+  m_omx_clock = m_av_clock->GetOMXClock();
+
+
   m_Passthrough = false;
   m_fifo_size = fifo_size;
 
-  if(bPassthrough != IAudioRenderer::ENCODED_NONE)
-    m_Passthrough =true;
-
-  m_drc         = 0;
+  if(bPassthrough != ENCODED_NONE)
+    m_Passthrough = true;
 
   memset(&m_wave_header, 0x0, sizeof(m_wave_header));
 
-#ifndef STANDALONE
-  bool bAudioOnAllSpeakers(false);
-  g_audioContext.SetupSpeakerConfig(iChannels, bAudioOnAllSpeakers, bIsMusic);
-
-  if(bPassthrough)
-  {
-    g_audioContext.SetActiveDevice(CAudioContext::DIRECTSOUND_DEVICE_DIGITAL);
-  } else {
-    g_audioContext.SetActiveDevice(CAudioContext::DIRECTSOUND_DEVICE);
-  }
-
-  m_CurrentVolume = g_settings.m_nVolumeLevel; 
-#else
   m_CurrentVolume = initialVolume;
-#endif
 
   m_downmix_channels = downmixChannels;
   m_normalize_downmix = !boostOnDownmix;
@@ -247,7 +323,10 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
   m_wave_header.dwChannelMask     = SPEAKER_FRONT_LEFT | SPEAKER_FRONT_RIGHT;
 
   // set the input format, and get the channel layout so we know what we need to open
-  enum PCMChannels *outLayout = m_remap.SetInputFormat (iChannels, channelMap, uiBitsPerSample / 8, uiSamplesPerSec);;
+  enum PCMChannels *outLayout = NULL;
+
+  if (!m_Passthrough && channelMap)
+    outLayout = m_remap.SetInputFormat (iChannels, channelMap, uiBitsPerSample / 8, uiSamplesPerSec);;
 
   if (!m_Passthrough && channelMap && outLayout)
   {
@@ -299,14 +378,15 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
   m_pcm_output.eNumData            = OMX_NumericalDataSigned;
   m_pcm_output.eEndian             = OMX_EndianLittle;
   m_pcm_output.bInterleaved        = OMX_TRUE;
-  m_pcm_output.nBitPerSample       = uiBitsPerSample;
+  m_pcm_output.nBitPerSample       = m_Passthrough && m_eEncoding == OMX_AUDIO_CodingPCM ? 0:16;
   m_pcm_output.ePCMMode            = OMX_AUDIO_PCMModeLinear;
   m_pcm_output.nChannels           = m_OutputChannels;
   m_pcm_output.nSamplingRate       = uiSamplesPerSec;
 
   m_SampleRate    = uiSamplesPerSec;
   m_BitsPerSample = uiBitsPerSample;
-  m_BufferLen     = m_BytesPerSec = uiSamplesPerSec * (uiBitsPerSample >> 3) * m_InputChannels;
+  m_BytesPerSec   = uiSamplesPerSec * (uiBitsPerSample >> 3) * m_InputChannels;
+  m_BufferLen     = uiSamplesPerSec * (m_pcm_output.nBitPerSample >> 3) * (m_InputChannels > 4 ? 8:m_InputChannels);
 #if 0
   m_BufferLen     *= AUDIO_BUFFER_SECONDS;
   // lcarlon: it seems OMX_EmptyThisBuffer takes quite some time
@@ -319,14 +399,15 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
   //m_ChunkLen    = 2048;
 #else
   m_BufferLen     *= m_fifo_size;
-  m_ChunkLen      = 2048 * (uiBitsPerSample >> 3) * m_InputChannels;
+  m_ChunkLen      = 4096 * (uiBitsPerSample >> 3) * m_InputChannels;
 #endif
 
   m_wave_header.Samples.wValidBitsPerSample = uiBitsPerSample;
   m_wave_header.Samples.wSamplesPerBlock    = 0;
   m_wave_header.Format.nChannels            = m_InputChannels;
   m_wave_header.Format.nBlockAlign          = m_InputChannels * (uiBitsPerSample >> 3);
-  m_wave_header.Format.wFormatTag           = WAVE_FORMAT_PCM;
+  // Custom format interpreted by GPU as WAVE_FORMAT_IEEE_FLOAT_PLANAR
+  m_wave_header.Format.wFormatTag           = uiBitsPerSample == 32 ? 0x8000 : WAVE_FORMAT_PCM;
   m_wave_header.Format.nSamplesPerSec       = uiSamplesPerSec;
   m_wave_header.Format.nAvgBytesPerSec      = m_BytesPerSec;
   m_wave_header.Format.wBitsPerSample       = uiBitsPerSample;
@@ -345,34 +426,13 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
   m_pcm_input.nChannels             = m_InputChannels;
   m_pcm_input.nSamplingRate         = uiSamplesPerSec;
 
-  PrintPCM(&m_pcm_input);
-  PrintPCM(&m_pcm_output);
+  PrintPCM(&m_pcm_input, "in");
+  PrintPCM(&m_pcm_output, "out");
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
-  std::string componentName = "";
 
-  componentName = "OMX.broadcom.audio_render";
-  if(!m_omx_render.Initialize(componentName, OMX_IndexParamAudioInit))
+  if(!m_omx_decoder.Initialize("OMX.broadcom.audio_decode", OMX_IndexParamAudioInit))
     return false;
-
-  OMX_CONFIG_BRCMAUDIODESTINATIONTYPE audioDest;
-  OMX_INIT_STRUCTURE(audioDest);
-  strncpy((char *)audioDest.sName, device.c_str(), strlen(device.c_str()));
-
-  omx_err = m_omx_render.SetConfig(OMX_IndexConfigBrcmAudioDestination, &audioDest);
-  if (omx_err != OMX_ErrorNone)
-    return false;
-
-  componentName = "OMX.broadcom.audio_decode";
-  if(!m_omx_decoder.Initialize(componentName, OMX_IndexParamAudioInit))
-    return false;
-
-  if(!m_Passthrough)
-  {
-    componentName = "OMX.broadcom.audio_mixer";
-    if(!m_omx_mixer.Initialize(componentName, OMX_IndexParamAudioInit))
-      return false;
-  }
 
   if(m_Passthrough)
   {
@@ -388,27 +448,46 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     }
   }
 
-  // set up the number/size of buffers
   OMX_PARAM_PORTDEFINITIONTYPE port_param;
+  // set up the number/size of buffers for decoder input
   OMX_INIT_STRUCTURE(port_param);
   port_param.nPortIndex = m_omx_decoder.GetInputPort();
 
   omx_err = m_omx_decoder.GetParameter(OMX_IndexParamPortDefinition, &port_param);
   if(omx_err != OMX_ErrorNone)
   {
-    CLog::Log(LOGERROR, "COMXAudio::Initialize error get OMX_IndexParamPortDefinition omx_err(0x%08x)\n", omx_err);
+    CLog::Log(LOGERROR, "COMXAudio::Initialize error get OMX_IndexParamPortDefinition (input) omx_err(0x%08x)\n", omx_err);
     return false;
   }
 
   port_param.format.audio.eEncoding = m_eEncoding;
-
   port_param.nBufferSize = m_ChunkLen;
-  port_param.nBufferCountActual = m_BufferLen / m_ChunkLen;
+  port_param.nBufferCountActual = port_param.nBufferCountMin;
 
   omx_err = m_omx_decoder.SetParameter(OMX_IndexParamPortDefinition, &port_param);
   if(omx_err != OMX_ErrorNone)
   {
-    CLog::Log(LOGERROR, "COMXAudio::Initialize error set OMX_IndexParamPortDefinition omx_err(0x%08x)\n", omx_err);
+    CLog::Log(LOGERROR, "COMXAudio::Initialize error set OMX_IndexParamPortDefinition (intput) omx_err(0x%08x)\n", omx_err);
+    return false;
+  }
+
+  // set up the number/size of buffers for decoder output
+  OMX_INIT_STRUCTURE(port_param);
+  port_param.nPortIndex = m_omx_decoder.GetOutputPort();
+
+  omx_err = m_omx_decoder.GetParameter(OMX_IndexParamPortDefinition, &port_param);
+  if(omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "COMXAudio::Initialize error get OMX_IndexParamPortDefinition (output) omx_err(0x%08x)\n", omx_err);
+    return false;
+  }
+
+  port_param.nBufferCountActual = std::max(1, (int)(m_BufferLen / port_param.nBufferSize));
+
+  omx_err = m_omx_decoder.SetParameter(OMX_IndexParamPortDefinition, &port_param);
+  if(omx_err != OMX_ErrorNone)
+  {
+    CLog::Log(LOGERROR, "COMXAudio::Initialize error set OMX_IndexParamPortDefinition (output) omx_err(0x%08x)\n", omx_err);
     return false;
   }
 
@@ -428,53 +507,6 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     }
   }
 
-  if(m_av_clock == NULL)
-  {
-    /* no external clock set. generate one */
-    m_external_clock = false;
-
-    m_av_clock = new OMXClock();
-    
-    if(!m_av_clock->OMXInitialize(false, true))
-    {
-      delete m_av_clock;
-      m_av_clock = NULL;
-      CLog::Log(LOGERROR, "COMXAudio::Initialize error creating av clock\n");
-      return false;
-    }
-  }
-
-  m_omx_clock = m_av_clock->GetOMXClock();
-
-  m_omx_tunnel_clock.Initialize(m_omx_clock, m_omx_clock->GetInputPort(), &m_omx_render, m_omx_render.GetInputPort()+1);
-
-  omx_err = m_omx_tunnel_clock.Establish(false);
-  if(omx_err != OMX_ErrorNone)
-  {
-    CLog::Log(LOGERROR, "COMXAudio::Initialize m_omx_tunnel_clock.Establish\n");
-    return false;
-  }
-
-  if(!m_external_clock)
-  {
-    omx_err = m_omx_clock->SetStateForComponent(OMX_StateExecuting);
-    if (omx_err != OMX_ErrorNone)
-    {
-      CLog::Log(LOGERROR, "COMXAudio::Initialize m_omx_clock.SetStateForComponent\n");
-      return false;
-    }
-  }
-
-  /*
-  m_pcm_output.nPortIndex          = m_omx_render.GetInputPort();
-  omx_err = m_omx_render.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
-  if(omx_err != OMX_ErrorNone)
-  {
-    CLog::Log(LOGERROR, "COMXAudio::Initialize OMX_IndexParamAudioPcm omx_err(0x%08x)\n", omx_err);
-    return false;
-  }
-  */
-
   omx_err = m_omx_decoder.AllocInputBuffers();
   if(omx_err != OMX_ErrorNone) 
   {
@@ -482,59 +514,12 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
     return false;
   }
 
-  if(!m_Passthrough)
-  {
-    m_omx_tunnel_decoder.Initialize(&m_omx_decoder, m_omx_decoder.GetOutputPort(), &m_omx_mixer, m_omx_mixer.GetInputPort());
-    omx_err = m_omx_tunnel_decoder.Establish(false);
-    if(omx_err != OMX_ErrorNone)
-    {
-      CLog::Log(LOGERROR, "COMXAudio::Initialize - Error m_omx_tunnel_decoder.Establish 0x%08x", omx_err);
-      return false;
-    }
-  
     omx_err = m_omx_decoder.SetStateForComponent(OMX_StateExecuting);
     if(omx_err != OMX_ErrorNone) {
       CLog::Log(LOGERROR, "COMXAudio::Initialize - Error setting OMX_StateExecuting 0x%08x", omx_err);
       return false;
     }
 
-    m_omx_tunnel_mixer.Initialize(&m_omx_mixer, m_omx_mixer.GetOutputPort(), &m_omx_render, m_omx_render.GetInputPort());
-    omx_err = m_omx_tunnel_mixer.Establish(false);
-    if(omx_err != OMX_ErrorNone)
-    {
-      CLog::Log(LOGERROR, "COMXAudio::Initialize - Error m_omx_tunnel_decoder.Establish 0x%08x", omx_err);
-      return false;
-    }
-  
-    omx_err = m_omx_mixer.SetStateForComponent(OMX_StateExecuting);
-    if(omx_err != OMX_ErrorNone) {
-      CLog::Log(LOGERROR, "COMXAudio::Initialize - Error setting OMX_StateExecuting 0x%08x", omx_err);
-      return false;
-    }
-  }
-  else
-  {
-    m_omx_tunnel_decoder.Initialize(&m_omx_decoder, m_omx_decoder.GetOutputPort(), &m_omx_render, m_omx_render.GetInputPort());
-    omx_err = m_omx_tunnel_decoder.Establish(false);
-    if(omx_err != OMX_ErrorNone)
-    {
-      CLog::Log(LOGERROR, "COMXAudio::Initialize - Error m_omx_tunnel_decoder.Establish 0x%08x", omx_err);
-      return false;
-    }
-  
-    omx_err = m_omx_decoder.SetStateForComponent(OMX_StateExecuting);
-    if(omx_err != OMX_ErrorNone) {
-      CLog::Log(LOGERROR, "COMXAudio::Initialize - Error setting OMX_StateExecuting 0x%08x", omx_err);
-      return false;
-    }
-  }
-
-  omx_err = m_omx_render.SetStateForComponent(OMX_StateExecuting);
-  if(omx_err != OMX_ErrorNone) 
-  {
-    CLog::Log(LOGERROR, "COMXAudio::Initialize - Error setting OMX_StateExecuting 0x%08x", omx_err);
-    return false;
-  }
 
   if(m_eEncoding == OMX_AUDIO_CodingPCM)
   {
@@ -599,15 +584,12 @@ bool COMXAudio::Initialize(IAudioCallback* pCallback, const CStdString& device, 
 
   m_Initialized   = true;
   m_setStartTime  = true;
-  m_first_frame   = true;
-  m_last_pts      = DVD_NOPTS_VALUE;
-
-  SetCurrentVolume(m_CurrentVolume);
+  m_settings_changed = false;
 
   CLog::Log(LOGDEBUG, "COMXAudio::Initialize Ouput bps %d samplerate %d channels %d device %s buffer size %d bytes per second %d passthrough %d hwdecode %d", 
-      (int)m_pcm_output.nBitPerSample, (int)m_pcm_output.nSamplingRate, (int)m_pcm_output.nChannels, deviceuse.c_str(), m_BufferLen, m_BytesPerSec, m_Passthrough, m_HWDecode);
+      (int)m_pcm_output.nBitPerSample, (int)m_pcm_output.nSamplingRate, (int)m_pcm_output.nChannels, m_deviceuse.c_str(), m_BufferLen, m_BytesPerSec, m_Passthrough, m_HWDecode);
   CLog::Log(LOGDEBUG, "COMXAudio::Initialize Input bps %d samplerate %d channels %d device %s buffer size %d bytes per second %d passthrough %d hwdecode %d", 
-      (int)m_pcm_input.nBitPerSample, (int)m_pcm_input.nSamplingRate, (int)m_pcm_input.nChannels, deviceuse.c_str(), m_BufferLen, m_BytesPerSec, m_Passthrough, m_HWDecode);
+      (int)m_pcm_input.nBitPerSample, (int)m_pcm_input.nSamplingRate, (int)m_pcm_input.nChannels, m_deviceuse.c_str(), m_BufferLen, m_BytesPerSec, m_Passthrough, m_HWDecode);
 
   return true;
 }
@@ -617,9 +599,6 @@ bool COMXAudio::Deinitialize()
 {
   if(!m_Initialized)
     return true;
-
-  if(!m_external_clock && m_av_clock != NULL)
-    m_av_clock->OMXStop();
 
   m_omx_tunnel_decoder.Flush();
   if(!m_Passthrough)
@@ -633,21 +612,14 @@ bool COMXAudio::Deinitialize()
 
   m_omx_decoder.FlushInput();
 
-  m_omx_render.Deinitialize();
+  m_omx_render.Deinitialize(true);
   if(!m_Passthrough)
-    m_omx_mixer.Deinitialize();
-  m_omx_decoder.Deinitialize();
+    m_omx_mixer.Deinitialize(true);
+  m_omx_decoder.Deinitialize(true);
 
   m_Initialized = false;
   m_BytesPerSec = 0;
   m_BufferLen   = 0;
-
-  if(!m_external_clock && m_av_clock != NULL)
-  {
-    delete m_av_clock;
-    m_av_clock  = NULL;
-    m_external_clock = false;
-  }
 
   m_omx_clock = NULL;
   m_av_clock  = NULL;
@@ -664,8 +636,6 @@ bool COMXAudio::Deinitialize()
   m_dllAvUtil.Unload();
 
   m_setStartTime  = true;
-  m_first_frame   = true;
-  m_last_pts      = DVD_NOPTS_VALUE;
 
   return true;
 }
@@ -681,50 +651,7 @@ void COMXAudio::Flush()
     m_omx_tunnel_mixer.Flush();
   
   //m_setStartTime  = true;
-  m_last_pts      = DVD_NOPTS_VALUE;
   m_LostSync      = true;
-  //m_first_frame   = true;
-}
-
-//***********************************************************************************************
-bool COMXAudio::Pause()
-{
-  if (!m_Initialized)
-     return -1;
-
-  if(m_Pause) return true;
-  m_Pause = true;
-
-  m_omx_decoder.SetStateForComponent(OMX_StatePause);
-
-  return true;
-}
-
-//***********************************************************************************************
-bool COMXAudio::Resume()
-{
-  if (!m_Initialized)
-     return -1;
-
-  if(!m_Pause) return true;
-  m_Pause = false;
-
-  m_omx_decoder.SetStateForComponent(OMX_StateExecuting);
-
-  return true;
-}
-
-//***********************************************************************************************
-bool COMXAudio::Stop()
-{
-  if (!m_Initialized)
-     return -1;
-
-  Flush();
-
-  m_Pause = false;
-
-  return true;
 }
 
 //***********************************************************************************************
@@ -852,13 +779,6 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
     return len;
   }
 
-  if (!m_Passthrough && m_pCallback)
-  {
-    unsigned int mylen = std::min(len, sizeof m_visBuffer);
-    memcpy(m_visBuffer, data, mylen);
-    m_visBufferLength = mylen;
-  }
-
   if(m_eEncoding == OMX_AUDIO_CodingDTS && m_LostSync && (m_Passthrough || m_HWDecode))
   {
     int skip = SyncDTS((uint8_t *)data, len);
@@ -873,14 +793,16 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
       return len;
   }
 
-  unsigned int demuxer_bytes = (unsigned int)len;
+  unsigned pitch = (m_Passthrough || m_HWDecode) ? 1:(m_BitsPerSample >> 3) * m_InputChannels;
+  unsigned int demuxer_samples = len / pitch;
+  unsigned int demuxer_samples_sent = 0;
   uint8_t *demuxer_content = (uint8_t *)data;
 
   OMX_ERRORTYPE omx_err;
 
   OMX_BUFFERHEADERTYPE *omx_buffer = NULL;
 
-  while(demuxer_bytes)
+  while(demuxer_samples_sent < demuxer_samples)
   {
     // 200ms timeout
     omx_buffer = m_omx_decoder.GetInputBuffer(200);
@@ -895,8 +817,31 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
     omx_buffer->nOffset = 0;
     omx_buffer->nFlags  = 0;
 
-    omx_buffer->nFilledLen = (demuxer_bytes > omx_buffer->nAllocLen) ? omx_buffer->nAllocLen : demuxer_bytes;
-    memcpy(omx_buffer->pBuffer, demuxer_content, omx_buffer->nFilledLen);
+    unsigned int remaining = demuxer_samples-demuxer_samples_sent;
+    unsigned int samples_space = omx_buffer->nAllocLen/pitch;
+    unsigned int samples = std::min(remaining, samples_space);
+
+    omx_buffer->nFilledLen = samples * pitch;
+
+    if (samples < demuxer_samples && m_BitsPerSample==32 && !(m_Passthrough || m_HWDecode))
+    {
+       uint8_t *dst = omx_buffer->pBuffer;
+       uint8_t *src = demuxer_content + demuxer_samples_sent * (m_BitsPerSample >> 3);
+       // we need to extract samples from an audio plane
+       for (int i=0; i<(int)m_InputChannels; i++)
+       {
+         memcpy(dst, src, omx_buffer->nFilledLen / m_InputChannels);
+         dst += omx_buffer->nFilledLen / m_InputChannels;
+         src += demuxer_samples * (m_BitsPerSample >> 3);
+       }
+       assert(dst <= omx_buffer->pBuffer + m_ChunkLen);
+    }
+    else
+    {
+       uint8_t *dst = omx_buffer->pBuffer;
+       uint8_t *src = demuxer_content + demuxer_samples_sent * pitch;
+       memcpy(dst, src, omx_buffer->nFilledLen);
+    }
 
     /*
     if (m_SampleSize > 0 && pts != DVD_NOPTS_VALUE && !(omx_buffer->nFlags & OMX_BUFFERFLAG_TIME_UNKNOWN) && !m_Passthrough && !m_HWDecode)
@@ -914,34 +859,17 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
       omx_buffer->nFlags = OMX_BUFFERFLAG_STARTTIME;
 
       m_setStartTime = false;
-      m_last_pts = pts;
     }
-    else
+    else if(pts == DVD_NOPTS_VALUE)
     {
-      if(pts == DVD_NOPTS_VALUE)
-      {
         omx_buffer->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
-        m_last_pts = pts;
-      }
-      else if (m_last_pts != pts)
-      {
-        if(pts > m_last_pts)
-          m_last_pts = pts;
-        else
-          omx_buffer->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;;
-      }
-      else if (m_last_pts == pts)
-      {
-        omx_buffer->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
-      }
     }
 
     omx_buffer->nTimeStamp = ToOMXTime(val);
 
-    demuxer_bytes -= omx_buffer->nFilledLen;
-    demuxer_content += omx_buffer->nFilledLen;
+    demuxer_samples_sent += samples;
 
-    if(demuxer_bytes == 0)
+    if(demuxer_samples_sent == demuxer_samples)
       omx_buffer->nFlags |= OMX_BUFFERFLAG_ENDOFFRAME;
 
     int nRetry = 0;
@@ -965,153 +893,14 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
       }
     }
 
-    if(m_first_frame)
+    omx_err = m_omx_decoder.WaitForEvent(OMX_EventPortSettingsChanged, 0);
+    if (omx_err == OMX_ErrorNone)
     {
-      m_first_frame = false;
-      //m_omx_render.WaitForEvent(OMX_EventPortSettingsChanged);
-
-      m_omx_render.DisablePort(m_omx_render.GetInputPort(), false);
-      if(!m_Passthrough)
+      if(!PortSettingsChanged())
       {
-        m_omx_mixer.DisablePort(m_omx_mixer.GetOutputPort(), false);
-        m_omx_mixer.DisablePort(m_omx_mixer.GetInputPort(), false);
+        CLog::Log(LOGERROR, "%s::%s - error PortSettingsChanged omx_err(0x%08x)\n", CLASSNAME, __func__, omx_err);
       }
-      m_omx_decoder.DisablePort(m_omx_decoder.GetOutputPort(), false);
-
-      if(!m_Passthrough)
-      {
-        if(m_HWDecode)
-        {
-          OMX_INIT_STRUCTURE(m_pcm_input);
-          m_pcm_input.nPortIndex      = m_omx_decoder.GetOutputPort();
-          omx_err = m_omx_decoder.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_input);
-          if(omx_err != OMX_ErrorNone)
-          {
-            CLog::Log(LOGERROR, "COMXAudio::AddPackets error GetParameter 1 omx_err(0x%08x)\n", omx_err);
-          }
-        }
-
-        /* setup mixer input */
-        m_pcm_input.nPortIndex      = m_omx_mixer.GetInputPort();
-        omx_err = m_omx_mixer.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_input);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error SetParameter 1 omx_err(0x%08x)\n", omx_err);
-        }
-        omx_err = m_omx_mixer.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_input);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error GetParameter 2  omx_err(0x%08x)\n", omx_err);
-        }
-
-        /* setup mixer output */
-        m_pcm_output.nPortIndex      = m_omx_mixer.GetOutputPort();
-        omx_err = m_omx_mixer.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error SetParameter 1 omx_err(0x%08x)\n", omx_err);
-        }
-        omx_err = m_omx_mixer.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error GetParameter 2  omx_err(0x%08x)\n", omx_err);
-        }
-
-        m_pcm_output.nPortIndex      = m_omx_render.GetInputPort();
-        omx_err = m_omx_render.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error SetParameter 1 omx_err(0x%08x)\n", omx_err);
-        }
-        omx_err = m_omx_render.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error GetParameter 2  omx_err(0x%08x)\n", omx_err);
-        }
-
-        PrintPCM(&m_pcm_input);
-        PrintPCM(&m_pcm_output);
-      }
-      else
-      {
-        m_pcm_output.nPortIndex      = m_omx_decoder.GetOutputPort();
-        m_omx_decoder.GetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
-        PrintPCM(&m_pcm_output);
-
-        OMX_AUDIO_PARAM_PORTFORMATTYPE formatType;
-        OMX_INIT_STRUCTURE(formatType);
-        formatType.nPortIndex = m_omx_render.GetInputPort();
-
-        omx_err = m_omx_render.GetParameter(OMX_IndexParamAudioPortFormat, &formatType);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error OMX_IndexParamAudioPortFormat omx_err(0x%08x)\n", omx_err);
-          assert(0);
-        }
-
-        formatType.eEncoding = m_eEncoding;
-
-        omx_err = m_omx_render.SetParameter(OMX_IndexParamAudioPortFormat, &formatType);
-        if(omx_err != OMX_ErrorNone)
-        {
-          CLog::Log(LOGERROR, "COMXAudio::AddPackets error OMX_IndexParamAudioPortFormat omx_err(0x%08x)\n", omx_err);
-          assert(0);
-        }
-
-        if(m_eEncoding == OMX_AUDIO_CodingDDP)
-        {
-          OMX_AUDIO_PARAM_DDPTYPE m_ddParam;
-          OMX_INIT_STRUCTURE(m_ddParam);
-
-          m_ddParam.nPortIndex      = m_omx_render.GetInputPort();
-
-          m_ddParam.nChannels       = m_InputChannels; //(m_InputChannels == 6) ? 8 : m_InputChannels;
-          m_ddParam.nSampleRate     = m_SampleRate;
-          m_ddParam.eBitStreamId    = OMX_AUDIO_DDPBitStreamIdAC3;
-          m_ddParam.nBitRate        = 0;
-
-          for(unsigned int i = 0; i < OMX_MAX_CHANNELS; i++)
-          {
-            if(i >= m_ddParam.nChannels)
-              break;
-
-            m_ddParam.eChannelMapping[i] = OMXChannels[i];
-          }
-  
-          m_omx_render.SetParameter(OMX_IndexParamAudioDdp, &m_ddParam);
-          m_omx_render.GetParameter(OMX_IndexParamAudioDdp, &m_ddParam);
-          PrintDDP(&m_ddParam);
-        }
-        else if(m_eEncoding == OMX_AUDIO_CodingDTS)
-        {
-          m_dtsParam.nPortIndex      = m_omx_render.GetInputPort();
-
-          m_dtsParam.nChannels       = m_InputChannels; //(m_InputChannels == 6) ? 8 : m_InputChannels;
-          m_dtsParam.nBitRate        = 0;
-
-          for(unsigned int i = 0; i < OMX_MAX_CHANNELS; i++)
-          {
-            if(i >= m_dtsParam.nChannels)
-              break;
-
-            m_dtsParam.eChannelMapping[i] = OMXChannels[i];
-          }
-  
-          m_omx_render.SetParameter(OMX_IndexParamAudioDts, &m_dtsParam);
-          m_omx_render.GetParameter(OMX_IndexParamAudioDts, &m_dtsParam);
-          PrintDTS(&m_dtsParam);
-        }
-      }
-
-      m_omx_render.EnablePort(m_omx_render.GetInputPort(), false);
-      if(!m_Passthrough)
-      {
-        m_omx_mixer.EnablePort(m_omx_mixer.GetOutputPort(), false);
-        m_omx_mixer.EnablePort(m_omx_mixer.GetInputPort(), false);
-      }
-      m_omx_decoder.EnablePort(m_omx_decoder.GetOutputPort(), false);
     }
- 
   }
 
   return len;
@@ -1143,32 +932,6 @@ unsigned int COMXAudio::GetChunkLen()
 {
   return m_ChunkLen;
 }
-//***********************************************************************************************
-int COMXAudio::SetPlaySpeed(int iSpeed)
-{
-  return 0;
-}
-
-void COMXAudio::RegisterAudioCallback(IAudioCallback *pCallback)
-{
-  m_pCallback = pCallback;
-  if (m_pCallback && !m_Passthrough && !m_HWDecode)
-    m_pCallback->OnInitialize(m_OutputChannels, m_SampleRate, m_BitsPerSample);
-}
-
-void COMXAudio::UnRegisterAudioCallback()
-{
-  m_pCallback = NULL;
-}
-
-void COMXAudio::DoAudioWork()
-{
-  if (m_pCallback && m_visBufferLength)
-  {
-    m_pCallback->OnAudioData((BYTE*)m_visBuffer, m_visBufferLength);
-    m_visBufferLength = 0;
-  }
-}
 
 unsigned int COMXAudio::GetAudioRenderingLatency()
 {
@@ -1189,9 +952,9 @@ unsigned int COMXAudio::GetAudioRenderingLatency()
   return param.nU32;
 }
 
-void COMXAudio::WaitCompletion()
+void COMXAudio::SubmitEOS()
 {
-  if(!m_Initialized || m_Pause)
+  if(!m_Initialized)
     return;
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
@@ -1215,57 +978,20 @@ void COMXAudio::WaitCompletion()
     CLog::Log(LOGERROR, "%s::%s - OMX_EmptyThisBuffer() failed with result(0x%x)\n", CLASSNAME, __func__, omx_err);
     return;
   }
-
-  while(true)
-  {
-    if(m_omx_render.IsEOS())
-      break;
-    OMXClock::OMXSleep(50);
-  }
-
-  while(true)
-  {
-    if(!GetAudioRenderingLatency())
-      break;
-
-    OMXClock::OMXSleep(50);
-  }
-
-  return;
+  CLog::Log(LOGDEBUG, "%s::%s\n", CLASSNAME, __func__);
 }
 
-void COMXAudio::SwitchChannels(int iAudioStream, bool bAudioOnAllSpeakers)
+bool COMXAudio::IsEOS()
 {
-    return ;
-}
-
-void COMXAudio::EnumerateAudioSinks(AudioSinkList& vAudioSinks, bool passthrough)
-{
-#ifndef STANDALONE
-  if (!passthrough)
-  {
-    vAudioSinks.push_back(AudioSink(g_localizeStrings.Get(409) + " (OMX)", "omx:default"));
-    vAudioSinks.push_back(AudioSink("analog (OMX)" , "omx:analog"));
-    vAudioSinks.push_back(AudioSink("hdmi (OMX)"   , "omx:hdmi"));
-  }
-  else
-  {
-    vAudioSinks.push_back(AudioSink("hdmi (OMX)"   , "omx:hdmi"));
-  }
-#endif
-}
-
-bool COMXAudio::SetClock(OMXClock *clock)
-{
-  if(m_av_clock != NULL)
+  if(!m_Initialized)
     return false;
-
-  m_av_clock = clock;
-  m_external_clock = true;
-  return true;
+  unsigned int latency = GetAudioRenderingLatency();
+  bool ret = m_omx_render.IsEOS() && latency <= 0;
+  CLog::Log(LOGDEBUG, "%s::%s = %d (%d,%d)\n", CLASSNAME, __func__, ret, m_omx_decoder.IsEOS(), latency);
+  return ret;
 }
- 
-void COMXAudio::SetCodingType(CodecID codec)
+
+void COMXAudio::SetCodingType(AVCodecID codec)
 {
   switch(codec)
   { 
@@ -1285,7 +1011,7 @@ void COMXAudio::SetCodingType(CodecID codec)
   } 
 }
 
-bool COMXAudio::CanHWDecode(CodecID codec)
+bool COMXAudio::CanHWDecode(AVCodecID codec)
 {
   switch(codec)
   { 
@@ -1328,7 +1054,7 @@ bool COMXAudio::CanHWDecode(CodecID codec)
   return m_HWDecode;
 }
 
-bool COMXAudio::HWDecode(CodecID codec)
+bool COMXAudio::HWDecode(AVCodecID codec)
 {
   bool ret = false;
 
@@ -1409,8 +1135,9 @@ void COMXAudio::PrintChannels(OMX_AUDIO_CHANNELTYPE eChannelMapping[])
   }
 }
 
-void COMXAudio::PrintPCM(OMX_AUDIO_PARAM_PCMMODETYPE *pcm)
+void COMXAudio::PrintPCM(OMX_AUDIO_PARAM_PCMMODETYPE *pcm, std::string direction)
 {
+  CLog::Log(LOGDEBUG, "pcm->direction      : %s\n", direction.c_str());
   CLog::Log(LOGDEBUG, "pcm->nPortIndex     : %d\n", (int)pcm->nPortIndex);
   CLog::Log(LOGDEBUG, "pcm->eNumData       : %d\n", pcm->eNumData);
   CLog::Log(LOGDEBUG, "pcm->eEndian        : %d\n", pcm->eEndian);
@@ -1552,7 +1279,6 @@ unsigned int COMXAudio::SyncDTS(BYTE* pData, unsigned int iSize)
 unsigned int COMXAudio::SyncAC3(BYTE* pData, unsigned int iSize)
 {
   unsigned int skip = 0;
-  //unsigned int fSize = 0;
 
   for(skip = 0; iSize - skip > 6; ++skip, ++pData)
   {
@@ -1581,7 +1307,6 @@ unsigned int COMXAudio::SyncAC3(BYTE* pData, unsigned int iSize)
       case 2: framesize = bitrate * 4; break;
     }
 
-    //fSize = framesize * 2;
     m_SampleRate = AC3FSCod[fscod];
 
     /* dont do extensive testing if we have not lost sync */

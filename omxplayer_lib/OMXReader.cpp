@@ -31,14 +31,7 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#ifndef STANDALONE
-#include "FileItem.h"
-#endif
-
 #include "linux/XMemUtils.h"
-#ifndef STANDALONE
-#include "utils/BitstreamStats.h"
-#endif
 
 #define MAX_DATA_SIZE_VIDEO    8 * 1024 * 1024
 #define MAX_DATA_SIZE_AUDIO    2 * 1024 * 1024
@@ -52,7 +45,6 @@ OMXReader::OMXReader()
   m_filename    = "";
   m_bMatroska   = false;
   m_bAVI        = false;
-  m_bMpeg       = false;
   g_abort       = false;
   m_pFile       = NULL;
   m_ioContext   = NULL;
@@ -135,10 +127,6 @@ bool OMXReader::Open(std::string filename, bool dump_format)
   AVInputFormat *iformat  = NULL;
   unsigned char *buffer   = NULL;
   unsigned int  flags     = READ_TRUNCATED | READ_BITRATE | READ_CHUNKED;
-#ifndef STANDALONE
-  if( CFileItem(m_filename, false).IsInternetStream() )
-    flags |= READ_CACHED;
-#endif
 
   if(m_filename.substr(0, 8) == "shout://" )
     m_filename.replace(0, 8, "http://");
@@ -154,7 +142,21 @@ bool OMXReader::Open(std::string filename, bool dump_format)
     if(idx != string::npos)
       m_filename = m_filename.substr(0, idx);
 
-    result = m_dllAvFormat.avformat_open_input(&m_pFormatContext, m_filename.c_str(), iformat, NULL);
+    AVDictionary *d = NULL;
+    // Enable seeking if http
+    if(m_filename.substr(0,7) == "http://")
+    {
+       av_dict_set(&d, "seekable", "1", 0);
+    }
+    CLog::Log(LOGDEBUG, "COMXPlayer::OpenFile - avformat_open_input %s ", m_filename.c_str());
+    result = m_dllAvFormat.avformat_open_input(&m_pFormatContext, m_filename.c_str(), iformat, &d);
+    if(av_dict_count(d) == 0)
+    {
+       CLog::Log(LOGDEBUG, "COMXPlayer::OpenFile - avformat_open_input enabled SEEKING ");
+       if(m_filename.substr(0,7) == "http://")
+         m_pFormatContext->pb->seekable = AVIO_SEEKABLE_NORMAL;
+    }
+    av_dict_free(&d);
     if(result < 0)
     {
       CLog::Log(LOGERROR, "COMXPlayer::OpenFile - avformat_open_input %s ", m_filename.c_str());
@@ -206,7 +208,6 @@ bool OMXReader::Open(std::string filename, bool dump_format)
 
   m_bMatroska = strncmp(m_pFormatContext->iformat->name, "matroska", 8) == 0; // for "matroska.webm"
   m_bAVI = strcmp(m_pFormatContext->iformat->name, "avi") == 0;
-  m_bMpeg = strcmp(m_pFormatContext->iformat->name, "mpeg") == 0;
 
   // if format can be nonblocking, let's use that
   m_pFormatContext->flags |= AVFMT_FLAG_NONBLOCK;
@@ -215,10 +216,8 @@ bool OMXReader::Open(std::string filename, bool dump_format)
   if (iformat && (strcmp(iformat->name, "mjpeg") == 0) && m_ioContext->seekable == 0)
     m_pFormatContext->max_analyze_duration = 500000;
 
-#ifdef STANDALONE
   if(/*m_bAVI || */m_bMatroska)
     m_pFormatContext->max_analyze_duration = 0;
-#endif
 
   result = m_dllAvFormat.avformat_find_stream_info(m_pFormatContext, NULL);
   if(result < 0)
@@ -326,7 +325,6 @@ bool OMXReader::Close()
   m_filename        = "";
   m_bMatroska       = false;
   m_bAVI            = false;
-  m_bMpeg           = false;
   m_video_count     = 0;
   m_audio_count     = 0;
   m_subtitle_count  = 0;
@@ -353,16 +351,19 @@ bool OMXReader::Close()
   ff_read_frame_flush(m_pFormatContext);
 }*/
 
-bool OMXReader::SeekTime(int64_t seek_ms, int seek_flags, double *startpts)
+bool OMXReader::SeekTime(int time, bool backwords, double *startpts)
 {
-  if(seek_ms < 0)
-    seek_ms = 0;
+  if(time < 0)
+    time = 0;
 
-  if(!m_pFile || !m_pFormatContext)
+  if(!m_pFormatContext)
     return false;
 
-  if(!m_pFile->IoControl(IOCTRL_SEEK_POSSIBLE, NULL))
+  if(m_pFile && !m_pFile->IoControl(IOCTRL_SEEK_POSSIBLE, NULL))
+  {
+    CLog::Log(LOGDEBUG, "%s - input stream reports it is not seekable", __FUNCTION__);
     return false;
+  }
 
   Lock();
 
@@ -371,37 +372,29 @@ bool OMXReader::SeekTime(int64_t seek_ms, int seek_flags, double *startpts)
   if(m_ioContext)
     m_ioContext->buf_ptr = m_ioContext->buf_end;
 
-  int64_t seek_pts = (int64_t)seek_ms * (AV_TIME_BASE / 1000);
+  int64_t seek_pts = (int64_t)time * (AV_TIME_BASE / 1000);
   if (m_pFormatContext->start_time != (int64_t)AV_NOPTS_VALUE)
     seek_pts += m_pFormatContext->start_time;
 
-  /* seek behind eof */
-  if((seek_pts / AV_TIME_BASE) > (GetStreamLength()  / 1000))
-  {
-    m_eof = true;
-    UnLock();
-    return true;
-  }
 
-  int ret = m_dllAvFormat.av_seek_frame(m_pFormatContext, -1, seek_pts, seek_flags ? AVSEEK_FLAG_BACKWARD : 0);
+  int ret = m_dllAvFormat.av_seek_frame(m_pFormatContext, -1, seek_pts, backwords ? AVSEEK_FLAG_BACKWARD : 0);
 
   if(ret >= 0)
-  {
     UpdateCurrentPTS();
-    m_eof = false;
-  }
 
-  if(m_iCurrentPts == DVD_NOPTS_VALUE)
-  {
-    CLog::Log(LOGDEBUG, "OMXReader::SeekTime - unknown position after seek");
-  }
-  else
-  {
-    CLog::Log(LOGDEBUG, "OMXReader::SeekTime - seek ended up on time %d",(int)(m_iCurrentPts / DVD_TIME_BASE * 1000));
-  }
-
+  // in this case the start time is requested time
   if(startpts)
-    *startpts = DVD_MSEC_TO_TIME(seek_ms);
+    *startpts = DVD_MSEC_TO_TIME(time);
+
+  // demuxer will return failure, if you seek to eof
+  m_eof = false;
+  if (m_pFile && m_pFile->IsEOF() && ret <= 0)
+  {
+    m_eof = true;
+    ret = 0;
+  }
+
+  CLog::Log(LOGDEBUG, "OMXReader::SeekTime(%d) - seek ended up on time %d",time,(int)(m_iCurrentPts / DVD_TIME_BASE * 1000));
 
   UnLock();
 
@@ -418,8 +411,6 @@ AVMediaType OMXReader::PacketType(OMXPacket *pkt)
 
 OMXPacket *OMXReader::Read()
 {
-  assert(!IsEof());
-  
   AVPacket  pkt;
   OMXPacket *m_omx_pkt = NULL;
   int       result = -1;
@@ -478,11 +469,12 @@ OMXPacket *OMXReader::Read()
   // lavf sometimes bugs out and gives 0 dts/pts instead of no dts/pts
   // since this could only happens on initial frame under normal
   // circomstances, let's assume it is wrong all the time
+#if 0
   if(pkt.dts == 0)
     pkt.dts = AV_NOPTS_VALUE;
   if(pkt.pts == 0)
     pkt.pts = AV_NOPTS_VALUE;
-
+#endif
   if(m_bMatroska && pStream->codec && pStream->codec->codec_type == AVMEDIA_TYPE_VIDEO)
   { // matroska can store different timestamps
     // for different formats, for native stored
@@ -527,10 +519,8 @@ OMXPacket *OMXReader::Read()
   m_omx_pkt->stream_index = pkt.stream_index;
   GetHints(pStream, &m_omx_pkt->hints);
 
-  //m_omx_pkt->dts = ConvertTimestamp(pkt.dts, pStream->time_base.den, pStream->time_base.num);
-  //m_omx_pkt->pts = ConvertTimestamp(pkt.pts, pStream->time_base.den, pStream->time_base.num);
-  m_omx_pkt->dts = ConvertTimestamp(pkt.dts, &pStream->time_base);
-  m_omx_pkt->pts = ConvertTimestamp(pkt.pts, &pStream->time_base);
+  m_omx_pkt->dts = ConvertTimestamp(pkt.dts, pStream->time_base.den, pStream->time_base.num);
+  m_omx_pkt->pts = ConvertTimestamp(pkt.pts, pStream->time_base.den, pStream->time_base.num);
   m_omx_pkt->duration = DVD_SEC_TO_TIME((double)pkt.duration * pStream->time_base.num / pStream->time_base.den);
 
   // used to guess streamlength
@@ -630,8 +620,7 @@ bool OMXReader::GetStreams()
       if(!chapter)
         continue;
 
-      //m_chapters[i].seekto_ms = ConvertTimestamp(chapter->start, chapter->time_base.den, chapter->time_base.num) / 1000;
-      m_chapters[i].seekto_ms = ConvertTimestamp(chapter->start, &chapter->time_base) / 1000;
+      m_chapters[i].seekto_ms = ConvertTimestamp(chapter->start, chapter->time_base.den, chapter->time_base.num) / 1000;
       m_chapters[i].ts        = m_chapters[i].seekto_ms / 1000;
 
 #if LIBAVFORMAT_VERSION_INT >= AV_VERSION_INT(52,83,0)
@@ -974,8 +963,7 @@ bool OMXReader::SeekChapter(int chapter, double* startpts)
     return false;
 
   AVChapter *ch = m_pFormatContext->chapters[chapter-1];
-  //double dts = ConvertTimestamp(ch->start, ch->time_base.den, ch->time_base.num);
-  double dts = ConvertTimestamp(ch->start, &ch->time_base);
+  double dts = ConvertTimestamp(ch->start, ch->time_base.den, ch->time_base.num);
   return SeekTime(DVD_TIME_TO_MSEC(dts), 0, startpts);
 #else
   return false;
@@ -985,7 +973,7 @@ bool OMXReader::SeekChapter(int chapter, double* startpts)
 double OMXReader::ConvertTimestamp(int64_t pts, int den, int num)
 {
   if(m_pFormatContext == NULL)
-    return false;
+    return DVD_NOPTS_VALUE;
 
   if (pts == (int64_t)AV_NOPTS_VALUE)
     return DVD_NOPTS_VALUE;
@@ -1006,26 +994,6 @@ double OMXReader::ConvertTimestamp(int64_t pts, int den, int num)
   return timestamp*DVD_TIME_BASE;
 }
 
-double OMXReader::ConvertTimestamp(int64_t pts, AVRational *time_base)
-{
-  double new_pts = pts;
-
-  if(m_pFormatContext == NULL)
-    return false;
-
-  if (pts == (int64_t)AV_NOPTS_VALUE)
-    return DVD_NOPTS_VALUE;
-
-  if (m_pFormatContext->start_time != (int64_t)AV_NOPTS_VALUE)
-    new_pts += m_pFormatContext->start_time;
-
-  new_pts *= av_q2d(*time_base);
-
-  new_pts *= (double)DVD_TIME_BASE;
-
-  return new_pts;
-}
-
 int OMXReader::GetChapter()
 {
   if(m_pFormatContext == NULL
@@ -1036,10 +1004,8 @@ int OMXReader::GetChapter()
   for(unsigned i = 0; i < m_pFormatContext->nb_chapters; i++)
   {
     AVChapter *chapter = m_pFormatContext->chapters[i];
-    //if(m_iCurrentPts >= ConvertTimestamp(chapter->start, chapter->time_base.den, chapter->time_base.num)
-    //  && m_iCurrentPts <  ConvertTimestamp(chapter->end,   chapter->time_base.den, chapter->time_base.num))
-    if(m_iCurrentPts >= ConvertTimestamp(chapter->start, &chapter->time_base)
-      && m_iCurrentPts <  ConvertTimestamp(chapter->end, &chapter->time_base))
+    if(m_iCurrentPts >= ConvertTimestamp(chapter->start, chapter->time_base.den, chapter->time_base.num)
+      && m_iCurrentPts <  ConvertTimestamp(chapter->end,   chapter->time_base.den, chapter->time_base.num))
       return i + 1;
   }
 #endif
@@ -1076,8 +1042,7 @@ void OMXReader::UpdateCurrentPTS()
     AVStream *stream = m_pFormatContext->streams[i];
     if(stream && stream->cur_dts != (int64_t)AV_NOPTS_VALUE)
     {
-      //double ts = ConvertTimestamp(stream->cur_dts, stream->time_base.den, stream->time_base.num);
-      double ts = ConvertTimestamp(stream->cur_dts, &stream->time_base);
+      double ts = ConvertTimestamp(stream->cur_dts, stream->time_base.den, stream->time_base.num);
       if(m_iCurrentPts == DVD_NOPTS_VALUE || m_iCurrentPts > ts )
         m_iCurrentPts = ts;
     }
@@ -1312,28 +1277,16 @@ std::string OMXReader::GetStreamType(OMXStreamType type, unsigned int index)
   return strInfo;
 }
 
-#ifndef STANDALONE
-int OMXReader::GetSourceBitrate()
-{
-  int ret = 0;
-
-  if(!m_pFile)
-    return 0;
-
-  if(m_pFile->GetBitstreamStats())
-  {
-    BitstreamStats *status = m_pFile->GetBitstreamStats();
-    ret = status->GetBitrate();
-  }
-
-  return ret;
-}
-#endif
-
 bool OMXReader::CanSeek()
 {
   if(m_ioContext)
     return m_ioContext->seekable;
+
+  if(!m_pFormatContext)
+    return false;
+
+  if(m_pFormatContext->pb->seekable == AVIO_SEEKABLE_NORMAL)
+    return true;
 
   return false;
 }

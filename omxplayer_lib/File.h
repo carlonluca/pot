@@ -73,10 +73,12 @@ public:
   static bool Exists(const CStdString& strFileName, bool bUseCache = true);
   int GetChunkSize() { return 6144 /*FFMPEG_FILE_BUFFER_SIZE*/; };
   int IoControl(EIoControl request, void* param);
+  bool IsEOF();
 private:
   unsigned int m_flags;
   FILE  *m_pFile;
   int64_t m_iLength;
+  bool m_bPipe;
 };
 
 };

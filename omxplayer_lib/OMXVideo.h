@@ -29,8 +29,6 @@
 
 #include <IL/OMX_Video.h>
 
-#include "BitstreamConverter.h"
-
 #include "OMXClock.h"
 #include "OMXReader.h"
 
@@ -56,7 +54,7 @@ public:
 
   // Required overrides
   bool SendDecoderConfig();
-  bool NaluFormatStartCodes(enum CodecID codec, uint8_t *in_extradata, int in_extrasize);
+  bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *in_extradata, int in_extrasize);
   bool Open(
           COMXStreamInfo &hints,
           OMXClock *clock,
@@ -79,7 +77,8 @@ public:
   std::string GetDecoderName() { return m_video_codec_name; };
   void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
   int GetInputBufferSize();
-  void WaitCompletion();
+  void SubmitEOS();
+  bool IsEOS();
 
 signals:
   void textureReady(const uint& textureId);
@@ -121,6 +120,7 @@ protected:
   bool              m_first_text;
   OMX_TextureProvider* m_provider;
   OMX_BUFFERHEADERTYPE* m_eglBuffer;
+  uint32_t          m_history_valid_pts;
 };
 
 #endif
