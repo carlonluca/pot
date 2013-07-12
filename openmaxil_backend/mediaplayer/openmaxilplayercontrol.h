@@ -22,6 +22,7 @@
 
 #include <limits.h>
 
+#include <omx_mediaprocessor.h>
 #include <omx_textureprovider.h>
 
 QT_BEGIN_NAMESPACE
@@ -32,8 +33,6 @@ QT_BEGIN_NAMESPACE
 class QMediaPlaylist;
 class QMediaPlaylistNavigator;
 class QSocketNotifier;
-
-class OMX_MediaProcessor;
 
 enum PlayerCommandType {
    PLAYER_COMMAND_TYPE_SET_MEDIA,
@@ -159,6 +158,7 @@ signals:
     void textureInvalidated();
 
 private slots:
+    void onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
     void onItemSceneChanged();
     void playInt();
     void pauseInt();
@@ -168,6 +168,7 @@ private slots:
 private:
     void appendCommand(PlayerCommand* command);
     void processCommands();
+    QMediaPlayer::State convertState(OMX_MediaProcessor::OMX_MediaProcessorState state) const;
 
     bool m_ownStream;
     QMediaPlayer::MediaStatus m_mediaStatus;
@@ -189,6 +190,28 @@ private:
     QMediaPlayer* m_mediaPlayer;
     QQuickItem*   m_quickItem;
 };
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::convertState
++-----------------------------------------------------------------------------*/
+inline
+QMediaPlayer::State OpenMAXILPlayerControl::convertState(OMX_MediaProcessor::OMX_MediaProcessorState state) const
+{
+   switch (state) {
+   case OMX_MediaProcessor::STATE_STOPPED:
+      return QMediaPlayer::StoppedState;
+   case OMX_MediaProcessor::STATE_INACTIVE:
+      return QMediaPlayer::StoppedState;
+   case OMX_MediaProcessor::STATE_PAUSED:
+      return QMediaPlayer::PausedState;
+   case OMX_MediaProcessor::STATE_PLAYING:
+      return QMediaPlayer::PlayingState;
+   default:
+      break;
+   }
+
+   return QMediaPlayer::StoppedState;
+}
 
 QT_END_NAMESPACE
 

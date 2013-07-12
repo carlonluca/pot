@@ -108,6 +108,9 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
     m_packetAfterSeek(false),
     startpts(0)
 {
+   qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorError>("OMX_MediaProcessor::OMX_MediaProcessorError");
+   qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorState>("OMX_MediaProcessor::OMX_MediaProcessorState");
+
    int gpu_mem = get_mem_gpu();
    int min_gpu_mem = 64;
    if (gpu_mem > 0 && gpu_mem < min_gpu_mem)
@@ -321,7 +324,7 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
     LOG_VERBOSE(LOG_TAG, "Executing clock...");
     m_av_clock->OMXStateExecute();
 
-    m_state = STATE_STOPPED;
+    setState(STATE_STOPPED);
     return true;
 }
 
@@ -346,7 +349,7 @@ bool OMX_MediaProcessor::play()
         return true;
     case STATE_STOPPED: {
         LOG_VERBOSE(LOG_TAG, "Starting thread.");
-        m_state = STATE_PLAYING;
+        setState(STATE_PLAYING);
         m_av_clock->OMXStart(0.0);
         return QMetaObject::invokeMethod(this, "mediaDecoding");
     }
@@ -354,7 +357,7 @@ bool OMX_MediaProcessor::play()
         return false;
     }
 
-    m_state = STATE_PLAYING;
+    setState(STATE_PLAYING);
     if (m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_NORMAL && m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_PAUSE) {
        LOG_VERBOSE(LOG_TAG, "resume\n");
        m_playspeedCurrent = playspeed_normal;
@@ -393,7 +396,7 @@ bool OMX_MediaProcessor::stop()
     }
 
     m_pendingStop = true;
-    m_state = STATE_STOPPED;
+    setState(STATE_STOPPED);
 
     // Wait for command completion.
     m_mutexPending.lock();
@@ -433,7 +436,7 @@ bool OMX_MediaProcessor::pause()
           m_player_subtitles.Pause();
 #endif
 
-    m_state = STATE_PAUSED;
+    setState(STATE_PAUSED);
     setSpeed(playspeeds[m_playspeedCurrent]);
     m_av_clock->OMXPause();
 
@@ -901,7 +904,7 @@ void OMX_MediaProcessor::cleanup()
     m_av_clock->OMXDeinitialize();
 
     // Actually change the state here and reset flags.
-    m_state = STATE_STOPPED;
+    setState(STATE_STOPPED);
     m_mutexPending.lock();
     if (m_pendingStop) {
         m_pendingStop = false;
