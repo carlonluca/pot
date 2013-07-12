@@ -36,6 +36,7 @@
 #include <stdexcept>
 
 #include "omx_qthread.h"
+#include "lgl_logging.h"
 
 using namespace std;
 
@@ -123,13 +124,15 @@ signals:
     void playbackCompleted();
     void textureInvalidated();
     void textureReady(const OMX_TextureData* textureData);
-    void errorOccurred(OMX_MediaProcessorError error);
+    void errorOccurred(OMX_MediaProcessor::OMX_MediaProcessorError error);
+    void stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
 
 private slots:
     void mediaDecoding();
     void cleanup();
 
 private:
+    void setState(OMX_MediaProcessorState state);
     void setSpeed(int iSpeed);
     void flushStreams(double pts);
     bool checkCurrentThread();
@@ -210,6 +213,15 @@ inline bool OMX_MediaProcessor::hasVideo() {
 +-----------------------------------------------------------------------------*/
 inline OMX_MediaProcessor::OMX_MediaProcessorState OMX_MediaProcessor::state() {
     return m_state;
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::setState
++-----------------------------------------------------------------------------*/
+inline void OMX_MediaProcessor::setState(OMX_MediaProcessorState state) {
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   m_state = state;
+   emit stateChanged(state);
 }
 
 #endif // OMX_MEDIAPROCESSOR_H

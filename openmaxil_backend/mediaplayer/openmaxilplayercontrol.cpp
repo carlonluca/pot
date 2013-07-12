@@ -66,6 +66,8 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
            this, SIGNAL(textureReady(const OMX_TextureData*)));
    connect(m_mediaProcessor, SIGNAL(textureInvalidated()),
            this, SIGNAL(textureInvalidated()));
+   connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
+           this, SLOT(onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
 }
 
 /*------------------------------------------------------------------------------
@@ -186,6 +188,15 @@ void OpenMAXILPlayerControl::onSceneGraphInitialized()
 void OpenMAXILPlayerControl::onAfterRendering()
 {
    processCommands();
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::onStateChanged
++-----------------------------------------------------------------------------*/
+void OpenMAXILPlayerControl::onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state)
+{
+   LOG_DEBUG(LOG_TAG, "State changed...");
+   emit stateChanged(convertState(state));
 }
 
 /*------------------------------------------------------------------------------
@@ -500,17 +511,7 @@ QMediaPlayer::State OpenMAXILPlayerControl::state() const
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
    assert(m_mediaProcessor);
-   switch (m_mediaProcessor->state()) {
-   case OMX_MediaProcessor::STATE_STOPPED:
-      return QMediaPlayer::StoppedState;
-   case OMX_MediaProcessor::STATE_INACTIVE:
-      return QMediaPlayer::StoppedState;
-   case OMX_MediaProcessor::STATE_PAUSED:
-      return QMediaPlayer::PausedState;
-   case OMX_MediaProcessor::STATE_PLAYING:
-      return QMediaPlayer::PlayingState;
-   }
-   return QMediaPlayer::StoppedState;
+   return convertState(m_mediaProcessor->state());
 }
 
 /*------------------------------------------------------------------------------
