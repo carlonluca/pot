@@ -33,6 +33,7 @@
 #include "lgl_logging.h"
 #include "omx_mediaprocessor.h"
 #include "omx_textureprovider.h"
+#include "omx_playeraudio.h"
 
 // omxplayer lib.
 #include "omxplayer_lib/linux/RBP.h"
@@ -80,33 +81,34 @@ static int get_mem_gpu(void)
 |    OMX_MediaProcessor::OMX_MediaProcessor
 +-----------------------------------------------------------------------------*/
 OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
-    m_state(STATE_INACTIVE),
+   m_textureData(NULL),
+   m_state(STATE_INACTIVE),
 #ifdef ENABLE_SUBTITLES
-    m_has_subtitle(false),
+   m_has_subtitle(false),
 #endif
-    m_omx_reader(new OMXReader),
-    m_omx_pkt(NULL),
-    m_RBP(new CRBP),
-    m_OMX(new COMXCore),
-    m_has_video(false),
-    m_has_audio(false),
-    m_buffer_empty(true),
-    m_pendingStop(false),
-    m_pendingPause(false),
-    m_subtitle_index(0),
-    m_audio_index(0),
-    m_provider(provider),
-    m_incr(0),
-    m_hints_audio(new COMXStreamInfo),
-    m_hints_video(new COMXStreamInfo),
-    m_audio_fifo_size(0.0f), // zero means use default
-    m_video_fifo_size(0.0f),
-    m_audio_queue_size(0.0f),
-    m_video_queue_size(0.0f),
-    m_playspeedCurrent(playspeed_normal),
-    m_seekFlush(false),
-    m_packetAfterSeek(false),
-    startpts(0)
+   m_omx_reader(new OMXReader),
+   m_omx_pkt(NULL),
+   m_RBP(new CRBP),
+   m_OMX(new COMXCore),
+   m_has_video(false),
+   m_has_audio(false),
+   m_buffer_empty(true),
+   m_pendingStop(false),
+   m_pendingPause(false),
+   m_subtitle_index(0),
+   m_audio_index(0),
+   m_provider(provider),
+   m_incr(0),
+   m_hints_audio(new COMXStreamInfo),
+   m_hints_video(new COMXStreamInfo),
+   m_audio_fifo_size(0.0f), // zero means use default
+   m_video_fifo_size(0.0f),
+   m_audio_queue_size(0.0f),
+   m_video_queue_size(0.0f),
+   m_playspeedCurrent(playspeed_normal),
+   m_seekFlush(false),
+   m_packetAfterSeek(false),
+   startpts(0)
 {
    qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorError>("OMX_MediaProcessor::OMX_MediaProcessorError");
    qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorState>("OMX_MediaProcessor::OMX_MediaProcessorState");
@@ -121,17 +123,17 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
    m_RBP->Initialize();
    m_OMX->Initialize();
 
-    // Players.
-    m_av_clock         = new OMXClock;
-    m_player_video     = new OMXPlayerVideo(provider);
-    m_player_audio     = new OMXPlayerAudio;
+   // Players.
+   m_av_clock         = new OMXClock;
+   m_player_video     = new OMXPlayerVideo(provider);
+   m_player_audio     = new OMX_PlayerAudio;
 #ifdef ENABLE_SUBTITLES
-    m_player_subtitles = new OMXPlayerSubtitles;
+   m_player_subtitles = new OMXPlayerSubtitles;
 #endif
 
-    // Move to a new thread.
-    moveToThread(&m_thread);
-    m_thread.start();
+   // Move to a new thread.
+   moveToThread(&m_thread);
+   m_thread.start();
 }
 
 /*------------------------------------------------------------------------------
@@ -147,15 +149,14 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
 
    // TODO: Fix this! When freeing players, a lock seems to hang!
    LOG_VERBOSE(LOG_TAG, "Freeing players...");
-#if 1
 #ifdef ENABLE_SUBTITLES
    delete m_player_subtitles;
 #endif
    delete m_player_audio;
    delete m_player_video;
-#endif
 
    LOG_VERBOSE(LOG_TAG, "Freeing clock...");
+   m_av_clock->OMXDeinitialize();
    delete m_av_clock;
 
    // TODO: This should really be done, but still it seems to sefault sometimes.
@@ -179,7 +180,7 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
 +-----------------------------------------------------------------------------*/
 QString OMX_MediaProcessor::filename()
 {
-    return m_filename;
+   return m_filename;
 }
 
 /*------------------------------------------------------------------------------
@@ -187,8 +188,8 @@ QString OMX_MediaProcessor::filename()
 +-----------------------------------------------------------------------------*/
 QStringList OMX_MediaProcessor::streams()
 {
-    // TODO: Reimplement.
-    return QStringList();
+   // TODO: Reimplement.
+   return QStringList();
 }
 
 /*------------------------------------------------------------------------------
@@ -203,129 +204,136 @@ QStringList OMX_MediaProcessor::streams()
  */
 bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& textureData)
 {
-    QMutexLocker locker(&m_sendCmd);
-    if (!checkCurrentThread())
-        return false;
+   QMutexLocker locker(&m_sendCmd);
+   if (!checkCurrentThread())
+      return false;
+   return setFilenameInt(filename, textureData);
+}
 
-    switch (m_state) {
-    case STATE_INACTIVE:
-    case STATE_STOPPED:
-        break;
-    case STATE_PAUSED:
-    case STATE_PLAYING:
-        return false; // TODO: Reimplement.
-    }
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::setFilenameInt
++-----------------------------------------------------------------------------*/
+inline
+bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& textureData)
+{
+   switch (m_state) {
+   case STATE_INACTIVE:
+      break;
+   case STATE_STOPPED:
+      cleanup();
+      break;
+   case STATE_PAUSED:
+   case STATE_PLAYING:
+      return false; // TODO: Reimplement.
+   }
 
-    LOG_VERBOSE(LOG_TAG, "Opening...");
-    if (!m_omx_reader->Open(filename.toStdString(), true)) {
-        LOG_ERROR(LOG_TAG, "Failed to open source.");
-        return false;
-    }
+   LOG_VERBOSE(LOG_TAG, "Opening...");
+   if (!m_omx_reader->Open(filename.toStdString(), true)) {
+      LOG_ERROR(LOG_TAG, "Failed to open source.");
+      return false;
+   }
 
-    m_filename = filename;
+   m_filename = filename;
 
-    m_has_video     = m_omx_reader->VideoStreamCount();
-    m_has_audio     = m_omx_reader->AudioStreamCount();
+   m_has_video     = m_omx_reader->VideoStreamCount();
+   m_has_audio     = m_omx_reader->AudioStreamCount();
 #ifdef ENABLE_SUBTITLES
-    m_has_subtitle  = m_omx_reader->SubtitleStreamCount();
+   m_has_subtitle  = m_omx_reader->SubtitleStreamCount();
 #endif
 
-    LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
-    if (!m_av_clock->OMXInitialize(m_has_video, m_has_audio))
-        return false;
+   LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
+   if (!m_av_clock->OMXInitialize(m_has_video, m_has_audio))
+      return false;
 
-    if (ENABLE_HDMI_CLOCK_SYNC && !m_av_clock->HDMIClockSync())
-        return false;
+   if (ENABLE_HDMI_CLOCK_SYNC && !m_av_clock->HDMIClockSync())
+      return false;
 
-    m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
-    m_omx_reader->GetHints(OMXSTREAM_VIDEO, *m_hints_video);
+   m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
+   m_omx_reader->GetHints(OMXSTREAM_VIDEO, *m_hints_video);
 
-    // Set audio stream to use.
-    // TODO: Implement a way to change it runtime.
+   // Set audio stream to use.
+   // TODO: Implement a way to change it runtime.
 #if 0
-    m_omx_reader->SetActiveStream(OMXSTREAM_AUDIO, m_audio_index_use);
+   m_omx_reader->SetActiveStream(OMXSTREAM_AUDIO, m_audio_index_use);
 #endif
 
-    // Seek on start?
+   // Seek on start?
 #if 0
-    if (m_seek_pos !=0 && m_omx_reader->CanSeek()) {
-        printf("Seeking start of video to %i seconds\n", m_seek_pos);
-        m_omx_reader->SeekTime(m_seek_pos * 1000.0f, false, &startpts);  // from seconds to DVD_TIME_BASE
-    }
+   if (m_seek_pos !=0 && m_omx_reader->CanSeek()) {
+      printf("Seeking start of video to %i seconds\n", m_seek_pos);
+      m_omx_reader->SeekTime(m_seek_pos * 1000.0f, false, &startpts);  // from seconds to DVD_TIME_BASE
+   }
 #endif
 
-    if (m_has_video) {
-        LOG_VERBOSE(LOG_TAG, "Opening video using OMX...");
-        if (!m_player_video->Open(
-                    *m_hints_video,
-                    m_av_clock,
-                    textureData,
-                    false,                  /* deinterlace */
-                    ENABLE_HDMI_CLOCK_SYNC,
-                    true,                   /* threaded */
-                    1.0,                    /* display aspect, unused */
-                    m_video_queue_size, m_video_fifo_size
-                    ))
-            return false;
+   if (m_has_video) {
+      LOG_VERBOSE(LOG_TAG, "Opening video using OMX...");
+      if (!m_player_video->Open(
+             *m_hints_video,
+             m_av_clock,
+             textureData,
+             false,                  /* deinterlace */
+             ENABLE_HDMI_CLOCK_SYNC,
+             true,                   /* threaded */
+             1.0,                    /* display aspect, unused */
+             m_video_queue_size, m_video_fifo_size
+             ))
+         return false;
 
-        m_textureData = textureData;
-        emit textureReady(textureData);
-    }
+      m_textureData = textureData;
+      emit textureReady(textureData);
+   }
 
 #ifdef ENABLE_SUBTITLES
-    LOG_VERBOSE(LOG_TAG, "Opening subtitles using OMX...");
-    if(m_has_subtitle &&
-           !m_player_subtitles.Open(m_omx_reader.SubtitleStreamCount(),
-                                    std::move(external_subtitles),
-                                    m_font_path,
-                                    m_italic_font_path,
-                                    m_font_size,
-                                    m_centered,
-                                    m_subtitle_lines,
-                                    m_av_clock))
-            return false;
+   LOG_VERBOSE(LOG_TAG, "Opening subtitles using OMX...");
+   if(m_has_subtitle &&
+         !m_player_subtitles.Open(m_omx_reader.SubtitleStreamCount(),
+                                  std::move(external_subtitles),
+                                  m_font_path,
+                                  m_italic_font_path,
+                                  m_font_size,
+                                  m_centered,
+                                  m_subtitle_lines,
+                                  m_av_clock))
+      return false;
 
-    // This is an upper bound check on the subtitle limits. When we pulled the subtitle
-    // index from the user we check to make sure that the value is larger than zero, but
-    // we couldn't know without scanning the file if it was too high. If this is the case
-    // then we replace the subtitle index with the maximum value possible.
-    if (m_has_subtitle && m_subtitle_index > (m_omx_reader->SubtitleStreamCount() - 1))
-        m_subtitle_index = m_omx_reader->SubtitleStreamCount() - 1;
+   // This is an upper bound check on the subtitle limits. When we pulled the subtitle
+   // index from the user we check to make sure that the value is larger than zero, but
+   // we couldn't know without scanning the file if it was too high. If this is the case
+   // then we replace the subtitle index with the maximum value possible.
+   if (m_has_subtitle && m_subtitle_index > (m_omx_reader->SubtitleStreamCount() - 1))
+      m_subtitle_index = m_omx_reader->SubtitleStreamCount() - 1;
 #endif
 
-    m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
+   m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
 
 #if 0
-    if ((m_hints_audio.codec == CODEC_ID_AC3 || m_hints_audio.codec == CODEC_ID_EAC3) &&
-        m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eAC3, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
-       m_passthrough = false;
-    if (m_hints_audio.codec == CODEC_ID_DTS &&
-        m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eDTS, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
-       m_passthrough = false;
+   if ((m_hints_audio.codec == CODEC_ID_AC3 || m_hints_audio.codec == CODEC_ID_EAC3) &&
+       m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eAC3, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
+      m_passthrough = false;
+   if (m_hints_audio.codec == CODEC_ID_DTS &&
+       m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eDTS, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
+      m_passthrough = false;
 #endif
 
 
-    LOG_VERBOSE(LOG_TAG, "Opening audio using OMX...");
-    if (m_has_audio)
-        if (!m_player_audio->Open(
-                    *m_hints_audio,
-                    m_av_clock,
-                    m_omx_reader,
-                    "omx:hdmi",         /* TODO: implement way to change */
-                    false,              /* TODO: passthrough */
-                    0,                  /* TODO: initial_volume */
-                    false,              /* TODO: hw decode */
-                    false,              /* TODO: downmix boost */
-                    true,               /* threaded */
-                    m_audio_queue_size, m_audio_fifo_size
-                    ))
-            return false;
+   LOG_VERBOSE(LOG_TAG, "Opening audio using OMX...");
+   if (m_has_audio)
+      if (!m_player_audio->Open(
+             *m_hints_audio,
+             m_av_clock,
+             m_omx_reader,
+             "omx:hdmi",         /* TODO: implement way to change */
+             false,              /* TODO: passthrough */
+             0,                  /* TODO: initial_volume */
+             false,              /* TODO: hw decode */
+             false,              /* TODO: downmix boost */
+             true,               /* threaded */
+             m_audio_queue_size, m_audio_fifo_size
+             ))
+         return false;
 
-    LOG_VERBOSE(LOG_TAG, "Executing clock...");
-    m_av_clock->OMXStateExecute();
-
-    setState(STATE_STOPPED);
-    return true;
+   setState(STATE_STOPPED);
+   return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -333,44 +341,59 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::play()
 {
-    // I need to invoke this in another thread (this object is owned by another
-    // thread).
-    LOG_VERBOSE(LOG_TAG, "Play");
-    QMutexLocker locker(&m_sendCmd);
-    if (!checkCurrentThread())
-        return false;
+   // I need to invoke this in another thread (this object is owned by another
+   // thread).
+   LOG_VERBOSE(LOG_TAG, "Play");
+   QMutexLocker locker(&m_sendCmd);
+   if (!checkCurrentThread())
+      return false;
 
-    switch (m_state) {
-    case STATE_INACTIVE:
-        return true;
-    case STATE_PAUSED:
-        break;
-    case STATE_PLAYING:
-        return true;
-    case STATE_STOPPED: {
-        LOG_VERBOSE(LOG_TAG, "Starting thread.");
-        setState(STATE_PLAYING);
-        m_av_clock->OMXStart(0.0);
-        return QMetaObject::invokeMethod(this, "mediaDecoding");
-    }
-    default:
-        return false;
-    }
+   switch (m_state) {
+   case STATE_INACTIVE:
+      return true;
+   case STATE_PAUSED:
+      break;
+   case STATE_PLAYING:
+      return true;
+   case STATE_STOPPED: {
+      setState(STATE_PLAYING);
 
-    setState(STATE_PLAYING);
-    if (m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_NORMAL && m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_PAUSE) {
-       LOG_VERBOSE(LOG_TAG, "resume\n");
-       m_playspeedCurrent = playspeed_normal;
-       setSpeed(playspeeds[m_playspeedCurrent]);
-       m_seekFlush = true;
-    }
+      if (!m_omx_reader->SeekTime(0, true, &startpts)) {
+         LOG_WARNING(LOG_TAG, "Failed to seek to the beginning.");
+         return false;
+      }
+
+      flushStreams(startpts);
+
+      m_av_clock->OMXStart(0.0);
+      m_av_clock->OMXStateExecute();
+      m_av_clock->OMXMediaTime(0.0D);
+
+      LOG_VERBOSE(LOG_TAG, "Starting thread.");
+      return QMetaObject::invokeMethod(this, "mediaDecoding");
+   }
+   default:
+      return false;
+   }
+
+   setState(STATE_PLAYING);
+   if (m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_NORMAL && m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_PAUSE) {
+      LOG_VERBOSE(LOG_TAG, "resume\n");
+      m_playspeedCurrent = playspeed_normal;
+      setSpeed(playspeeds[m_playspeedCurrent]);
+      m_seekFlush = true;
+   }
+
+   setSpeed(playspeeds[m_playspeedCurrent]);
+   m_av_clock->OMXResume();
 
 #ifdef ENABLE_SUBTITLES
-    if (m_has_subtitle)
-       m_player_subtitles.Resume();
+   if (m_has_subtitle)
+      m_player_subtitles.Resume();
 #endif
 
-    return true;
+   LOG_INFORMATION(LOG_TAG, "Play command issued.");
+   return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -378,35 +401,35 @@ bool OMX_MediaProcessor::play()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::stop()
 {
-    LOG_VERBOSE(LOG_TAG, "Stop");
-    QMutexLocker locker(&m_sendCmd);
-    if (!checkCurrentThread())
-        return false;
+   LOG_VERBOSE(LOG_TAG, "Stop");
+   QMutexLocker locker(&m_sendCmd);
+   if (!checkCurrentThread())
+      return false;
 
-    switch (m_state) {
-    case STATE_INACTIVE:
-        return false;
-    case STATE_PAUSED:
-    case STATE_PLAYING:
-       break;
-    case STATE_STOPPED:
-        return true;
-    default:
-        return false;
-    }
+   switch (m_state) {
+   case STATE_INACTIVE:
+      return false;
+   case STATE_PAUSED:
+   case STATE_PLAYING:
+      break;
+   case STATE_STOPPED:
+      return true;
+   default:
+      return false;
+   }
 
-    m_pendingStop = true;
-    setState(STATE_STOPPED);
+   m_pendingStop = true;
+   setState(STATE_STOPPED);
 
-    // Wait for command completion.
-    m_mutexPending.lock();
-    if (m_pendingStop) {
-        LOG_VERBOSE(LOG_TAG, "Waiting for the stop command to finish.");
-        m_waitPendingCommand.wait(&m_mutexPending);
-    }
-    m_mutexPending.unlock();
-    LOG_INFORMATION(LOG_TAG, "Stop command issued.");
-    return true;
+   // Wait for command completion.
+   m_mutexPending.lock();
+   if (m_pendingStop) {
+      LOG_VERBOSE(LOG_TAG, "Waiting for the stop command to finish.");
+      m_waitPendingCommand.wait(&m_mutexPending);
+   }
+   m_mutexPending.unlock();
+   LOG_INFORMATION(LOG_TAG, "Stop command issued.");
+   return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -414,41 +437,41 @@ bool OMX_MediaProcessor::stop()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::pause()
 {
-    LOG_VERBOSE(LOG_TAG, "Pause");
-    QMutexLocker locker(&m_sendCmd);
-    if (!checkCurrentThread())
-        return false;
+   LOG_VERBOSE(LOG_TAG, "Pause");
+   QMutexLocker locker(&m_sendCmd);
+   if (!checkCurrentThread())
+      return false;
 
-    switch (m_state) {
-    case STATE_INACTIVE:
-    case STATE_STOPPED:
-        return true;
-    case STATE_PAUSED:
-       return true;
-    case STATE_PLAYING:
-        break;
-    default:
-        return false;
-    }
+   switch (m_state) {
+   case STATE_INACTIVE:
+   case STATE_STOPPED:
+      return true;
+   case STATE_PAUSED:
+      return true;
+   case STATE_PLAYING:
+      break;
+   default:
+      return false;
+   }
 
 #ifdef ENABLE_SUBTITLES
-    if (m_has_subtitle)
-          m_player_subtitles.Pause();
+   if (m_has_subtitle)
+      m_player_subtitles.Pause();
 #endif
 
-    setState(STATE_PAUSED);
-    setSpeed(playspeeds[m_playspeedCurrent]);
-    m_av_clock->OMXPause();
+   setState(STATE_PAUSED);
+   setSpeed(playspeeds[m_playspeedCurrent]);
+   m_av_clock->OMXPause();
 
-    // Wait for command completion.
-    m_mutexPending.lock();
-    if (m_pendingPause) {
-        LOG_VERBOSE(LOG_TAG, "Waiting for the pause command to finish.");
-        m_waitPendingCommand.wait(&m_mutexPending);
-    }
-    m_mutexPending.unlock();
-    LOG_INFORMATION(LOG_TAG, "Pause command issued.");
-    return true;
+   // Wait for command completion.
+   m_mutexPending.lock();
+   if (m_pendingPause) {
+      LOG_VERBOSE(LOG_TAG, "Waiting for the pause command to finish.");
+      m_waitPendingCommand.wait(&m_mutexPending);
+   }
+   m_mutexPending.unlock();
+   LOG_INFORMATION(LOG_TAG, "Pause command issued.");
+   return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -456,8 +479,8 @@ bool OMX_MediaProcessor::pause()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::seek(long position)
 {
-    m_incr = 600;
-    return true;
+   m_incr = 600;
+   return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -465,9 +488,9 @@ bool OMX_MediaProcessor::seek(long position)
 +-----------------------------------------------------------------------------*/
 double OMX_MediaProcessor::streamPosition()
 {
-    if (m_av_clock)
-        return m_player_audio->GetCurrentPTS();
-    return -1;
+   if (m_av_clock)
+      return m_player_audio->GetCurrentPTS();
+   return -1;
 }
 
 /*------------------------------------------------------------------------------
@@ -475,27 +498,23 @@ double OMX_MediaProcessor::streamPosition()
 +-----------------------------------------------------------------------------*/
 OMX_TextureData* OMX_MediaProcessor::textureData()
 {
-    return m_textureData;
+   return m_textureData;
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::setVolume
 +-----------------------------------------------------------------------------*/
-void OMX_MediaProcessor::setVolume(int volume)
+void OMX_MediaProcessor::setVolume(long volume, bool linear)
 {
-   // TODO: I should pass millibel here. What is the parameter? Dcoumentation
-   // doesn't state that.
-   m_player_audio->SetCurrentVolume(volume);
+   m_player_audio->SetCurrentVolume(volume, linear);
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::volume
 +-----------------------------------------------------------------------------*/
-int OMX_MediaProcessor::volume()
+long OMX_MediaProcessor::volume(bool linear)
 {
-   // TODO: I'm returning millibel here. What should I? Dcoumentation
-   // doesn't state that.
-   return m_player_audio->GetCurrentVolume();
+   return 0;
 }
 
 /*------------------------------------------------------------------------------
@@ -504,298 +523,314 @@ int OMX_MediaProcessor::volume()
 void OMX_MediaProcessor::mediaDecoding()
 {
    // See description in the qmakefile.
-//#define ENABLE_PROFILE_MAIN_LOOP
-//#define ENABLE_PAUSE_FOR_BUFFERING
+   //#define ENABLE_PROFILE_MAIN_LOOP
+   //#define ENABLE_PAUSE_FOR_BUFFERING
 
-    LOG_VERBOSE(LOG_TAG, "Decoding thread started.");
-    emit playbackStarted();
+   LOG_VERBOSE(LOG_TAG, "Decoding thread started.");
+   emit playbackStarted();
 
-    // Prealloc.
+   // Prealloc.
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
-    float stamp     = 0;
-    float audio_pts = 0;
-    float video_pts = 0;
+   float stamp     = 0;
+   float audio_pts = 0;
+   float video_pts = 0;
 
-    float audio_fifo = 0;
-    float video_fifo = 0;
-    float threshold = 0;
-    bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
-    float m_threshold = 0.1f; //std::min(0.1f, audio_fifo_size * 0.1f);
+   float audio_fifo = 0;
+   float video_fifo = 0;
+   float threshold = 0;
+   bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
+   float m_threshold = 0.1f; //std::min(0.1f, audio_fifo_size * 0.1f);
 #endif // ENABLE_PAUSE_FOR_BUFFERING
 
-    bool sendEos = false;
+   bool sendEos = false;
 
-    while (!m_pendingStop) {
+   while (!m_pendingStop) {
 #ifdef ENABLE_PROFILE_MAIN_LOOP
-       static qint64 tot    = 0;
-       static qint64 totNum = 0;
-       static QElapsedTimer timer;
-       static int count = 0;
-       if (tot == 0) {
-          timer.start();
-          tot++;
-       }
-       else
+      static qint64 tot    = 0;
+      static qint64 totNum = 0;
+      static QElapsedTimer timer;
+      static int count = 0;
+      if (tot == 0) {
+         timer.start();
+         tot++;
+      }
+      else
          tot += timer.restart();
-       totNum++;
-       if ((count++)%30 == 0) {
-          //LOG_VERBOSE(LOG_TAG, "Elapsed: %lld", timer.restart());
-          LOG_VERBOSE(LOG_TAG, "Average: %f.", (double)tot/totNum);
-       }
+      totNum++;
+      if ((count++)%30 == 0) {
+         //LOG_VERBOSE(LOG_TAG, "Elapsed: %lld", timer.restart());
+         LOG_VERBOSE(LOG_TAG, "Average: %f.", (double)tot/totNum);
+      }
 #endif
 
-        // If a request is pending then consider done here.
-        m_mutexPending.lock();
-        if (m_pendingPause) {
-            m_waitPendingCommand.wakeAll();
-            m_pendingPause = false;
-        }
-        m_mutexPending.unlock();
+      // If a request is pending then consider done here.
+      m_mutexPending.lock();
+      if (m_pendingPause) {
+         m_waitPendingCommand.wakeAll();
+         m_pendingPause = false;
+      }
+      m_mutexPending.unlock();
 
-        // TODO: Use a semaphore instead.
-        if (m_state == STATE_PAUSED) {
-            OMXClock::OMXSleep(2);
-            continue;
-        }
+      // TODO: Use a semaphore instead.
+      if (m_state == STATE_PAUSED) {
+         OMXClock::OMXSleep(2);
+         continue;
+      }
 
-        if (m_seekFlush || m_incr != 0) {
-            double seek_pos = 0;
-            double pts      = m_av_clock->OMXMediaTime();
-            seek_pos        = (pts / DVD_TIME_BASE) + m_incr;
-            seek_pos        *= 1000.0;
-            m_incr          = 0;
+      if (m_seekFlush || m_incr != 0) {
+         double seek_pos = 0;
+         double pts      = m_av_clock->OMXMediaTime();
+         seek_pos        = (pts / DVD_TIME_BASE) + m_incr;
+         seek_pos        *= 1000.0;
+         m_incr          = 0;
 
-            if (m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
-                flushStreams(startpts);
+         if (m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
+            flushStreams(startpts);
 
 #if 0
-            m_player_video->Close();
-            if (m_has_video && !m_player_video->Open(
-                        m_hints_video,
-                        m_av_clock,
-                        textureData,
-                        false,                  /* deinterlace */
-                        m_bMpeg,
-                        ENABLE_HDMI_CLOCK_SYNC,
-                        true,                   /* threaded */
-                        1.0                     /* display aspect, unused */
-                        ))
-                //goto do_exit;
-                break;
+         m_player_video->Close();
+         if (m_has_video && !m_player_video->Open(
+                m_hints_video,
+                m_av_clock,
+                textureData,
+                false,                  /* deinterlace */
+                m_bMpeg,
+                ENABLE_HDMI_CLOCK_SYNC,
+                true,                   /* threaded */
+                1.0                     /* display aspect, unused */
+                ))
+            //goto do_exit;
+            break;
 #endif
 
-            CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
+         CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
 
-            m_av_clock->OMXMediaTime(startpts);
+         m_av_clock->OMXMediaTime(startpts);
 
 #ifdef ENABLE_SUBTITLES
-            if (m_has_subtitle)
-               m_player_subtitles.Resume();
+         if (m_has_subtitle)
+            m_player_subtitles.Resume();
 #endif
 
-            unsigned t = (unsigned)(startpts*1e-6);
-            LOG_VERBOSE(LOG_TAG, "Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
-            m_packetAfterSeek = false;
-            m_seekFlush       = false;
-        }
-        else if (m_packetAfterSeek && TRICKPLAY(m_av_clock->OMXPlaySpeed())) {
-           double seek_pos     = 0;
-           double pts          = 0;
-           //static int faket    = 20*60*1e6;
+         unsigned t = (unsigned)(startpts*1e-6);
+         LOG_VERBOSE(LOG_TAG, "Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
+         m_packetAfterSeek = false;
+         m_seekFlush       = false;
+      }
+      else if (m_packetAfterSeek && TRICKPLAY(m_av_clock->OMXPlaySpeed())) {
+         double seek_pos     = 0;
+         double pts          = 0;
+         //static int faket    = 20*60*1e6;
 
-           pts      = m_av_clock->OMXMediaTime();
-           seek_pos = (pts/DVD_TIME_BASE);
+         pts      = m_av_clock->OMXMediaTime();
+         seek_pos = (pts/DVD_TIME_BASE);
 
-           seek_pos *= 1000.0;
+         seek_pos *= 1000.0;
 
-           if (m_omx_reader->SeekTime((int)seek_pos, m_av_clock->OMXPlaySpeed() < 0, &startpts))
-              ; //FlushStreams(DVD_NOPTS_VALUE);
+#if 0
+         if (m_omx_reader->SeekTime((int)seek_pos, m_av_clock->OMXPlaySpeed() < 0, &startpts))
+            ; //FlushStreams(DVD_NOPTS_VALUE);
+#endif // 0
 
-           CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
+         CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
 
-           //unsigned t = (unsigned)(startpts*1e-6);
-           unsigned t = (unsigned)(pts*1e-6);
-           printf("Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
-           m_packetAfterSeek = false;
-        }
+         //unsigned t = (unsigned)(startpts*1e-6);
+         unsigned t = (unsigned)(pts*1e-6);
+         printf("Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
+         m_packetAfterSeek = false;
+      }
 
-        // TODO: Better error handling.
-        if (m_player_audio->Error()) {
-            LOG_ERROR(LOG_TAG, "Audio player error. emergency exit!");
-            break;
-        }
+      // TODO: Better error handling.
+      if (m_player_audio->Error()) {
+         LOG_ERROR(LOG_TAG, "Audio player error. emergency exit!");
+         break;
+      }
 
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
-        /* when the video/audio fifos are low, we pause clock, when high we resume */
-        stamp     = m_av_clock->OMXMediaTime();
-        audio_pts = m_player_audio->GetCurrentPTS();
-        video_pts = m_player_video->GetCurrentPTS();
+      /* when the video/audio fifos are low, we pause clock, when high we resume */
+      stamp     = m_av_clock->OMXMediaTime();
+      audio_pts = m_player_audio->GetCurrentPTS();
+      video_pts = m_player_video->GetCurrentPTS();
 
-        if (0 && m_av_clock->OMXIsPaused()) {
-           double old_stamp = stamp;
-           if (audio_pts != DVD_NOPTS_VALUE && (stamp == 0 || audio_pts < stamp))
-              stamp = audio_pts;
-           if (video_pts != DVD_NOPTS_VALUE && (stamp == 0 || video_pts < stamp))
-              stamp = video_pts;
-           if (old_stamp != stamp)
-           {
-              m_av_clock->OMXMediaTime(stamp);
-              stamp = m_av_clock->OMXMediaTime();
-           }
-        }
+      if (0 && m_av_clock->OMXIsPaused()) {
+         double old_stamp = stamp;
+         if (audio_pts != DVD_NOPTS_VALUE && (stamp == 0 || audio_pts < stamp))
+            stamp = audio_pts;
+         if (video_pts != DVD_NOPTS_VALUE && (stamp == 0 || video_pts < stamp))
+            stamp = video_pts;
+         if (old_stamp != stamp)
+         {
+            m_av_clock->OMXMediaTime(stamp);
+            stamp = m_av_clock->OMXMediaTime();
+         }
+      }
 
-        audio_fifo = audio_pts == DVD_NOPTS_VALUE ? 0.0f : audio_pts / DVD_TIME_BASE - stamp * 1e-6;
-        video_fifo = video_pts == DVD_NOPTS_VALUE ? 0.0f : video_pts / DVD_TIME_BASE - stamp * 1e-6;
-        threshold  = min(0.1f, (float)m_player_audio->GetCacheTotal()*0.1f);
+      audio_fifo = audio_pts == DVD_NOPTS_VALUE ? 0.0f : audio_pts / DVD_TIME_BASE - stamp * 1e-6;
+      video_fifo = video_pts == DVD_NOPTS_VALUE ? 0.0f : video_pts / DVD_TIME_BASE - stamp * 1e-6;
+      threshold  = min(0.1f, (float)m_player_audio->GetCacheTotal()*0.1f);
 #ifdef ENABLE_PROFILE_MAIN_LOOP
-        static int ciccio = 0;
-        if ((ciccio++)%15 == 0) {
-           LOG_DEBUG(LOG_TAG, "Fifo: %f, %f.", audio_fifo, video_fifo);
-        }
+      static int ciccio = 0;
+      if ((ciccio++)%15 == 0) {
+         LOG_DEBUG(LOG_TAG, "Fifo: %f, %f.", audio_fifo, video_fifo);
+      }
 #endif // ENABLE_PROFILE_MAIN_LOOP
 #endif // ENABLE_PAUSE_FOR_BUFFERING
 
 #if 0
-        static int count;
-        if ((count++ & 15) == 0) {
-           LOG_VERBOSE(LOG_TAG, "M: %8.02f V : %8.02f %8d %8d A : %8.02f %8.02f/%8.02f Cv : %8d Ca : %8d \r", stamp,
-                  audio_fifo, m_player_video->GetDecoderBufferSize(), m_player_video->GetDecoderFreeSpace(),
-                  video_fifo, m_player_audio->GetDelay(), m_player_audio->GetCacheTotal(),
-                  m_player_video->GetCached(), m_player_audio->GetCached());
-        }
+      static int count;
+      if ((count++ & 15) == 0) {
+         LOG_VERBOSE(LOG_TAG, "M: %8.02f V : %8.02f %8d %8d A : %8.02f %8.02f/%8.02f Cv : %8d Ca : %8d \r", stamp,
+                     audio_fifo, m_player_video->GetDecoderBufferSize(), m_player_video->GetDecoderFreeSpace(),
+                     video_fifo, m_player_audio->GetDelay(), m_player_audio->GetCacheTotal(),
+                     m_player_video->GetCached(), m_player_audio->GetCached());
+      }
 #endif
 
 #if 0
-        if(m_tv_show_info) {
-           static unsigned count;
-           if ((count++ & 15) == 0) {
-              char response[80];
-              if (m_player_video.GetDecoderBufferSize() && m_player_audio.GetCacheTotal())
-                 vc_gencmd(response, sizeof response, "render_bar 4 video_fifo %d %d %d %d",
-                           (int)(100.0*m_player_video.GetDecoderBufferSize()-m_player_video.GetDecoderFreeSpace())/m_player_video.GetDecoderBufferSize(),
-                           (int)(100.0*video_fifo/m_player_audio.GetCacheTotal()),
-                           0, 100);
-              if (m_player_audio.GetCacheTotal())
-                 vc_gencmd(response, sizeof response, "render_bar 5 audio_fifo %d %d %d %d",
-                           (int)(100.0*audio_fifo/m_player_audio.GetCacheTotal()),
-                           (int)(100.0*m_player_audio.GetDelay()/m_player_audio.GetCacheTotal()),
-                           0, 100);
-              vc_gencmd(response, sizeof response, "render_bar 6 video_queue %d %d %d %d",
-                        m_player_video.GetLevel(), 0, 0, 100);
-              vc_gencmd(response, sizeof response, "render_bar 7 audio_queue %d %d %d %d",
-                        m_player_audio.GetLevel(), 0, 0, 100);
-           }
-        }
+      if(m_tv_show_info) {
+         static unsigned count;
+         if ((count++ & 15) == 0) {
+            char response[80];
+            if (m_player_video.GetDecoderBufferSize() && m_player_audio.GetCacheTotal())
+               vc_gencmd(response, sizeof response, "render_bar 4 video_fifo %d %d %d %d",
+                         (int)(100.0*m_player_video.GetDecoderBufferSize()-m_player_video.GetDecoderFreeSpace())/m_player_video.GetDecoderBufferSize(),
+                         (int)(100.0*video_fifo/m_player_audio.GetCacheTotal()),
+                         0, 100);
+            if (m_player_audio.GetCacheTotal())
+               vc_gencmd(response, sizeof response, "render_bar 5 audio_fifo %d %d %d %d",
+                         (int)(100.0*audio_fifo/m_player_audio.GetCacheTotal()),
+                         (int)(100.0*m_player_audio.GetDelay()/m_player_audio.GetCacheTotal()),
+                         0, 100);
+            vc_gencmd(response, sizeof response, "render_bar 6 video_queue %d %d %d %d",
+                      m_player_video.GetLevel(), 0, 0, 100);
+            vc_gencmd(response, sizeof response, "render_bar 7 audio_queue %d %d %d %d",
+                      m_player_audio.GetLevel(), 0, 0, 100);
+         }
+      }
 #endif
 
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
-        if (audio_pts != DVD_NOPTS_VALUE) {
-           audio_fifo_low  = m_has_audio && audio_fifo < threshold;
-           audio_fifo_high = !m_has_audio || (audio_pts != DVD_NOPTS_VALUE && audio_fifo > 2.0f * m_threshold);
-        }
+      if (audio_pts != DVD_NOPTS_VALUE) {
+         audio_fifo_low  = m_has_audio && audio_fifo < threshold;
+         audio_fifo_high = !m_has_audio || (audio_pts != DVD_NOPTS_VALUE && audio_fifo > 2.0f * m_threshold);
+      }
 
-        if (video_pts != DVD_NOPTS_VALUE) {
-           video_fifo_low  = m_has_video && video_fifo < threshold;
-           video_fifo_high = !m_has_video || (video_pts != DVD_NOPTS_VALUE && video_fifo > 2.0f * m_threshold);
-        }
+      if (video_pts != DVD_NOPTS_VALUE) {
+         video_fifo_low  = m_has_video && video_fifo < threshold;
+         video_fifo_high = !m_has_video || (video_pts != DVD_NOPTS_VALUE && video_fifo > 2.0f * m_threshold);
+      }
 #endif
 
 #if 0
-        CLog::Log(LOGDEBUG, "Normal M:%.0f (A:%.0f V:%.0f) P:%d A:%.2f V:%.2f/T:%.2f (%d,%d,%d,%d) A:%d%% V:%d%% (%.2f,%.2f)\n", stamp, audio_pts, video_pts, m_av_clock->OMXIsPaused(),
-                  audio_pts == DVD_NOPTS_VALUE ? 0.0:audio_fifo, video_pts == DVD_NOPTS_VALUE ? 0.0:video_fifo, 2.0f * m_threshold, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high,
-                  m_player_audio.GetLevel(), m_player_video.GetLevel(), m_player_audio.GetDelay(), (float)m_player_audio.GetCacheTotal());
+      CLog::Log(LOGDEBUG, "Normal M:%.0f (A:%.0f V:%.0f) P:%d A:%.2f V:%.2f/T:%.2f (%d,%d,%d,%d) A:%d%% V:%d%% (%.2f,%.2f)\n", stamp, audio_pts, video_pts, m_av_clock->OMXIsPaused(),
+                audio_pts == DVD_NOPTS_VALUE ? 0.0:audio_fifo, video_pts == DVD_NOPTS_VALUE ? 0.0:video_fifo, 2.0f * m_threshold, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high,
+                m_player_audio.GetLevel(), m_player_video.GetLevel(), m_player_audio.GetDelay(), (float)m_player_audio.GetCacheTotal());
 #endif
 
-        // Enable this to enable pause for buffering.
+      // Enable this to enable pause for buffering.
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
-        if (!m_Pause && (m_omx_reader.IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high)))
-        {
-           if (m_av_clock->OMXIsPaused())
-           {
-              CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader.IsEof(), m_omx_pkt);
-              m_av_clock->OMXResume();
-           }
-        }
-        else if (m_Pause || audio_fifo_low || video_fifo_low)
-        {
-           if (!m_av_clock->OMXIsPaused())
-           {
-              CLog::Log(LOGDEBUG, "Pause %.2f,%.2f (%d,%d,%d,%d) %.2f\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_threshold);
-              m_av_clock->OMXPause();
-           }
-        }
+      if (!m_Pause && (m_omx_reader.IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high)))
+      {
+         if (m_av_clock->OMXIsPaused())
+         {
+            CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader.IsEof(), m_omx_pkt);
+            m_av_clock->OMXResume();
+         }
+      }
+      else if (m_Pause || audio_fifo_low || video_fifo_low)
+      {
+         if (!m_av_clock->OMXIsPaused())
+         {
+            CLog::Log(LOGDEBUG, "Pause %.2f,%.2f (%d,%d,%d,%d) %.2f\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_threshold);
+            m_av_clock->OMXPause();
+         }
+      }
 #endif
 
-        if (!m_omx_pkt)
-           m_omx_pkt = m_omx_reader->Read();
+      if (!m_omx_pkt)
+         m_omx_pkt = m_omx_reader->Read();
 
-        if (m_omx_pkt)
-           sendEos = false;
+      if (m_omx_pkt)
+         sendEos = false;
 
-        if (m_omx_reader->IsEof() && !m_omx_pkt) {
-           // demuxer EOF, but may have not played out data yet
-           if ((m_has_video && m_player_video->GetCached()) ||
-               (m_has_audio && m_player_audio->GetCached())) {
-              OMXClock::OMXSleep(10);
-              continue;
-           }
+      if (m_omx_reader->IsEof() && !m_omx_pkt) {
+         // demuxer EOF, but may have not played out data yet
+         if ((m_has_video && m_player_video->GetCached()) ||
+             (m_has_audio && m_player_audio->GetCached())) {
+            OMXClock::OMXSleep(10);
+            continue;
+         }
 
-           if (!sendEos && m_has_video)
-              m_player_video->SubmitEOS();
-           if (!sendEos && m_has_audio)
-              m_player_audio->SubmitEOS();
-           sendEos = true;
-           if ((m_has_video && !m_player_video->IsEOS()) ||
-               (m_has_audio && !m_player_audio->IsEOS()) ) {
-              OMXClock::OMXSleep(10);
-              continue;
-           }
+         if (!sendEos && m_has_video)
+            m_player_video->SubmitEOS();
+         if (!sendEos && m_has_audio)
+            m_player_audio->SubmitEOS();
+         sendEos = true;
+         if ((m_has_video && !m_player_video->IsEOS()) ||
+             (m_has_audio && !m_player_audio->IsEOS()) ) {
+            OMXClock::OMXSleep(10);
+            continue;
+         }
 
-           break;
-        }
+         break;
+      }
 
-        if (!m_omx_pkt)
-            m_omx_pkt = m_omx_reader->Read();
+      if (!m_omx_pkt)
+         m_omx_pkt = m_omx_reader->Read();
 
-        if (m_has_video && m_omx_pkt && m_omx_reader->IsActive(OMXSTREAM_VIDEO, m_omx_pkt->stream_index)) {
-           if (TRICKPLAY(m_av_clock->OMXPlaySpeed()))
-              m_packetAfterSeek = true;
-           if (m_player_video->AddPacket(m_omx_pkt))
-              m_omx_pkt = NULL;
-           else
-              OMXClock::OMXSleep(10);
-        }
-        else if(m_has_audio && m_omx_pkt && !TRICKPLAY(m_av_clock->OMXPlaySpeed()) && m_omx_pkt->codec_type == AVMEDIA_TYPE_AUDIO) {
-            if (m_player_audio->AddPacket(m_omx_pkt))
-                m_omx_pkt = NULL;
-            else
-                OMXClock::OMXSleep(10);
-        }
+      if (m_has_video && m_omx_pkt && m_omx_reader->IsActive(OMXSTREAM_VIDEO, m_omx_pkt->stream_index)) {
+         if (TRICKPLAY(m_av_clock->OMXPlaySpeed()))
+            m_packetAfterSeek = true;
+         if (m_player_video->AddPacket(m_omx_pkt))
+            m_omx_pkt = NULL;
+         else
+            OMXClock::OMXSleep(10);
+      }
+      else if(m_has_audio && m_omx_pkt && !TRICKPLAY(m_av_clock->OMXPlaySpeed()) && m_omx_pkt->codec_type == AVMEDIA_TYPE_AUDIO) {
+         if (m_player_audio->AddPacket(m_omx_pkt))
+            m_omx_pkt = NULL;
+         else
+            OMXClock::OMXSleep(10);
+      }
 #ifdef ENABLE_SUBTITLES
-    else if(m_has_subtitle && m_omx_pkt && !TRICKPLAY(m_av_clock->OMXPlaySpeed()) &&
-                m_omx_pkt->codec_type == AVMEDIA_TYPE_SUBTITLE) {
-            if (m_omx_pkt->size && ENABLE_SUBTITLES &&
-                    (m_omx_pkt->hints.codec == CODEC_ID_TEXT ||
-                     m_omx_pkt->hints.codec == CODEC_ID_SSA)) {
-                if(m_player_subtitles->AddPacket(m_omx_pkt))
-                    m_omx_pkt = NULL;
-                else
-                    OMXClock::OMXSleep(10);
-            }
-            else {
-                m_omx_reader.FreePacket(m_omx_pkt);
-                m_omx_pkt = NULL;
-            }
-        }
+      else if(m_has_subtitle && m_omx_pkt && !TRICKPLAY(m_av_clock->OMXPlaySpeed()) &&
+              m_omx_pkt->codec_type == AVMEDIA_TYPE_SUBTITLE) {
+         if (m_omx_pkt->size && ENABLE_SUBTITLES &&
+             (m_omx_pkt->hints.codec == CODEC_ID_TEXT ||
+              m_omx_pkt->hints.codec == CODEC_ID_SSA)) {
+            if(m_player_subtitles->AddPacket(m_omx_pkt))
+               m_omx_pkt = NULL;
+            else
+               OMXClock::OMXSleep(10);
+         }
+         else {
+            m_omx_reader.FreePacket(m_omx_pkt);
+            m_omx_pkt = NULL;
+         }
+      }
 #endif
-        else if (m_omx_pkt) {
-           m_omx_reader->FreePacket(m_omx_pkt);
-           m_omx_pkt = NULL;
-        }
-    }
+      else if (m_omx_pkt) {
+         m_omx_reader->FreePacket(m_omx_pkt);
+         m_omx_pkt = NULL;
+      }
+   }
 
-    emit playbackCompleted();
-    cleanup();
+   emit playbackCompleted();
+
+   LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
+   m_av_clock->OMXResume();
+   m_av_clock->OMXStop();
+   m_av_clock->OMXStateIdle();
+   m_av_clock->OMXStateExecute();
+
+   // Actually change the state here and reset flags.
+   setState(STATE_STOPPED);
+   m_mutexPending.lock();
+   if (m_pendingStop) {
+      m_pendingStop = false;
+      m_waitPendingCommand.wakeAll();
+   }
+   m_mutexPending.unlock();
 }
 
 /*------------------------------------------------------------------------------
@@ -804,16 +839,16 @@ void OMX_MediaProcessor::mediaDecoding()
 inline
 void OMX_MediaProcessor::setSpeed(int iSpeed)
 {
-    if (!m_av_clock)
-        return;
+   if (!m_av_clock)
+      return;
 
-    m_omx_reader->SetSpeed(iSpeed);
+   m_omx_reader->SetSpeed(iSpeed);
 
-    // flush when in trickplay mode
-    if (TRICKPLAY(iSpeed) || TRICKPLAY(m_av_clock->OMXPlaySpeed()))
-       flushStreams(DVD_NOPTS_VALUE);
+   // flush when in trickplay mode
+   if (TRICKPLAY(iSpeed) || TRICKPLAY(m_av_clock->OMXPlaySpeed()))
+      flushStreams(DVD_NOPTS_VALUE);
 
-    m_av_clock->OMXSetSpeed(iSpeed);
+   m_av_clock->OMXSetSpeed(iSpeed);
 }
 
 /*------------------------------------------------------------------------------
@@ -821,24 +856,24 @@ void OMX_MediaProcessor::setSpeed(int iSpeed)
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::flushStreams(double pts)
 {
-    if (m_has_video)
-        m_player_video->Flush();
+   if (m_has_video)
+      m_player_video->Flush();
 
-    if (m_has_audio)
-        m_player_audio->Flush();
+   if (m_has_audio)
+      m_player_audio->Flush();
 
 #ifdef ENABLE_SUBTITLES
-    if (m_has_subtitle)
-        m_player_subtitles->Flush();
+   if (m_has_subtitle)
+      m_player_subtitles->Flush();
 #endif
 
-    if (m_omx_pkt) {
-        m_omx_reader->FreePacket(m_omx_pkt);
-        m_omx_pkt = NULL;
-    }
+   if (m_omx_pkt) {
+      m_omx_reader->FreePacket(m_omx_pkt);
+      m_omx_pkt = NULL;
+   }
 
-    if (pts != DVD_NOPTS_VALUE)
-        m_av_clock->OMXMediaTime(pts);
+   if (pts != DVD_NOPTS_VALUE)
+      m_av_clock->OMXMediaTime(pts);
 }
 
 /*------------------------------------------------------------------------------
@@ -847,11 +882,11 @@ void OMX_MediaProcessor::flushStreams(double pts)
 inline
 bool OMX_MediaProcessor::checkCurrentThread()
 {
-    if (QThread::currentThreadId() == m_thread.getThreadId()) {
-        LOG_ERROR(LOG_TAG, "Do not invoke in the object's thread!");
-        return false;
-    }
-    return true;
+   if (QThread::currentThreadId() == m_thread.getThreadId()) {
+      LOG_ERROR(LOG_TAG, "Do not invoke in the object's thread!");
+      return false;
+   }
+   return true;
 }
 
 /*------------------------------------------------------------------------------
@@ -859,74 +894,56 @@ bool OMX_MediaProcessor::checkCurrentThread()
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::cleanup()
 {
-    LOG_INFORMATION(LOG_TAG, "Cleaning up...");
+   LOG_INFORMATION(LOG_TAG, "Cleaning up...");
 
 #if 0
-    if (m_refresh)
-    {
-        m_BcmHost.vc_tv_hdmi_power_on_best(
-                    tv_state.width,
-                    tv_state.height,
-                    tv_state.frame_rate,
-                    HDMI_NONINTERLACED,
-                    (EDID_MODE_MATCH_FLAG_T)(HDMI_MODE_MATCH_FRAMERATE|
-                                             HDMI_MODE_MATCH_RESOLUTION|HDMI_MODE_MATCH_SCANMODE)
-                    );
-    }
+   if (m_refresh)
+   {
+      m_BcmHost.vc_tv_hdmi_power_on_best(
+               tv_state.width,
+               tv_state.height,
+               tv_state.frame_rate,
+               HDMI_NONINTERLACED,
+               (EDID_MODE_MATCH_FLAG_T)(HDMI_MODE_MATCH_FRAMERATE|
+                                        HDMI_MODE_MATCH_RESOLUTION|HDMI_MODE_MATCH_SCANMODE)
+               );
+   }
 #endif
 
-    LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
-    m_av_clock->OMXStop();
-    m_av_clock->OMXStateIdle();
-    m_av_clock->OMXStateExecute();
-
-    LOG_VERBOSE(LOG_TAG, "Closing players...");
+   LOG_VERBOSE(LOG_TAG, "Closing players...");
 #ifdef ENABLE_SUBTITLES
-    m_player_subtitles->Close();
+   m_player_subtitles->Close();
 #endif
-    m_player_video->Close();
-    m_player_audio->Close();
+   m_player_video->Close();
+   m_player_audio->Close();
 
-    if (m_omx_pkt) {
-        m_omx_reader->FreePacket(m_omx_pkt);
-        m_omx_pkt = NULL;
-    }
+   if (m_omx_pkt) {
+      m_omx_reader->FreePacket(m_omx_pkt);
+      m_omx_pkt = NULL;
+   }
 
-    LOG_VERBOSE(LOG_TAG, "Closing players...");
-    m_omx_reader->Close();
+   LOG_VERBOSE(LOG_TAG, "Closing players...");
+   m_omx_reader->Close();
 
-    vc_tv_show_info(0);
+   vc_tv_show_info(0);
 
-    // Keep an handle to the texture data that will be freed.
-    OMX_TextureData* textureData = m_textureData;
-    m_textureData = NULL;
+   // lcarlon: free the texture. Invoke freeTexture so that it is the user
+   // of the class to do it cause it is commonly required to do it in the
+   // current OpenGL and EGL context. Do it here, after the stop command is
+   // considered finished: this is needed to avoid hardlock in case the
+   // used wants to free the texture in his own thread, which would still
+   // be blocked waiting for the stop command to finish.
+   LOG_VERBOSE(LOG_TAG, "Freeing texture...");
+   m_provider->freeTexture(m_textureData);
+   m_textureData = NULL;
+   emit textureInvalidated();
 
-    m_av_clock->OMXDeinitialize();
-
-    // Actually change the state here and reset flags.
-    setState(STATE_STOPPED);
-    m_mutexPending.lock();
-    if (m_pendingStop) {
-        m_pendingStop = false;
-        m_waitPendingCommand.wakeAll();
-    }
-    m_mutexPending.unlock();
-    LOG_INFORMATION(LOG_TAG, "Cleanup done.");
-
-    // lcarlon: free the texture. Invoke freeTexture so that it is the user
-    // of the class to do it cause it is commonly required to do it in the
-    // current OpenGL and EGL context. Do it here, after the stop command is
-    // considered finished: this is needed to avoid hardlock in case the
-    // used wants to free the texture in his own thread, which would still
-    // be blocked waiting for the stop command to finish.
-    LOG_VERBOSE(LOG_TAG, "Freeing texture...");
-    m_provider->freeTexture(textureData);
-    emit textureInvalidated();
+   LOG_INFORMATION(LOG_TAG, "Cleanup done.");
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::streamLength
 +-----------------------------------------------------------------------------*/
 long OMX_MediaProcessor::streamLength() {
-    return m_omx_reader->GetStreamLength();
+   return m_omx_reader->GetStreamLength();
 }
