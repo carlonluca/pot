@@ -25,4 +25,7 @@ QT          += quick multimedia
 SOURCES     += main.cpp
 RESOURCES   += resources_qml.qrc
 OTHER_FILES += qml/main.qml \
-    qml/POC_ControlBar.qml
+    qml/POC_ControlBar.qml \
+    qml/POC_StringUtils.js \
+    qml/POC_TextPosition.qml \
+    qml/POC_VideoOutput.qml

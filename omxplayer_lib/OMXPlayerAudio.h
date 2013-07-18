@@ -86,7 +86,7 @@ protected:
 private:
 public:
   OMXPlayerAudio();
-  ~OMXPlayerAudio();
+  virtual ~OMXPlayerAudio();
   bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMXReader *omx_reader,
             std::string device, bool passthrough, long initialVolume, bool hw_decode,
             bool boost_on_downmix, bool use_thread, float queue_size, float fifo_size);

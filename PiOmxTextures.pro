@@ -69,7 +69,7 @@ INCLUDEPATH += \
 
 VERSION = 4.2.0
 
-# Flags used bu hello_pi examples:
+# Flags used by hello_pi examples:
 #-DSTANDALONE -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS
 # -DTARGET_POSIX -D_LINUX -fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE
 # -D_FILE_OFFSET_BITS=64 -U_FORTIFY_SOURCE -Wall -g -DHAVE_LIBOPENMAX=2 -DOMX
@@ -118,7 +118,6 @@ DEFINES += ENABLE_IMPROVED_BUFFERING
 # Can also be enabled in omx_mediaprocessor.h.
 #DEFINES += ENABLE_PAUSE_FOR_BUFFERING
 
-QMAKE_CXXFLAGS_DEBUG += -rdynamic
 # For omxplayer.
 QMAKE_CXXFLAGS += -std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS             \
    -DTARGET_POSIX -D_LINUX -fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE               \
@@ -129,7 +128,7 @@ QMAKE_CXXFLAGS += -std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS     
    -DHAVE_LIBAVFORMAT_AVFORMAT_H -DHAVE_LIBAVFILTER_AVFILTER_H -DOMX -DOMX_SKIP64BIT    \
    -ftree-vectorize -DUSE_EXTERNAL_OMX -DTARGET_RASPBERRY_PI -DUSE_EXTERNAL_LIBBCM_HOST \
    -Wno-deprecated-declarations -Wno-missing-field-initializers -Wno-ignored-qualifiers \
-   -Wno-psabi
+   -Wno-psabi -Wno-unused-parameter
 
 # [1]: part of implementation without omxplayer.
 
@@ -163,7 +162,8 @@ SOURCES += \
     omx_wrapper/OMX_Core.cpp \
     omx_mediaprocessorelement.cpp \
     omx_globals.cpp \
-    omx_textureprovider.cpp
+    omx_textureprovider.cpp \
+    omx_playeraudio.cpp
 
 SOURCES += \
     omxplayer_lib/Srt.cpp \
@@ -225,7 +225,8 @@ HEADERS  += \
     omxplayer_lib/DllAvFilter.h \
     omxplayer_lib/DllAvCodec.h \
     omx_mediaprocessorelement.h \
-    omx_textureprovider.h
+    omx_textureprovider.h \
+    omx_playeraudio.h
 
 HEADERS += \
     omxplayer_lib/Unicode.h \

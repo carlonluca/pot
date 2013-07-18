@@ -48,7 +48,7 @@ class OMX_TextureProvider;
 class OMXCore;
 class OMXClock;
 class OMXPlayerVideo;
-class OMXPlayerAudio;
+class OMX_PlayerAudio;
 #ifdef ENABLE_SUBTITLES
 class OMXPlayerSubtitles;
 #endif
@@ -110,8 +110,8 @@ public:
 
     OMX_MediaProcessorState state();
 
-    void setVolume(int volume);
-    int volume();
+    void setVolume(long volume, bool linear);
+    long volume(bool linear);
 
 public slots:
     bool play();
@@ -132,6 +132,7 @@ private slots:
     void cleanup();
 
 private:
+    bool setFilenameInt(QString filename, OMX_TextureData*& textureData);
     void setState(OMX_MediaProcessorState state);
     void setSpeed(int iSpeed);
     void flushStreams(double pts);
@@ -151,7 +152,7 @@ private:
 
     OMXClock*           m_av_clock;
     OMXPlayerVideo*     m_player_video;
-    OMXPlayerAudio*     m_player_audio;
+    OMX_PlayerAudio*    m_player_audio;
 #ifdef ENABLE_SUBTITLES
     OMXPlayerSubtitles* m_player_subtitles;
 #endif
