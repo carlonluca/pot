@@ -2,5 +2,8 @@
     <qresource prefix="/">
         <file>qml/main.qml</file>
         <file>qml/POC_ControlBar.qml</file>
+        <file>qml/POC_StringUtils.js</file>
+        <file>qml/POC_TextPosition.qml</file>
+        <file>qml/POC_VideoOutput.qml</file>
     </qresource>
 </RCC>
