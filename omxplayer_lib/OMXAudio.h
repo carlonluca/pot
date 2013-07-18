@@ -135,6 +135,8 @@ protected:
   DllAvUtil         m_dllAvUtil;
   bool              m_settings_changed;
   CPCMRemap         m_remap;
+
+  friend class OMX_PlayerAudio;
 };
 #endif
 

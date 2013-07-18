@@ -28,6 +28,7 @@ Rectangle {
     color:  "black"
     focus:  true
 
+    // The unique media player.
     MediaPlayer {
         objectName: "mediaPlayer"
         id: mediaPlayer
@@ -42,24 +43,31 @@ Rectangle {
             else if (mediaPlayer.playbackState === MediaPlayer.StoppedState)
                 mediaPlayer.play();
         }
-    }
 
-    VideoOutput {
-        height: parent.height
-        width:  parent.width
+        function volumeUp() {
+            volume = (volume + 0.1 > 1) ? 1 : volume + 0.1;
+        }
 
-        source: mediaPlayer
-        fillMode: VideoOutput.Stretch
-
-        POC_ControlBar {
-            anchors.bottom: parent.bottom
+        function volumeDown() {
+            volume = (volume - 0.1 < 0) ? 0 : volume - 0.1;
         }
     }
 
+    POC_VideoOutput {
+        source: mediaPlayer
+    }
+
+    // These are shortcuts for common functionalities.
     Keys.onPressed: {
         if (event.key === Qt.Key_S)
             mediaPlayer.stop();
         else if (event.key === Qt.Key_P)
             mediaPlayer.playPause();
+        else if (event.key === Qt.Key_Space)
+            mediaPlayer.playPause();
+        else if (event.key === Qt.Key_Plus)
+            mediaPlayer.volumeUp();
+        else if (event.key === Qt.Key_Minus)
+            mediaPlayer.volumeDown();
     }
 }
