@@ -95,3 +95,20 @@ void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
    // omxplayer expects millibels here.
    OMXPlayerAudio::SetCurrentVolume(mbVolume*1000);
 }
+
+long OMX_PlayerAudio::GetCurrentVolume(bool linear)
+{
+   long mbVol = OMXPlayerAudio::GetCurrentVolume();
+   if (!linear)
+      return mbVol;
+
+   OMX_S32 mbMax = 2;
+   OMX_S32 mbMin = -6;
+   double expMin = exp(mbMin);
+   double expMax = exp(mbMax);
+   double num = 100*exp(mbVol/1000) - expMin;
+   double den = expMax - expMin;
+
+   LOG_DEBUG(LOG_TAG, "Volume%: %ld.", (long)(num/den));
+   return (long)(num/den);
+}

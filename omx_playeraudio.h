@@ -40,7 +40,7 @@ public:
    ~OMX_PlayerAudio();
 
    void SetCurrentVolume(long volume, bool linear);
-   long GetCurrentVolume();
+   long GetCurrentVolume(bool linear);
 };
 
 #endif // OMX_AUDIO_H

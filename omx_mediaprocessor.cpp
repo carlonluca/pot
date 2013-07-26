@@ -514,7 +514,7 @@ void OMX_MediaProcessor::setVolume(long volume, bool linear)
 +-----------------------------------------------------------------------------*/
 long OMX_MediaProcessor::volume(bool linear)
 {
-   return 0;
+   return m_player_audio->GetCurrentVolume(linear);
 }
 
 /*------------------------------------------------------------------------------
