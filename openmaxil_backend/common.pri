@@ -1,4 +1,27 @@
-QT += multimedia-private network
+#
+# Project: PiOmxTextures
+# Author:  Luca Carlon
+# Date:    04.06.2013
+#
+# Copyright (c) 2012 Luca Carlon. All rights reserved.
+#
+# This file is part of PiOmxTextures.
+#
+# PiOmxTextures is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# PiOmxTextures is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
+#
+
+QT     += multimedia-private network
 CONFIG += no_private_qt_headers_warning
 
 qtHaveModule(widgets) {
@@ -6,32 +29,7 @@ qtHaveModule(widgets) {
     DEFINES += HAVE_WIDGETS
 }
 
-LIBS += -lqgsttools_p
-
-CONFIG += link_pkgconfig
-
-PKGCONFIG += \
-    gstreamer-0.10 \
-    gstreamer-base-0.10 \
-    gstreamer-interfaces-0.10 \
-    gstreamer-audio-0.10 \
-    gstreamer-video-0.10 \
-    gstreamer-pbutils-0.10
-
-maemo*:PKGCONFIG +=gstreamer-plugins-bad-0.10
-
-config_resourcepolicy {
-    DEFINES += HAVE_RESOURCE_POLICY
-    PKGCONFIG += libresourceqt1
-}
-
 config_xvideo:qtHaveModule(widgets) {
-    DEFINES += HAVE_XVIDEO
-    LIBS += -lXv -lX11 -lXext
-}
-
-config_gstreamer_appsrc {
-    PKGCONFIG += gstreamer-app-0.10
-    DEFINES += HAVE_GST_APPSRC
-    LIBS += -lgstapp-0.10
+#    DEFINES += HAVE_XVIDEO
+#    LIBS += -lXv -lX11 -lXext
 }

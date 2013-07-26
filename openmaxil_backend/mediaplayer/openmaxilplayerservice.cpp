@@ -1,8 +1,24 @@
 /*
+ * Project: PiOmxTextures
  * Author:  Luca Carlon
- * Company: -
  * Date:    04.14.2013
- * Project: OpenMAXIL QtMultimedia Plugin
+ *
+ * Copyright (c) 2012 Luca Carlon. All rights reserved.
+ *
+ * This file is part of PiOmxTextures.
+ *
+ * PiOmxTextures is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * PiOmxTextures is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
  */
 
 #include <QtCore/qvariant.h>
@@ -17,20 +33,7 @@
 #include "openmaxilmetadataprovider.h"
 #include "openmaxilavailabilitycontrol.h"
 #include "openmaxilvideorenderercontrol.h"
-
-#if defined(HAVE_WIDGETS)
-#include <private/qgstreamervideooverlay_p.h>
-#include <private/qgstreamervideowindow_p.h>
-#include <private/qgstreamervideowidget_p.h>
-#endif
-
-#if defined(Q_WS_MAEMO_6) && defined(__arm__)
-#include "qgstreamergltexturerenderer.h"
-#endif
-
 #include "openmaxilstreamscontrol.h"
-#include <private/qgstreameraudioprobecontrol_p.h>
-#include <private/qgstreamervideoprobecontrol_p.h>
 
 #include <private/qmediaplaylistnavigator_p.h>
 #include <qmediaplaylist.h>
@@ -88,10 +91,11 @@ QMediaControl *QGstreamerPlayerService::requestControl(const char *name)
     if (qstrcmp(name, QMediaPlayerControl_iid) == 0)
         return m_control;
 
-    if (qstrcmp(name,QMetaDataReaderControl_iid) == 0)
+#if 0
+    if (qstrcmp(name, QMetaDataReaderControl_iid) == 0)
         return 0;
 
-    if (qstrcmp(name,QMediaStreamsControl_iid) == 0)
+    if (qstrcmp(name, QMediaStreamsControl_iid) == 0)
         return 0;
 
     if (qstrcmp(name, QMediaAvailabilityControl_iid) == 0)
@@ -108,7 +112,7 @@ QMediaControl *QGstreamerPlayerService::requestControl(const char *name)
         //return 0;
     }
 
-    if (qstrcmp(name,QMediaAudioProbeControl_iid) == 0) {
+    if (qstrcmp(name, QMediaAudioProbeControl_iid) == 0) {
         //if (m_session) {
         //    QGstreamerAudioProbeControl *probe = new QGstreamerAudioProbeControl(this);
         //    m_session->addProbe(probe);
@@ -116,11 +120,13 @@ QMediaControl *QGstreamerPlayerService::requestControl(const char *name)
         //}
         return 0;
     }
+#endif
 
     if (qstrcmp(name, QVideoRendererControl_iid) == 0)
        return m_videoRenderer;
 
-    /*if (!m_videoOutput) {
+#if 0
+    if (!m_videoOutput) {
         if (qstrcmp(name, QVideoRendererControl_iid) == 0)
             m_videoOutput = m_videoRenderer;
 #if defined(HAVE_XVIDEO) && defined(HAVE_WIDGETS)
@@ -135,7 +141,8 @@ QMediaControl *QGstreamerPlayerService::requestControl(const char *name)
             m_control->setVideoOutput(m_videoOutput);
             return m_videoOutput;
         }
-    }*/
+    }
+#endif
 
     return 0;
 }
