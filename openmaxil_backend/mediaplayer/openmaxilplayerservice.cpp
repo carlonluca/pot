@@ -3,7 +3,7 @@
  * Author:  Luca Carlon
  * Date:    04.14.2013
  *
- * Copyright (c) 2012 Luca Carlon. All rights reserved.
+ * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -54,7 +54,7 @@ QGstreamerPlayerService::QGstreamerPlayerService(QObject *parent):
     qDebug("Instantiating QMediaService...");
 
     m_control             = new OpenMAXILPlayerControl(this);
-    m_metaData            = new QGstreamerMetaDataProvider(this);
+    m_metaData            = new OMX_MetaDataProvider(m_control, this);
     m_streamsControl      = new QGstreamerStreamsControl(this);
     m_availabilityControl = new OpenMAXILAvailabilityControl(this);
 
@@ -91,10 +91,10 @@ QMediaControl *QGstreamerPlayerService::requestControl(const char *name)
     if (qstrcmp(name, QMediaPlayerControl_iid) == 0)
         return m_control;
 
-#if 0
     if (qstrcmp(name, QMetaDataReaderControl_iid) == 0)
-        return 0;
+        return m_metaData;
 
+#if 0
     if (qstrcmp(name, QMediaStreamsControl_iid) == 0)
         return 0;
 

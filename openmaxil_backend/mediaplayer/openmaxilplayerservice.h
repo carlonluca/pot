@@ -3,7 +3,7 @@
  * Author:  Luca Carlon
  * Date:    04.14.2013
  *
- * Copyright (c) 2012 Luca Carlon. All rights reserved.
+ * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -37,7 +37,7 @@ class QMediaPlaylistNavigator;
 class QGstreamerMetaData;
 class OpenMAXILPlayerControl;
 class QGstreamerPlayerSession;
-class QGstreamerMetaDataProvider;
+class OMX_MetaDataProvider;
 class QGstreamerStreamsControl;
 class QGstreamerVideoRenderer;
 class QGstreamerVideoOverlay;
@@ -57,7 +57,7 @@ public:
 
 private:
     OpenMAXILPlayerControl *m_control;
-    QGstreamerMetaDataProvider *m_metaData;
+    OMX_MetaDataProvider *m_metaData;
     QGstreamerStreamsControl *m_streamsControl;
     OpenMAXILAvailabilityControl *m_availabilityControl;
 
