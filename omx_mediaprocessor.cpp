@@ -494,11 +494,11 @@ bool OMX_MediaProcessor::seek(long position)
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::currentPosition
 +-----------------------------------------------------------------------------*/
-double OMX_MediaProcessor::streamPosition()
+qint64 OMX_MediaProcessor::streamPosition()
 {
-   if (m_av_clock)
-      return m_player_audio->GetCurrentPTS();
-   return -1;
+   if (!m_av_clock)
+      return -1;
+   return m_av_clock->OMXMediaTime(false)*1E-3;
 }
 
 /*------------------------------------------------------------------------------
@@ -972,6 +972,9 @@ void OMX_MediaProcessor::cleanup()
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::streamLength
 +-----------------------------------------------------------------------------*/
-long OMX_MediaProcessor::streamLength() {
+qint64 OMX_MediaProcessor::streamLength()
+{
+   if (!m_omx_reader)
+      return -1;
    return m_omx_reader->GetStreamLength();
 }
