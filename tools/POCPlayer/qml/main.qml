@@ -53,8 +53,20 @@ Rectangle {
         }
     }
 
+    // The video output component.
     POC_VideoOutput {
+        id:     videoOutput
         source: mediaPlayer
+    }
+
+    // The legend.
+    POC_Legend {
+        id:      legend
+        x:       parent.width*1/10
+        y:       parent.height*1/10
+        width:   parent.width*5/6
+        height:  parent.height*4/6
+        opacity: 0.0
     }
 
     // These are shortcuts for common functionalities.
@@ -63,11 +75,17 @@ Rectangle {
             mediaPlayer.stop();
         else if (event.key === Qt.Key_P)
             mediaPlayer.playPause();
-        else if (event.key === Qt.Key_Space)
-            mediaPlayer.playPause();
         else if (event.key === Qt.Key_Plus)
             mediaPlayer.volumeUp();
         else if (event.key === Qt.Key_Minus)
             mediaPlayer.volumeDown();
+        else if (event.key === Qt.Key_Down)
+            videoOutput.focus = true;
+        else if (event.key === Qt.Key_L)
+            legend.toggleVisibility();
+        else
+            return;
+
+        event.accepted = true;
     }
 }

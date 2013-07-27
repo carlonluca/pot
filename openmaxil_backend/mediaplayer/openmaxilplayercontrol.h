@@ -3,7 +3,7 @@
  * Author:  Luca Carlon
  * Date:    04.14.2013
  *
- * Copyright (c) 2012 Luca Carlon. All rights reserved.
+ * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -152,6 +152,8 @@ public:
     void setMedia(const QMediaContent&, QIODevice*);
     void setMediaInt(const QMediaContent& mediaContent);
 
+    QVariantMap getMetaData();
+
     // OMX_TextureProvider interface.
     OMX_TextureData* instantiateTexture(QSize size);
     void freeTexture(OMX_TextureData* textureData);
@@ -170,6 +172,7 @@ public Q_SLOTS:
     void onAfterRendering();
 
 signals:
+    void metaDataChanged(const QVariantMap metaData);
     void textureReady(const OMX_TextureData* textureData);
     void textureInvalidated();
 

@@ -1,7 +1,7 @@
 /*
 * Project: PiOmxTextures
 * Author:  Luca Carlon
-* Date:    07.17.2013
+* Date:    07.24.2013
 *
 * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
 *
@@ -22,36 +22,9 @@
 */
 
 import QtQuick 2.0
-import QtMultimedia 5.0
 
-// The unique video surface.
-VideoOutput {
-    height: parent.height
-    width:  parent.width
-
-    fillMode: VideoOutput.Stretch
-
-    // The control bar.
-    POC_ControlBar {
-        id:             controlBar
-        anchors.bottom: parent.bottom
-    }
-
-    // Text containing the position/duration.
-    POC_TextPosition {
-        anchors.top:   parent.top
-        anchors.right: parent.right
-    }
-
-    Text {
-        text: "Title: " + parent.source.metaData.title
-        anchors.top: parent.top
-        anchors.left: parent.left
-    }
-
-    // Automatically pass the focus to the control bar.
-    onFocusChanged: {
-        if (activeFocus)
-            controlBar.focus = true;
-    }
+Text {
+    width: parent.width
+    color: "white"
+    font {pixelSize: 30}
 }

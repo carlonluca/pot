@@ -31,6 +31,7 @@
 #include <QThread>
 #include <QMutex>
 #include <QWaitCondition>
+#include <QVariantMap>
 
 #include <GLES2/gl2.h>
 #include <stdexcept>
@@ -52,7 +53,7 @@ class OMX_PlayerAudio;
 #ifdef ENABLE_SUBTITLES
 class OMXPlayerSubtitles;
 #endif
-class OMXReader;
+class OMX_Reader;
 class OMXPacket;
 class AVFormatContext;
 class AVStream;
@@ -113,6 +114,8 @@ public:
     void setVolume(long volume, bool linear);
     long volume(bool linear);
 
+    QVariantMap getMetaData();
+
 public slots:
     bool play();
     bool stop();
@@ -120,6 +123,7 @@ public slots:
     bool seek(long position);
 
 signals:
+    void metadataChanged(const QVariantMap metadata);
     void playbackStarted();
     void playbackCompleted();
     void textureInvalidated();
@@ -137,6 +141,7 @@ private:
     void setSpeed(int iSpeed);
     void flushStreams(double pts);
     bool checkCurrentThread();
+    void convertMetaData();
 
     OMX_QThread m_thread;
     QString m_filename;
@@ -156,7 +161,7 @@ private:
 #ifdef ENABLE_SUBTITLES
     OMXPlayerSubtitles* m_player_subtitles;
 #endif
-    OMXReader*          m_omx_reader;
+    OMX_Reader*         m_omx_reader;
     OMXPacket*          m_omx_pkt;
 
     CRBP*     m_RBP;
@@ -192,6 +197,8 @@ private:
     bool m_seekFlush;
     bool m_packetAfterSeek;
     double startpts;
+
+    QVariantMap m_metadata;
 };
 
 
@@ -223,6 +230,13 @@ inline void OMX_MediaProcessor::setState(OMX_MediaProcessorState state) {
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
    m_state = state;
    emit stateChanged(state);
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::getMetaData
++-----------------------------------------------------------------------------*/
+inline QVariantMap OMX_MediaProcessor::getMetaData() {
+   return m_metadata;
 }
 
 #endif // OMX_MEDIAPROCESSOR_H

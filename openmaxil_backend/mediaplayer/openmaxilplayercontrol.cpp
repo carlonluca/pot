@@ -3,7 +3,7 @@
  * Author:  Luca Carlon
  * Date:    04.14.2013
  *
- * Copyright (c) 2012 Luca Carlon. All rights reserved.
+ * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -84,6 +84,8 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
            this, SIGNAL(textureInvalidated()));
    connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
            this, SLOT(onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
+   connect(m_mediaProcessor, SIGNAL(metadataChanged(QVariantMap)),
+           this, SIGNAL(metaDataChanged(QVariantMap)));
 }
 
 /*------------------------------------------------------------------------------
@@ -371,6 +373,17 @@ void OpenMAXILPlayerControl::setMediaInt(const QMediaContent& mediaContent)
    if (!m_mediaProcessor->setFilename(mediaContent.canonicalUrl().path(), m_textureData))
       return;
    m_currentResource = mediaContent;
+   emit mediaChanged(mediaContent);
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::getMetaData
++-----------------------------------------------------------------------------*/
+QVariantMap OpenMAXILPlayerControl::getMetaData()
+{
+   if (!m_mediaProcessor)
+      return QVariantMap();
+   return m_mediaProcessor->getMetaData();
 }
 
 /*------------------------------------------------------------------------------

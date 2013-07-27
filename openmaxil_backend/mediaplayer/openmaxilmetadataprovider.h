@@ -3,7 +3,7 @@
  * Author:  Luca Carlon
  * Date:    04.14.2013
  *
- * Copyright (c) 2012 Luca Carlon. All rights reserved.
+ * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -25,17 +25,20 @@
 #define QGSTREAMERMETADATAPROVIDER_H
 
 #include <qmetadatareadercontrol.h>
+#include <qmediacontent.h>
+
+#include "openmaxilplayercontrol.h"
 
 QT_BEGIN_NAMESPACE
 
 class QGstreamerPlayerSession;
 
-class QGstreamerMetaDataProvider : public QMetaDataReaderControl
+class OMX_MetaDataProvider : public QMetaDataReaderControl
 {
     Q_OBJECT
 public:
-    QGstreamerMetaDataProvider(QObject* parent);
-    virtual ~QGstreamerMetaDataProvider();
+    OMX_MetaDataProvider(OpenMAXILPlayerControl* playerControl, QObject* parent);
+    virtual ~OMX_MetaDataProvider();
 
     bool isMetaDataAvailable() const;
     bool isWritable() const;
@@ -43,12 +46,13 @@ public:
     QVariant metaData(const QString &key) const;
     QStringList availableMetaData() const;
 
-private slots:
-    void updateTags();
+public slots:
+    void onUpdateRequested(const QVariantMap metaData);
 
 private:
     QVariantMap m_tags;
     QMap<QByteArray, QString> m_keysMap;
+    OpenMAXILPlayerControl* m_playerControl;
 };
 
 QT_END_NAMESPACE

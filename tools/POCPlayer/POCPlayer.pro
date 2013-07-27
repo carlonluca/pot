@@ -28,4 +28,6 @@ OTHER_FILES += qml/main.qml \
     qml/POC_ControlBar.qml \
     qml/POC_StringUtils.js \
     qml/POC_TextPosition.qml \
-    qml/POC_VideoOutput.qml
+    qml/POC_VideoOutput.qml \
+    qml/POC_Legend.qml \
+    qml/POC_LegendItem.qml

@@ -163,7 +163,8 @@ SOURCES += \
     omx_mediaprocessorelement.cpp \
     omx_globals.cpp \
     omx_textureprovider.cpp \
-    omx_playeraudio.cpp
+    omx_playeraudio.cpp \
+    omx_reader.cpp
 
 SOURCES += \
     omxplayer_lib/Srt.cpp \
@@ -226,7 +227,8 @@ HEADERS  += \
     omxplayer_lib/DllAvCodec.h \
     omx_mediaprocessorelement.h \
     omx_textureprovider.h \
-    omx_playeraudio.h
+    omx_playeraudio.h \
+    omx_reader.h
 
 HEADERS += \
     omxplayer_lib/Unicode.h \

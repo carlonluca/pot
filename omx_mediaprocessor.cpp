@@ -34,6 +34,7 @@
 #include "omx_mediaprocessor.h"
 #include "omx_textureprovider.h"
 #include "omx_playeraudio.h"
+#include "omx_reader.h"
 
 // omxplayer lib.
 #include "omxplayer_lib/linux/RBP.h"
@@ -86,7 +87,7 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
 #ifdef ENABLE_SUBTITLES
    m_has_subtitle(false),
 #endif
-   m_omx_reader(new OMXReader),
+   m_omx_reader(new OMX_Reader),
    m_omx_pkt(NULL),
    m_RBP(new CRBP),
    m_OMX(new COMXCore),
@@ -232,6 +233,13 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
       LOG_ERROR(LOG_TAG, "Failed to open source.");
       return false;
    }
+
+   // Emit a signal transmitting the matadata. Anyway, I'm not sure where to check for
+   // metadata actually changed or not... I emit the signal anyway, then the receiver
+   // decides.
+   LOG_VERBOSE(LOG_TAG, "Copy metatada...");
+   convertMetaData();
+   emit metadataChanged(m_metadata);
 
    m_filename = filename;
 
@@ -890,6 +898,24 @@ bool OMX_MediaProcessor::checkCurrentThread()
 }
 
 /*------------------------------------------------------------------------------
+|    OMX_VideoProcessor::convertMetaData
++-----------------------------------------------------------------------------*/
+inline
+void OMX_MediaProcessor::convertMetaData()
+{
+   // TODO: It would be good to lock this somehow.
+   AVDictionary* dictionary = m_omx_reader->getMetadata();
+
+   AVDictionaryEntry* tag = NULL;
+   LOG_VERBOSE(LOG_TAG, "MetaData");
+   m_metadata.clear();
+   while ((tag = av_dict_get(dictionary, "", tag, AV_DICT_IGNORE_SUFFIX))) {
+      m_metadata.insert(tag->key, tag->value);
+      LOG_VERBOSE(LOG_TAG, "Key: %s, Value: %s.", tag->key, tag->value);
+   }
+}
+
+/*------------------------------------------------------------------------------
 |    OMX_VideoProcessor::cleanup
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::cleanup()
@@ -924,6 +950,8 @@ void OMX_MediaProcessor::cleanup()
 
    LOG_VERBOSE(LOG_TAG, "Closing players...");
    m_omx_reader->Close();
+   m_metadata.clear();
+   emit metadataChanged(m_metadata);
 
    vc_tv_show_info(0);
 
