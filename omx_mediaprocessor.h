@@ -94,14 +94,14 @@ public:
     QString filename();
     QStringList streams();
 
-    double streamPosition();
+    qint64 streamPosition();
 
     OMX_TextureData* textureData();
 
     bool hasAudio();
     bool hasVideo();
 
-    long streamLength();
+    qint64 streamLength();
 
 #ifdef ENABLE_SUBTITLES
     inline bool hasSubtitle() {
