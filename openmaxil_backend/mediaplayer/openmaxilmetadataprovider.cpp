@@ -21,7 +21,12 @@
  * along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
 #include <lgl_logging.h>
+
+#include "QtCore/QDate"
 
 #include "qmediametadata.h"
 #include "openmaxilmetadataprovider.h"
@@ -41,6 +46,9 @@ static const OMX_MetaDataKeyLookup omx_metaDataKeys[] = {
 };
 #endif
 
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider::OMX_MetaDataProvider
++-----------------------------------------------------------------------------*/
 OMX_MetaDataProvider::OMX_MetaDataProvider(OpenMAXILPlayerControl* playerControl, QObject* parent)
    :QMetaDataReaderControl(parent)
 {
@@ -58,32 +66,49 @@ OMX_MetaDataProvider::OMX_MetaDataProvider(OpenMAXILPlayerControl* playerControl
            this, SLOT(onUpdateRequested(QVariantMap)));
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider::~OMX_MetaDataProvider
++-----------------------------------------------------------------------------*/
 OMX_MetaDataProvider::~OMX_MetaDataProvider()
 {
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider::isMetaDataAvailable
++-----------------------------------------------------------------------------*/
 bool OMX_MetaDataProvider::isMetaDataAvailable() const
 {
    return true;
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider::isWritable
++-----------------------------------------------------------------------------*/
 bool OMX_MetaDataProvider::isWritable() const
 {
    return false;
 }
-
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider::metaData
++-----------------------------------------------------------------------------*/
 QVariant OMX_MetaDataProvider::metaData(const QString& key) const
 {
    LOG_DEBUG(LOG_TAG, "MetaData request for key: %s.", qPrintable(key));
    return m_tags.value(key);
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider::availableMetaData
++-----------------------------------------------------------------------------*/
 QStringList OMX_MetaDataProvider::availableMetaData() const
 {
    LOG_DEBUG(LOG_TAG, "Available metadata requested...");
    return m_tags.keys();
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider::onUpdateRequested
++-----------------------------------------------------------------------------*/
 void OMX_MetaDataProvider::onUpdateRequested(const QVariantMap metaData)
 {
    Q_UNUSED(metaData);
@@ -95,6 +120,14 @@ void OMX_MetaDataProvider::onUpdateRequested(const QVariantMap metaData)
    while (i != metaData.constEnd()) {
       if (!i.key().compare("title", Qt::CaseInsensitive))
          m_tags.insert(QMediaMetaData::Title, i.value());
+      else if (!i.key().compare("artist", Qt::CaseInsensitive))
+         m_tags.insert(QMediaMetaData::Author, QStringList() << i.value().toString());
+      else if (!i.key().compare("date", Qt::CaseInsensitive))
+         m_tags.insert(QMediaMetaData::Date, QDate::fromString(i.value().toString(), Qt::ISODate));
+      else if (!i.key().compare("album", Qt::CaseInsensitive))
+         m_tags.insert(QMediaMetaData::AlbumTitle, i.value());
+      else if (!i.key().compare("album_artist", Qt::CaseInsensitive))
+         m_tags.insert(QMediaMetaData::AlbumArtist, i.value());
       ++i;
    }
 

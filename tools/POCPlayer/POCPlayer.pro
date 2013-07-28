@@ -30,4 +30,6 @@ OTHER_FILES += qml/main.qml \
     qml/POC_TextPosition.qml \
     qml/POC_VideoOutput.qml \
     qml/POC_Legend.qml \
-    qml/POC_LegendItem.qml
+    qml/POC_LegendItem.qml \
+    qml/POC_AnimatedOverlay.qml \
+    qml/POC_MetaData.qml
