@@ -3,6 +3,26 @@
 # Author:  Luca Carlon
 # Date:    12.03.2012
 #
+# Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
+#
+# This file is part of PiOmxTextures.
+#
+# PiOmxTextures is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+#
+# PiOmxTextures is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
+#
+
+# On the command line you can manually speciy some params.
+# qmake "DEFINES+=[CONFIG_APP|CONFIG_LIB] [CONFIG_INCLUDE_FFMPEG]"
 
 # Either CONFIG_LIB or CONFIG_APP.
 #DEFINES += CONFIG_LIB
@@ -46,7 +66,17 @@ error("Either config as app or lib.");
 LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
-LIBS += -L$$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample
+contains(DEFINES, CONFIG_INCLUDE_FFMPEG) {
+LIBS += $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libavformat.a \
+   $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libavcodec.a \
+   $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libavutil.a \
+   $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libswscale.a \
+   $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libswresample.a
+}
+else {
+LIBS += -L$$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib \
+   -lavformat -lavcodec -lavutil -lswscale -lswresample
+}
 INCLUDEPATH += $$_PRO_FILE_PWD_/3rdparty/ffmpeg/include
 # Add this if building with old firmware.
 INCLUDEPATH += /opt/rpi/sysroot/opt/vc/include/interface/vmcs_host/linux

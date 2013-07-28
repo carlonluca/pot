@@ -25,8 +25,7 @@ fi
 
 cd 3rdparty/ffmpeg
 git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src
-cd ffmpeg_src
-git checkout 4e10d87f384a11b11034349e441f76207275c756
+cd ffmpeg_src; git checkout n2.0
 
 echo "Configuring..."
 FLOAT=hard
@@ -36,7 +35,7 @@ echo "Prefix to $PWD..."
 --extra-cflags="-mfpu=vfp -mfloat-abi=$FLOAT -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog" \
 --enable-cross-compile \
 --enable-shared \
---disable-static \
+--enable-static \
 --arch=arm \
 --cpu=arm1176jzf-s \
 --target-os=linux \
@@ -80,9 +79,9 @@ echo "Prefix to $PWD..."
 --disable-decoder=mpeg_xvmc \
 --disable-decoder=msmpeg4_crystalhd \
 --disable-decoder=vc1_vdpau \
---disable-decoder=mpegvideo \
---disable-decoder=mpeg1video \
---disable-decoder=mpeg2video \
+--enable-decoder=mpegvideo \
+--enable-decoder=mpeg1video \
+--enable-decoder=mpeg2video \
 --disable-decoder=mvc1 \
 --disable-decoder=mvc2 \
 --disable-decoder=h261 \
@@ -93,7 +92,7 @@ echo "Prefix to $PWD..."
 --disable-decoder=mjpegb \
 --disable-decoder=sp5x \
 --disable-decoder=jpegls \
---disable-decoder=mpeg4 \
+--enable-decoder=mpeg4 \
 --disable-decoder=rawvideo \
 --disable-decoder=msmpeg4v1 \
 --disable-decoder=msmpeg4v2 \
@@ -110,7 +109,7 @@ echo "Prefix to $PWD..."
 --enable-decoder=h264 \
 --disable-decoder=indeo3 \
 --disable-decoder=vp3 \
---disable-decoder=theora \
+--enable-decoder=theora \
 --disable-decoder=asv1 \
 --disable-decoder=asv2 \
 --disable-decoder=ffv1 \
@@ -146,8 +145,8 @@ echo "Prefix to $PWD..."
 --disable-decoder=ffvhuff \
 --disable-decoder=rv30 \
 --disable-decoder=rv40 \
---disable-decoder=vc1 \
---disable-decoder=wmv3 \
+--enable-decoder=vc1 \
+--enable-decoder=wmv3 \
 --disable-decoder=loco \
 --disable-decoder=wnv1 \
 --disable-decoder=aasc \
@@ -166,8 +165,8 @@ echo "Prefix to $PWD..."
 --disable-decoder=jpeg2000 \
 --disable-decoder=vmnc \
 --disable-decoder=vp5 \
---disable-decoder=vp6 \
---disable-decoder=vp6f \
+--enable-decoder=vp6 \
+--enable-decoder=vp6f \
 --disable-decoder=targa \
 --disable-decoder=dsicinvideo \
 --disable-decoder=tiertexseqvideo \
@@ -209,7 +208,7 @@ echo "Prefix to $PWD..."
 --disable-decoder=iff_byterun1 \
 --disable-decoder=kgv1 \
 --disable-decoder=yop \
---disable-decoder=vp8 \
+--enable-decoder=vp8 \
 --disable-decoder=webp \
 --disable-decoder=pictor \
 --disable-decoder=ansi \
@@ -255,7 +254,7 @@ echo "Prefix to $PWD..."
 --cross-prefix=arm-linux-gnueabihf- \
 --prefix=$PWD/ffmpeg_compiled
 
-echo "Compiling..."
+echo "Building..."
 mkdir $PWD/ffmpeg_compiled
 make -j$1
 make install
