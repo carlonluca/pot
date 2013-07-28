@@ -24,6 +24,9 @@
 #ifndef QGSTREAMERMETADATAPROVIDER_H
 #define QGSTREAMERMETADATAPROVIDER_H
 
+/*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
 #include <qmetadatareadercontrol.h>
 #include <qmediacontent.h>
 
@@ -33,6 +36,9 @@ QT_BEGIN_NAMESPACE
 
 class QGstreamerPlayerSession;
 
+/*------------------------------------------------------------------------------
+|    OMX_MetaDataProvider class
++-----------------------------------------------------------------------------*/
 class OMX_MetaDataProvider : public QMetaDataReaderControl
 {
     Q_OBJECT

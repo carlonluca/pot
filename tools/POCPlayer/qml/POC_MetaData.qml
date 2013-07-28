@@ -23,17 +23,28 @@
 
 import QtQuick 2.0
 
+/**
+  Componenet to show metadata.
+  */
 POC_AnimatedOverlay {
+    property var source: null
+
     Text {
         anchors.fill: parent
         color: "white"
-        text:  "Media Player - Stop [s]\n" +
-               "Media Player - Play/Pause [p]\n" +
-               "Media Player - Volume Up [+]\n" +
-               "Media Player - Volume Down [-]\n" +
-               "Activate Toolbar [Down Arrow]\n" +
-               "Show/Hide Legend [l]"
+        text: "Title: " + formatString(source.metaData.title) + "\n" +
+              "Subtitle: " + formatString(source.metaData.subTitle) + "\n" +
+              "Artist: " + formatString(source.metaData.author) + "\n" +
+              "Date of the Media: " + formatString(source.metaData.date) + "\n" +
+              "Album: " + formatString(source.metaData.albumTitle) + "\n" +
+              "Album Artist: " + formatString(source.metaData.albumArtist);
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment:   Text.AlignVCenter
+
+        function formatString(s) {
+            if (s === null || s === undefined)
+                return "-";
+            return s;
+        }
     }
 }

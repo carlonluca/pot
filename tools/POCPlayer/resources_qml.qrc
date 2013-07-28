@@ -7,5 +7,7 @@
         <file>qml/POC_VideoOutput.qml</file>
         <file>qml/POC_Legend.qml</file>
         <file>qml/POC_LegendItem.qml</file>
+        <file>qml/POC_AnimatedOverlay.qml</file>
+        <file>qml/POC_MetaData.qml</file>
     </qresource>
 </RCC>

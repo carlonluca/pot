@@ -62,11 +62,24 @@ Rectangle {
     // The legend.
     POC_Legend {
         id:      legend
-        x:       parent.width*1/10
-        y:       parent.height*1/10
-        width:   parent.width*5/6
-        height:  parent.height*4/6
-        opacity: 0.0
+
+        // The element unfocuses.
+        onFocusChanged: {
+            if (!activeFocus)
+                parent.focus = true;
+        }
+    }
+
+    // The metadata.
+    POC_MetaData {
+        id:      metaData
+        source:  mediaPlayer
+
+        // The element unfocuses.
+        onFocusChanged: {
+            if (!activeFocus)
+                parent.focus = true;
+        }
     }
 
     // These are shortcuts for common functionalities.
@@ -83,6 +96,8 @@ Rectangle {
             videoOutput.focus = true;
         else if (event.key === Qt.Key_L)
             legend.toggleVisibility();
+        else if (event.key === Qt.Key_T)
+            metaData.showAnimated();
         else
             return;
 
