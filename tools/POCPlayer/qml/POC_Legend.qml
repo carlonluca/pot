@@ -32,7 +32,8 @@ POC_AnimatedOverlay {
                "Media Player - Volume Up [+]\n" +
                "Media Player - Volume Down [-]\n" +
                "Activate Toolbar [Down Arrow]\n" +
-               "Show/Hide Legend [l]"
+               "Show/Hide Legend [l]\n" +
+               "Show/Hide MetaData [t]";
         horizontalAlignment: Text.AlignHCenter
         verticalAlignment:   Text.AlignVCenter
     }

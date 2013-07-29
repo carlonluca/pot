@@ -125,8 +125,34 @@ Item {
             KeyNavigation.right: sliderPosition
             KeyNavigation.down:  sliderPosition
             KeyNavigation.tab:   sliderPosition
-            KeyNavigation.left:  buttonStop
-            KeyNavigation.up:    buttonStop
+            KeyNavigation.left:  buttonMetaData
+            KeyNavigation.up:    buttonMetaData
+        }
+
+        Button {
+            id: buttonMetaData
+            Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
+            text: qsTr("MetaData")
+            onClicked: metaData.showAnimated();
+
+            KeyNavigation.right: buttonLegend
+            KeyNavigation.down:  buttonLegend
+            KeyNavigation.tab:   buttonLegend
+            KeyNavigation.left:  buttonVolume
+            KeyNavigation.up:    buttonVolume
+        }
+
+        Button {
+            id: buttonLegend
+            Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
+            text: qsTr("Legend")
+            onClicked: legend.showAnimated();
+
+            KeyNavigation.right: sliderPosition
+            KeyNavigation.down:  sliderPosition
+            KeyNavigation.tab:   sliderPosition
+            KeyNavigation.left:  buttonMetaData
+            KeyNavigation.up:    buttonMetaData
         }
 
         // Set the play/pause button.

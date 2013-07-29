@@ -36,6 +36,18 @@ Rectangle {
     height:  parent.height*4/6
     opacity: 0.0
 
+    // Catch any mouse input.
+    MouseArea {
+        id: mouseCatcher
+        x: 0
+        y: 0
+        width: mainView.width
+        height: mainView.height
+        enabled: false
+
+        onPressed: hideAnimated();
+    }
+
     // Always animate opacity.
     Behavior on opacity {
         NumberAnimation {
@@ -61,10 +73,12 @@ Rectangle {
     function showAnimated() {
         opacity = 0.5;
         focus = true;
+        mouseCatcher.enabled = true;
     }
 
     function hideAnimated() {
         opacity = 0.0;
         focus = false;
+        mouseCatcher.enabled = false;
     }
 }
