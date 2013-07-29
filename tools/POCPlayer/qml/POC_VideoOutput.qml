@@ -43,12 +43,6 @@ VideoOutput {
         anchors.right: parent.right
     }
 
-    Text {
-        text: "Title: " + parent.source.metaData.title
-        anchors.top: parent.top
-        anchors.left: parent.left
-    }
-
     // Automatically pass the focus to the control bar.
     onFocusChanged: {
         if (activeFocus)
