@@ -1,0 +1,13 @@
+<RCC>
+    <qresource prefix="/">
+        <file>img/airglass-inode-directory.png</file>
+        <file>img/image-bmp.png</file>
+        <file>img/image-cgm.png</file>
+        <file>img/image-gif.png</file>
+        <file>img/image-jpeg.png</file>
+        <file>img/image-svg+xml.png</file>
+        <file>img/image-x-generic.png</file>
+        <file>img/unknown.png</file>
+        <file>img/video-x-generic.png</file>
+    </qresource>
+</RCC>

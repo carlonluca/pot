@@ -28,6 +28,8 @@ import QtQuick.Layouts 1.0
   Used to show information in overlay with uniform appearance.
   */
 Rectangle {
+    signal focusRelinquished()
+
     color:   "black"
     radius:  5
     x:       parent.width*1/10
@@ -80,5 +82,6 @@ Rectangle {
         opacity = 0.0;
         focus = false;
         mouseCatcher.enabled = false;
+        focusRelinquished();
     }
 }

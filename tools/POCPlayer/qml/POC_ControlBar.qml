@@ -148,11 +148,37 @@ Item {
             text: qsTr("Legend")
             onClicked: legend.showAnimated();
 
+            KeyNavigation.right: buttonOpen
+            KeyNavigation.down:  buttonOpen
+            KeyNavigation.tab:   buttonOpen
+            KeyNavigation.left:  buttonMetaData
+            KeyNavigation.up:    buttonMetaData
+        }
+
+        Button {
+            id: buttonOpen
+            Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
+            text: qsTr("Open")
+            onClicked: fileBrowser.showAnimated();
+
+            KeyNavigation.right: buttonQuit
+            KeyNavigation.down:  buttonQuit
+            KeyNavigation.tab:   buttonQuit
+            KeyNavigation.left:  buttonLegend
+            KeyNavigation.up:    buttonLegend
+        }
+
+        Button {
+            id: buttonQuit
+            Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
+            text: qsTr("Quit")
+            onClicked: Qt.quit()
+
             KeyNavigation.right: sliderPosition
             KeyNavigation.down:  sliderPosition
             KeyNavigation.tab:   sliderPosition
-            KeyNavigation.left:  buttonMetaData
-            KeyNavigation.up:    buttonMetaData
+            KeyNavigation.left:  buttonOpen
+            KeyNavigation.up:    buttonOpen
         }
 
         // Set the play/pause button.
@@ -163,8 +189,10 @@ Item {
 
         // If esc if pressed, focus to the parent.
         Keys.onPressed: {
-            if (event.key === Qt.Key_Escape)
-                controlBar.parent.parent.focus = true;
+            if (event.key === Qt.Key_Escape) {
+                controlBar.parent.parent.parent.focus = true;
+                controlBarDismissed();
+            }
         }
     }
 
@@ -213,6 +241,8 @@ Item {
     // When focused pass the focus to the currently visible layout.
     onFocusChanged: {
         if (activeFocus) {
+            // Exiting from the main bar means dismiss the control bar.
+            controlBarEnabled();
             if (state == "MAIN")
                 barMain.focus = true;
             else if (state == "VOLUME")

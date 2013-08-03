@@ -23,6 +23,7 @@
 
 import QtQuick 2.0
 import QtMultimedia 5.0
+import "POC_StringUtils.js" as POC_StringUtils
 
 Rectangle {
     id:     mainView
@@ -54,10 +55,8 @@ Rectangle {
         }
     }
 
-    // The video output component.
-    POC_VideoOutput {
-        id:     videoOutput
-        source: mediaPlayer
+    POC_MediaOutput {
+        id:    mediaOutput
     }
 
     // The legend.
@@ -65,9 +64,8 @@ Rectangle {
         id:      legend
 
         // The element unfocuses.
-        onFocusChanged: {
-            if (!activeFocus)
-                parent.focus = true;
+        onFocusRelinquished: {
+            parent.focus = true;
         }
     }
 
@@ -77,10 +75,57 @@ Rectangle {
         source:  mediaPlayer
 
         // The element unfocuses.
-        onFocusChanged: {
-            if (!activeFocus)
-                parent.focus = true;
+        onFocusRelinquished: {
+            parent.focus = true;
         }
+    }
+
+    // File browser.
+    POC_FileBrowser {
+        id:         fileBrowser
+        currentDir: utils.getHomeDir()
+
+        // When the file is selected, set it as the source of the media
+        // player.
+        onFileSelected: {
+            var ext = POC_StringUtils.getFilePathExt(fileAbsPath);
+
+            switch (ext) {
+            case "jpg":
+            case "png":
+                mediaOutput.showImage("file://" + fileAbsPath);
+                break;
+            case "mp4":
+            case "mov":
+                mediaOutput.showVideo("file://" + fileAbsPath);
+                break;
+            default:
+                console.log("I can't handle that file at the moment.");
+                break;
+            }
+        }
+
+            //if (ext.toLowerCase() === "jpg") {
+            //    mediaOutput.showImage("file://" + fileAbsPath);
+            //    console.log("Showing image!");
+            //}
+        //}
+
+        // The element unfocuses.
+        onFocusRelinquished: {
+            parent.focus = true;
+        }
+    }
+
+    // The URL interface.
+    POC_UrlInterface {
+        id: urlInterface
+
+        onFocusRelinquished: {
+            parent.focus = true;
+        }
+
+        onUrlSelected: mediaPlayer.source = url
     }
 
     // These are shortcuts for common functionalities.
@@ -94,11 +139,17 @@ Rectangle {
         else if (event.key === Qt.Key_Minus)
             mediaPlayer.volumeDown();
         else if (event.key === Qt.Key_Down)
-            videoOutput.focus = true;
+            mediaOutput.focus = true;
         else if (event.key === Qt.Key_L)
             legend.toggleVisibility();
         else if (event.key === Qt.Key_T)
             metaData.showAnimated();
+        else if (event.key === Qt.Key_O)
+            fileBrowser.showAnimated();
+        else if (event.key === Qt.Key_U)
+            urlInterface.showAnimated();
+        else if (event.key === Qt.Key_Q)
+            Qt.quit();
         else
             return;
 

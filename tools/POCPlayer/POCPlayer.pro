@@ -22,14 +22,24 @@
 #
 
 QT          += quick multimedia
-SOURCES     += main.cpp
-RESOURCES   += resources_qml.qrc
+SOURCES     += main.cpp \
+    poc_qmlutils.cpp
+RESOURCES   += resources_qml.qrc \
+    resources_imgs.qrc
 OTHER_FILES += qml/main.qml \
     qml/POC_ControlBar.qml \
     qml/POC_StringUtils.js \
     qml/POC_TextPosition.qml \
     qml/POC_VideoOutput.qml \
     qml/POC_Legend.qml \
-    qml/POC_LegendItem.qml \
     qml/POC_AnimatedOverlay.qml \
-    qml/POC_MetaData.qml
+    qml/POC_MetaData.qml \
+    qml/POC_FileBrowser.qml \
+    qml/POC_FileBrowserItem.qml \
+    qml/POC_Constants.js \
+    qml/POC_UrlInterface.qml \
+    qml/POC_MediaOutput.qml \
+    qml/POC_ImageOutput.qml
+
+HEADERS += \
+    poc_qmlutils.h

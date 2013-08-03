@@ -33,8 +33,50 @@ VideoOutput {
 
     // The control bar.
     POC_ControlBar {
+        signal controlBarDismissed
+        signal controlBarEnabled
+
         id:             controlBar
+        x:              parent.width
         anchors.bottom: parent.bottom
+
+        PropertyAnimation {
+            id: animationShow
+            easing.type: Easing.OutElastic
+            duration: 1000
+            target: controlBar; property: "x"; to: 0
+        }
+
+        PropertyAnimation {
+            id: animationHide
+            easing.type: Easing.OutElastic
+            duration: 1000
+            target: controlBar; property: "x"; to: parent.width
+        }
+
+        onControlBarEnabled: {
+            showAnimated();
+        }
+
+        onControlBarDismissed: {
+            hideAnimated();
+        }
+
+        // Methods to show and hide.
+        function toggleAnimated() {
+            if (x === 0)
+                hideAnimated();
+            else
+                showAnimated();
+        }
+
+        function showAnimated() {
+            animationShow.running = true;
+        }
+
+        function hideAnimated() {
+            animationHide.running = true;
+        }
     }
 
     // Text containing the position/duration.
