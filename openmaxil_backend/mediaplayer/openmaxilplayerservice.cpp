@@ -64,10 +64,11 @@ QGstreamerPlayerService::QGstreamerPlayerService(QObject *parent):
     //m_videoRenderer = new QGstreamerVideoRenderer(this);
     m_videoRenderer = new OpenMAXILVideoRendererControl(this);
 
+    // Connect directly to avoid deadlock.
     connect(m_control, SIGNAL(textureInvalidated()),
-            m_videoRenderer, SLOT(onTextureInvalidated()));
+            m_videoRenderer, SLOT(onTextureInvalidated()), Qt::DirectConnection);
     connect(m_control, SIGNAL(textureReady(const OMX_TextureData*)),
-            m_videoRenderer, SLOT(onTextureReady(const OMX_TextureData*)));
+            m_videoRenderer, SLOT(onTextureReady(const OMX_TextureData*)), Qt::DirectConnection);
 #endif
 
 #if defined(HAVE_XVIDEO) && defined(HAVE_WIDGETS)
