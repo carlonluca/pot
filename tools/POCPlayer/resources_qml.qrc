@@ -6,8 +6,13 @@
         <file>qml/POC_TextPosition.qml</file>
         <file>qml/POC_VideoOutput.qml</file>
         <file>qml/POC_Legend.qml</file>
-        <file>qml/POC_LegendItem.qml</file>
         <file>qml/POC_AnimatedOverlay.qml</file>
         <file>qml/POC_MetaData.qml</file>
+        <file>qml/POC_FileBrowser.qml</file>
+        <file>qml/POC_FileBrowserItem.qml</file>
+        <file>qml/POC_Constants.js</file>
+        <file>qml/POC_UrlInterface.qml</file>
+        <file>qml/POC_MediaOutput.qml</file>
+        <file>qml/POC_ImageOutput.qml</file>
     </qresource>
 </RCC>

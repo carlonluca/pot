@@ -27,7 +27,10 @@
 #include <QGuiApplication>
 #include <QQuickView>
 #include <QQuickItem>
+#include <QQmlEngine>
+#include <QQmlContext>
 
+#include "poc_qmlutils.h"
 
 /*----------------------------------------------------------------------
 |    main
@@ -40,10 +43,20 @@ int main(int argc, char* argv[])
     //viewer.setMainQmlFile(QStringLiteral("qml/POCPlayer/main.qml"));
     //viewer.showExpanded();
 
+    // Utility.
+    POC_QMLUtils qmlUtils;
+
     QQuickView view;
+    view.engine()->rootContext()->setContextProperty("utils", &qmlUtils);
     view.setSource(QUrl("qrc:///qml/main.qml"));
     view.setResizeMode(QQuickView::SizeRootObjectToView);
+#ifdef RASPBERRY
     view.showFullScreen();
+#else
+    view.resize(800, 400);
+    view.show();
+#endif // RASPBERRY
+    qApp->connect(view.engine(), SIGNAL(quit()), qApp, SLOT(quit()));
 
     // If file path is provided from the command line, I start the player
     // immediately.
