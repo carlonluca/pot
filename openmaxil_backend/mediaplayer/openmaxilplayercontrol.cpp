@@ -322,10 +322,16 @@ void OpenMAXILPlayerControl::freeTexture(OMX_TextureData* textureData)
 {
    LOG_DEBUG("%s", Q_FUNC_INFO);
 
+#if 0
    PlayerCommandFreeTextureData* command = new PlayerCommandFreeTextureData;
    command->m_playerCommandType = PLAYER_COMMAND_TYPE_FREE_TEXTURE_DATA;
    command->m_textureData       = textureData;
    appendCommand(command);
+#endif
+
+   // Guaranteed to be invoked in the renderer thread. No need to queue a message.
+   OMX_TextureProviderQQuickItem provider(NULL);
+   provider.freeTexture(m_textureData);
 }
 
 /*------------------------------------------------------------------------------
