@@ -9,5 +9,6 @@
         <file>img/image-x-generic.png</file>
         <file>img/unknown.png</file>
         <file>img/video-x-generic.png</file>
+        <file>img/audio-x-generic.png</file>
     </qresource>
 </RCC>

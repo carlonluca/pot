@@ -14,5 +14,6 @@
         <file>qml/POC_UrlInterface.qml</file>
         <file>qml/POC_MediaOutput.qml</file>
         <file>qml/POC_ImageOutput.qml</file>
+        <file>qml/POC_ArrayUtils.js</file>
     </qresource>
 </RCC>

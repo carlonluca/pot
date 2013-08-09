@@ -79,6 +79,20 @@ VideoOutput {
         }
     }
 
+    /**
+      Should "go on" inside the media or to the next media.
+      */
+    function goOnMedia() {
+        // Unimplemented.
+    }
+
+    /**
+      Should "go back" inside the media or to the prev media.
+      */
+    function goBackMedia() {
+        // Unimplemented.
+    }
+
     // Text containing the position/duration.
     POC_TextPosition {
         anchors.top:   parent.top

@@ -30,6 +30,7 @@
 #include <QQmlEngine>
 #include <QQmlContext>
 
+#include "poc_utils.h"
 #include "poc_qmlutils.h"
 
 /*----------------------------------------------------------------------
@@ -38,10 +39,6 @@
 int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
-
-    //QtQuick2ApplicationViewer viewer;
-    //viewer.setMainQmlFile(QStringLiteral("qml/POCPlayer/main.qml"));
-    //viewer.showExpanded();
 
     // Utility.
     POC_QMLUtils qmlUtils;

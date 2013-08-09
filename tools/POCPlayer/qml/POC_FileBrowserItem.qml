@@ -46,7 +46,24 @@ Rectangle {
             width:    gridBrowser.cellWidth
             height:   gridBrowser.cellHeight - fileText.height - 10
             fillMode: Image.PreserveAspectFit
-            source:   fileIsDir ? POC_Constants.PATH_ICON_DIR : POC_Constants.PATH_ICON_UNKNOWN
+
+            // Do not use the source property directly. Use this handler instead so that
+            // it is possible to decide the proper icon to use.
+            Component.onCompleted: {
+                if (fileIsDir) {
+                    source = POC_Constants.PATH_ICON_DIR;
+                    return;
+                }
+
+                if (utils.isSupportedAudio(filePath))
+                    source = POC_Constants.PATH_ICON_AUDIO;
+                else if (utils.isSupportedVideo(filePath))
+                    source = POC_Constants.PATH_ICON_VIDEO;
+                else if (utils.isSupportedImage(filePath))
+                    source = POC_Constants.PATH_ICON_IMAGE;
+                else
+                    source = POC_Constants.PATH_ICON_UNKNOWN;
+            }
         }
 
         Text {
