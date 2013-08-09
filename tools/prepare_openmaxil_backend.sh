@@ -48,7 +48,7 @@ if [ ! -d build-PiOmxTextures ]; then
    mkdir build-PiOmxTextures
 fi
 cd build-PiOmxTextures
-$qmake_bin "DEFINES+=CONFIG_LIB" ../../..
+$qmake_bin "DEFINES+=CONFIG_LIB" "DEFINES+=CONFIG_INCLUDE_FFMPEG" ../../..
 make -j$1
 make install
 
