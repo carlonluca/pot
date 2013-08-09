@@ -55,6 +55,7 @@ Rectangle {
         }
     }
 
+    // Generic media output for images, videos and audio.
     POC_MediaOutput {
         id:    mediaOutput
     }
@@ -88,28 +89,14 @@ Rectangle {
         // When the file is selected, set it as the source of the media
         // player.
         onFileSelected: {
-            var ext = POC_StringUtils.getFilePathExt(fileAbsPath);
-
-            switch (ext) {
-            case "jpg":
-            case "png":
+            if (utils.isSupportedImage(fileAbsPath))
                 mediaOutput.showImage("file://" + fileAbsPath);
-                break;
-            case "mp4":
-            case "mov":
+            else if (utils.isSupportedVideo(fileAbsPath))
                 mediaOutput.showVideo("file://" + fileAbsPath);
-                break;
-            default:
+            else
+                // TODO: Implement a dialog for this.
                 console.log("I can't handle that file at the moment.");
-                break;
-            }
         }
-
-            //if (ext.toLowerCase() === "jpg") {
-            //    mediaOutput.showImage("file://" + fileAbsPath);
-            //    console.log("Showing image!");
-            //}
-        //}
 
         // The element unfocuses.
         onFocusRelinquished: {
@@ -140,6 +127,10 @@ Rectangle {
             mediaPlayer.volumeDown();
         else if (event.key === Qt.Key_Down)
             mediaOutput.focus = true;
+        else if (event.key === Qt.Key_Right)
+            mediaOutput.goOnMedia();
+        else if (event.key === Qt.Key_Left)
+            mediaOutput.goBackMedia();
         else if (event.key === Qt.Key_L)
             legend.toggleVisibility();
         else if (event.key === Qt.Key_T)

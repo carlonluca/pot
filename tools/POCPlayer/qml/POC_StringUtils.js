@@ -42,13 +42,3 @@ function secondsToHHMMSS(s) {
     var time = hours + ':' + minutes + ':' + seconds;
     return time;
 }
-
-/**
-  * Returns the extension given the file path. The extension does not include
-  * the dot.
-  * @param fp The file path. It can be just the file name, the relative path or
-  * an absolute path.
-  */
-function getFilePathExt(fp) {
-    return fp.split('.').pop();
-}

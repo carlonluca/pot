@@ -54,7 +54,7 @@ Item {
             maximumValue:             1.0
             minimumValue:             0.0
             stepSize:                 0.01
-            value:                    (controlBar.parent.source).position/(controlBar.parent.source).duration;
+            value: (controlBar.parent.source).position/(controlBar.parent.source).duration;
             updateValueWhileDragging: false
 
             // NOTE: Remember to avoid seeking on value changed. That will result in

@@ -23,6 +23,7 @@ FocusScope {
         state = "VIDEO";
         mediaPlayer.source = videoUri;
         mediaPlayer.play();
+        videoOutput.focus  = true;
     }
 
     /**
@@ -32,12 +33,35 @@ FocusScope {
         state = "IMAGE";
         mediaPlayer.stop();
         imageOutput.source = imageUri;
+        imageOutput.focus  = true;
+    }
+
+    /**
+      Method used to "go on" to next media or inside the media.
+      */
+    function goOnMedia() {
+        if (state === "VIDEO")
+            videoOutput.goOnMedia();
+        else if (state === "IMAGE")
+            imageOutput.goOnMedia();
+    }
+
+    /**
+      Method to "go back" to prev media or inside the media.
+      */
+    function goBackMedia() {
+        if (state === "VIDEO")
+            videoOutput.goBackMedia();
+        else if (state === "IMAGE")
+            imageOutput.goBackMedia();
     }
 
     onFocusChanged: {
-        console.log("Focus: " + activeFocus);
-        if (activeFocus)
+        console.log("MediaOutput focus: " + activeFocus);
+        if (activeFocus && state === "VIDEO")
             videoOutput.focus = true;
+        else if (activeFocus && state === "IMAGE")
+            imageOutput.focus = true;
     }
 
     states: [

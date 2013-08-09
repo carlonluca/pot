@@ -1,7 +1,7 @@
 /*
 * Project: PiOmxTextures
 * Author:  Luca Carlon
-* Date:    07.28.2013
+* Date:    08.09.2013
 *
 * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
 *
@@ -21,37 +21,36 @@
 * along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef POC_QMLUTILS_H
-#define POC_QMLUTILS_H
+#ifndef POC_UTILS_H
+#define POC_UTILS_H
 
 /*----------------------------------------------------------------------
 |    includes
 +---------------------------------------------------------------------*/
-#include <QObject>
-#include <QStringList>
+#include <QHash>
+#include <QString>
 
 /*----------------------------------------------------------------------
-|    POC_QMLUtils class
+|    POC_Utils class
 +---------------------------------------------------------------------*/
-class POC_QMLUtils : public QObject
+class POC_Utils
 {
-   Q_OBJECT
 public:
-   explicit POC_QMLUtils(QObject* parent = 0);
+   static const QStringList& getSupportedImageFormats();
+   static const QStringList& getSupportedImageExtensions();
 
-   Q_INVOKABLE QString getHomeDir();
-   Q_INVOKABLE QString getPathFromUri(QString uri);
-   Q_INVOKABLE QString getFileExtension(QString file);
+   static const QStringList& getSupportedVideoExtensions();
 
-   // File methods.
-   Q_INVOKABLE bool isSupportedImage(QString file);
-   Q_INVOKABLE bool isSupportedVideo(QString file);
-   Q_INVOKABLE bool isSupportedAudio(QString file);
+   static bool isSupportedVideo(QString file);
+   static bool isSupportedImage(QString file);
+   static bool isSupportedAudio(QString file);
 
-   // Gallery methods.
-   Q_INVOKABLE QString getNextImage(QString imageAbsPath);
-   Q_INVOKABLE QString getPrevImage(QString imageAbsPath);
-   Q_INVOKABLE QStringList getSupportedImageExtensions();
+   static void listSupportedImageFormats();
+   static void listSupportedImageExtensions();
+
+   static const QHash<QString, QString>& getMimeToExtMap();
+
+   static QString getFileExtension(const QString& file);
 };
 
-#endif // POC_QMLUTILS_H
+#endif // POC_UTILS_H

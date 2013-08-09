@@ -23,8 +23,10 @@
 
 QT          += quick multimedia
 SOURCES     += main.cpp \
-    poc_qmlutils.cpp
-HEADERS     += poc_qmlutils.h
+    poc_qmlutils.cpp \
+    poc_utils.cpp
+HEADERS     += poc_qmlutils.h \
+    poc_utils.h
 RESOURCES   += resources_qml.qrc \
     resources_imgs.qrc
 OTHER_FILES += qml/main.qml \
@@ -40,4 +42,5 @@ OTHER_FILES += qml/main.qml \
     qml/POC_Constants.js \
     qml/POC_UrlInterface.qml \
     qml/POC_MediaOutput.qml \
-    qml/POC_ImageOutput.qml
+    qml/POC_ImageOutput.qml \
+    qml/POC_ArrayUtils.js
