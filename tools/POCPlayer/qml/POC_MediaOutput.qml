@@ -17,6 +17,22 @@ FocusScope {
     }
 
     /**
+      * Determines the type of media and plays it.
+      */
+    function showLocalMedia(mediaPath) {
+        var mediaUri = "file://" + mediaPath;
+        if (utils.isSupportedAudio(mediaPath));
+            // TODO: Implement!
+        else if (utils.isSupportedImage(mediaPath))
+            showImage(mediaUri);
+        else if (utils.isSupportedVideo(mediaPath))
+            showVideo(mediaUri);
+        else
+            // TODO: Implement dialog here.
+            console.log("Can't handle this media, sorry.");
+    }
+
+    /**
       * Shows a video on the media output.
       */
     function showVideo(videoUri) {
