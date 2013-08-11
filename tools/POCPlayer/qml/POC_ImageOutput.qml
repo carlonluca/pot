@@ -48,8 +48,8 @@ Item {
         // Handle the messages.
         onNextImage:     goOnMedia()
         onPrevImage:     goBackMedia()
-        onRotateClock:   imageComponent.rotateClock();
-        onRotateCounter: imageComponent.rotateCounter();
+        onRotateClock:   currentSurface.rotateClock();
+        onRotateCounter: currentSurface.rotateCounter();
     }
 
     /**
