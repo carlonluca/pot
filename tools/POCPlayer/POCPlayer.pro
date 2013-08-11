@@ -43,4 +43,7 @@ OTHER_FILES += qml/main.qml \
     qml/POC_UrlInterface.qml \
     qml/POC_MediaOutput.qml \
     qml/POC_ImageOutput.qml \
-    qml/POC_ArrayUtils.js
+    qml/POC_ArrayUtils.js \
+    qml/POC_ControlBarVideo.qml \
+    qml/POC_ControlBarImage.qml \
+    qml/POC_ImageOutputSurface.qml

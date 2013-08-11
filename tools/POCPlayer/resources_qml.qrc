@@ -15,5 +15,8 @@
         <file>qml/POC_MediaOutput.qml</file>
         <file>qml/POC_ImageOutput.qml</file>
         <file>qml/POC_ArrayUtils.js</file>
+        <file>qml/POC_ControlBarVideo.qml</file>
+        <file>qml/POC_ControlBarImage.qml</file>
+        <file>qml/POC_ImageOutputSurface.qml</file>
     </qresource>
 </RCC>

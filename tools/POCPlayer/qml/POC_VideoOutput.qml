@@ -32,62 +32,19 @@ VideoOutput {
     fillMode: VideoOutput.Stretch
 
     // The control bar.
-    POC_ControlBar {
-        signal controlBarDismissed
-        signal controlBarEnabled
-
-        id:             controlBar
-        x:              parent.width
-        anchors.bottom: parent.bottom
-
-        PropertyAnimation {
-            id: animationShow
-            easing.type: Easing.OutElastic
-            duration: 1000
-            target: controlBar; property: "x"; to: 0
-        }
-
-        PropertyAnimation {
-            id: animationHide
-            easing.type: Easing.OutElastic
-            duration: 1000
-            target: controlBar; property: "x"; to: parent.width
-        }
-
-        onControlBarEnabled: {
-            showAnimated();
-        }
-
-        onControlBarDismissed: {
-            hideAnimated();
-        }
-
-        // Methods to show and hide.
-        function toggleAnimated() {
-            if (x === 0)
-                hideAnimated();
-            else
-                showAnimated();
-        }
-
-        function showAnimated() {
-            animationShow.running = true;
-        }
-
-        function hideAnimated() {
-            animationHide.running = true;
-        }
+    POC_ControlBarVideo {
+        id: controlBar
     }
 
     /**
-      Should "go on" inside the media or to the next media.
+      * Should "go on" inside the media or to the next media.
       */
     function goOnMedia() {
         // Unimplemented.
     }
 
     /**
-      Should "go back" inside the media or to the prev media.
+      * Should "go back" inside the media or to the prev media.
       */
     function goBackMedia() {
         // Unimplemented.
@@ -101,7 +58,9 @@ VideoOutput {
 
     // Automatically pass the focus to the control bar.
     onFocusChanged: {
-        if (activeFocus)
+        if (focus) {
+            console.log("Giving focus to the video control bar...");
             controlBar.focus = true;
+        }
     }
 }
