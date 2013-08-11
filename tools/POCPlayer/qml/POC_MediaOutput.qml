@@ -17,27 +17,25 @@ FocusScope {
     }
 
     /**
-      Shows a video on the media output.
+      * Shows a video on the media output.
       */
     function showVideo(videoUri) {
         state = "VIDEO";
         mediaPlayer.source = videoUri;
         mediaPlayer.play();
-        videoOutput.focus  = true;
     }
 
     /**
-      Shows an image on the media output.
+      * Shows an image on the media output.
       */
     function showImage(imageUri) {
-        state = "IMAGE";
         mediaPlayer.stop();
-        imageOutput.source = imageUri;
-        imageOutput.focus  = true;
+        state = "IMAGE";
+        imageOutput.showImage(imageUri);
     }
 
     /**
-      Method used to "go on" to next media or inside the media.
+      * Method used to "go on" to next media or inside the media.
       */
     function goOnMedia() {
         if (state === "VIDEO")
@@ -47,7 +45,7 @@ FocusScope {
     }
 
     /**
-      Method to "go back" to prev media or inside the media.
+      * Method to "go back" to prev media or inside the media.
       */
     function goBackMedia() {
         if (state === "VIDEO")
@@ -57,11 +55,16 @@ FocusScope {
     }
 
     onFocusChanged: {
-        console.log("MediaOutput focus: " + activeFocus);
-        if (activeFocus && state === "VIDEO")
+        if (activeFocus && state === "VIDEO") {
+            console.log("Giving focus to the video output.");
             videoOutput.focus = true;
-        else if (activeFocus && state === "IMAGE")
+        }
+        else if (activeFocus && state === "IMAGE") {
+            console.log("Giving focus to the image output.");
             imageOutput.focus = true;
+        }
+        else
+            console.log("What kinda status is this?!");
     }
 
     states: [
@@ -85,6 +88,46 @@ FocusScope {
             PropertyChanges {
                 target:  imageOutput
                 opacity: 1.0
+            }
+        }
+    ]
+
+    transitions: [
+        Transition {
+            from: "VIDEO"
+            to:   "IMAGE"
+
+            NumberAnimation {
+                target:      videoOutput
+                property:    "opacity"
+                duration:    1000
+                easing.type: Easing.InOutQuad
+            }
+
+            NumberAnimation {
+                target:      imageOutput
+                property:    "opacity"
+                duration:    1000
+                easing.type: Easing.InOutQuad
+            }
+        },
+
+        Transition {
+            from: "IMAGE"
+            to:   "VIDEO"
+
+            NumberAnimation {
+                target:      videoOutput
+                property:    "opacity"
+                duration:    1000
+                easing.type: Easing.InOutQuad
+            }
+
+            NumberAnimation {
+                target:      imageOutput
+                property:    "opacity"
+                duration:    1000
+                easing.type: Easing.InOutQuad
             }
         }
     ]

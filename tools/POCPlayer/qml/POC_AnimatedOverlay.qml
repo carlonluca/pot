@@ -53,7 +53,7 @@ Rectangle {
     // Always animate opacity.
     Behavior on opacity {
         NumberAnimation {
-            duration: 1000
+            duration: 600
             easing.type: Easing.OutQuad
         }
     }

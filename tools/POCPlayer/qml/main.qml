@@ -117,6 +117,7 @@ Rectangle {
 
     // These are shortcuts for common functionalities.
     Keys.onPressed: {
+        console.log("Main interface is processing the key...");
         if (event.key === Qt.Key_S)
             mediaPlayer.stop();
         else if (event.key === Qt.Key_P)
