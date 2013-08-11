@@ -57,12 +57,13 @@ Rectangle {
 
     // Generic media output for images, videos and audio.
     POC_MediaOutput {
-        id:    mediaOutput
+        objectName: "mediaOutput"
+        id: mediaOutput
     }
 
     // The legend.
     POC_Legend {
-        id:      legend
+        id: legend
 
         // The element unfocuses.
         onFocusRelinquished: {
@@ -88,29 +89,17 @@ Rectangle {
 
         // When the file is selected, set it as the source of the media
         // player.
-        onFileSelected: {
-            if (utils.isSupportedImage(fileAbsPath))
-                mediaOutput.showImage("file://" + fileAbsPath);
-            else if (utils.isSupportedVideo(fileAbsPath))
-                mediaOutput.showVideo("file://" + fileAbsPath);
-            else
-                // TODO: Implement a dialog for this.
-                console.log("I can't handle that file at the moment.");
-        }
+        onFileSelected: mediaOutput.showLocalMedia(fileAbsPath)
 
         // The element unfocuses.
-        onFocusRelinquished: {
-            parent.focus = true;
-        }
+        onFocusRelinquished: parent.focus = true
     }
 
     // The URL interface.
     POC_UrlInterface {
         id: urlInterface
 
-        onFocusRelinquished: {
-            parent.focus = true;
-        }
+        onFocusRelinquished: parent.focus = true
 
         onUrlSelected: mediaPlayer.source = url
     }

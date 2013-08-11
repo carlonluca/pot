@@ -64,9 +64,9 @@ int main(int argc, char* argv[])
           qWarning("File provided does not exist.");
        else {
           QObject* rootObject  = dynamic_cast<QObject*>(view.rootObject());
-          QObject* mediaPlayer = rootObject->findChild<QObject*>("mediaPlayer");
-          mediaPlayer->setProperty("source", QUrl::fromLocalFile(args.at(1)));
-          QMetaObject::invokeMethod(mediaPlayer, "play");
+          QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
+          //mediaPlayer->setProperty("source", QUrl::fromLocalFile(args.at(1)));
+          QMetaObject::invokeMethod(mediaOutput, "showLocalMedia", Q_ARG(QVariant, args.at(1)));
        }
     }
 
