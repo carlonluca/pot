@@ -47,8 +47,8 @@ POC_ControlBar {
             KeyNavigation.right: buttonNextImage
             KeyNavigation.down:  buttonNextImage
             KeyNavigation.tab:   buttonNextImage
-            KeyNavigation.left:  buttonNextImage
-            KeyNavigation.up:    buttonNextImage
+            KeyNavigation.left:  buttonRotateClock
+            KeyNavigation.up:    buttonRotateClock
         }
 
         Button {
@@ -57,9 +57,9 @@ POC_ControlBar {
             text: "Next Image"
             onClicked: nextImage()
 
-            KeyNavigation.right: buttonPrevImage
-            KeyNavigation.down:  buttonPrevImage
-            KeyNavigation.tab:   buttonPrevImage
+            KeyNavigation.right: buttonRotateCounter
+            KeyNavigation.down:  buttonRotateCounter
+            KeyNavigation.tab:   buttonRotateCounter
             KeyNavigation.left:  buttonPrevImage
             KeyNavigation.up:    buttonPrevImage
         }
@@ -70,11 +70,11 @@ POC_ControlBar {
             text: "Rotate Counter"
             onClicked: rotateCounter()
 
-            KeyNavigation.right: buttonPrevImage
-            KeyNavigation.down:  buttonPrevImage
-            KeyNavigation.tab:   buttonPrevImage
-            KeyNavigation.left:  buttonPrevImage
-            KeyNavigation.up:    buttonPrevImage
+            KeyNavigation.right: buttonRotateClock
+            KeyNavigation.down:  buttonRotateClock
+            KeyNavigation.tab:   buttonRotateClock
+            KeyNavigation.left:  buttonNextImage
+            KeyNavigation.up:    buttonNextImage
         }
 
         Button {
@@ -86,8 +86,8 @@ POC_ControlBar {
             KeyNavigation.right: buttonPrevImage
             KeyNavigation.down:  buttonPrevImage
             KeyNavigation.tab:   buttonPrevImage
-            KeyNavigation.left:  buttonPrevImage
-            KeyNavigation.up:    buttonPrevImage
+            KeyNavigation.left:  buttonRotateCounter
+            KeyNavigation.up:    buttonRotateCounter
         }
 
         // Focus to prev image.

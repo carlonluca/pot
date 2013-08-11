@@ -27,6 +27,13 @@ import "POC_Constants.js" as POC_Constants
 Image {
     property var orientation: POC_Constants.Orientation.HORIZONTAL
 
+    // The usage of this value instead of simply the rotation property is due to the
+    // fact that rotation assumes all the intermediate values. If a new rotation is
+    // requested before the current is completed, I would not know the new value to
+    // give to the rotation. I also cannot use the orientation property because I need
+    // to provide a complete angle, not simply the value in [0, 360].
+    property int currentRotationValue: 0
+
     id: imageComponent
     anchors.centerIn: parent
 
@@ -34,6 +41,8 @@ Image {
     height: parent.height
 
     fillMode: Image.PreserveAspectFit
+
+    onCurrentRotationValueChanged: rotation = currentRotationValue
 
     Behavior on rotation {
         NumberAnimation {
@@ -68,6 +77,8 @@ Image {
       * Rotates the image clockwise.
       */
     function rotateClock() {
+        currentRotationValue += 90;
+
         switch (orientation) {
         case POC_Constants.Orientation.HORIZONTAL_UPDOWN:
             orientation = POC_Constants.Orientation.VERTICAL_UPDOWN;
@@ -86,13 +97,14 @@ Image {
         }
 
         fitIntoParent();
-        rotation += 90;
     }
 
     /**
       * Rotates the image counter-clockwise.
       */
     function rotateCounter() {
+        currentRotationValue -= 90;
+
         switch (orientation) {
         case POC_Constants.Orientation.HORIZONTAL_UPDOWN:
             orientation = POC_Constants.Orientation.VERTICAL;
@@ -111,7 +123,6 @@ Image {
         }
 
         fitIntoParent();
-        rotation -= 90;
     }
 
     /**

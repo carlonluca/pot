@@ -34,10 +34,10 @@ var PATH_ICON_AUDIO   = "qrc:///img/audio-x-generic.png"
   * Represents the possible orientations.
   */
 var Orientation = {
-    HORIZONTAL:        0,
-    VERTICAL:          1,
-    HORIZONTAL_UPDOWN: 2,
-    VERTICAL_UPDOWN:   3
+    HORIZONTAL:        {value: 0, rotation: 0},
+    VERTICAL:          {value: 1, rotation: 90.0},
+    HORIZONTAL_UPDOWN: {value: 2, rotation: 180.0},
+    VERTICAL_UPDOWN:   {value: 3, rotation: 270.0}
 };
 if (Object.freeze)
     Object.freeze(Orientation);
