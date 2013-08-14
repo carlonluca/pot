@@ -100,6 +100,17 @@ index aed5183..73b45f6 100644
      virtual QMediaPlayer::State state() const = 0;
  
      virtual QMediaPlayer::MediaStatus mediaStatus() const = 0;
+diff --git a/src/multimedia/multimedia.pro b/src/multimedia/multimedia.pro
+index 96b9e79..454219a 100644
+--- a/src/multimedia/multimedia.pro
++++ b/src/multimedia/multimedia.pro
+@@ -1,5 +1,5 @@
+ TARGET = QtMultimedia
+-QT = core-private network gui
++QT = core-private network gui quick
+ 
+ QMAKE_DOCS = $$PWD/doc/qtmultimedia.qdocconf
+ 
 diff --git a/src/multimedia/playback/qmediaplayer.cpp b/src/multimedia/playback/qmediaplayer.cpp
 index eaac828..4392cb1 100644
 --- a/src/multimedia/playback/qmediaplayer.cpp
@@ -169,7 +180,7 @@ index 3195ae0..de3b8f1 100644
  
  QT_END_NAMESPACE
 diff --git a/src/plugins/plugins.pro b/src/plugins/plugins.pro
-index 8f751ae..737e7ae 100644
+index 8234e7e..bf6a46e 100644
 --- a/src/plugins/plugins.pro
 +++ b/src/plugins/plugins.pro
 @@ -30,7 +30,11 @@ win32 {

@@ -673,13 +673,27 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, OMX_TextureData*& t
                 Q_RETURN_ARG(OMX_TextureData*, textureData),
                 Q_ARG(QSize, QSize(hints.width, hints.height)));
 #else
-    textureData = m_provider->instantiateTexture(QSize(hints.width, hints.height));
+    // lcarlon: there are cases in which I don't want to generate a new texture, but I want to
+    // re-use an existing one. For instance seek and restart may want to simply close and reopen
+    // the video player without generating a new texture.
+    QSize videoSize(hints.width, hints.height);
+    if (!textureData) {
+       textureData = m_provider->instantiateTexture(QSize(hints.width, hints.height));
+       LOG_VERBOSE(LOG_TAG, "Texture generated!");
+    }
+    else {
+       // It means the user wants to re-use the texture. Just double-check the size is correct.
+       if (videoSize != textureData->m_textureSize) {
+          LOG_ERROR(LOG_TAG, "Trying to re-use a texture with a wrong size!");
+          return false;
+       }
+       LOG_VERBOSE(LOG_TAG, "Well done, reusing existing texture.");
+    }
 #endif
     if (!textureData) {
        LOG_WARNING(LOG_TAG, "No texture was instantiated. Can't go on.");
        return false;
     }
-    LOG_VERBOSE(LOG_TAG, "Generated!");
 
     omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &m_eglBuffer, 221, NULL, textureData->m_eglImage);
     if (omx_err != OMX_ErrorNone) {

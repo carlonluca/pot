@@ -1,19 +1,55 @@
+/*
+* Project: PiOmxTextures
+* Author:  Luca Carlon
+* Date:    08.10.2013
+*
+* Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
+*
+* This file is part of PiOmxTextures.
+*
+* PiOmxTextures is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* PiOmxTextures is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
+*/
+
 import QtQuick 2.0
 
-FocusScope {
+Item {
+    signal controlBarDismissed()
+
+    property var currentOutput: videoOutput
+
     width:  parent.width
     height: parent.height
     state:  "VIDEO"
+
+    MouseArea {
+        anchors.fill: parent
+        onPressed: parent.focus = true
+    }
 
     // The video output component.
     POC_VideoOutput {
         id:     videoOutput
         source: mediaPlayer
+
+        onControlBarDismissed: parent.controlBarDismissed()
     }
 
     // The image output.
     POC_ImageOutput {
         id: imageOutput
+
+        onControlBarDismissed: parent.controlBarDismissed()
     }
 
     /**
@@ -30,6 +66,14 @@ FocusScope {
         else
             // TODO: Implement dialog here.
             console.log("Can't handle this media, sorry.");
+    }
+
+    /**
+      * Shows and give focus to the control bar of the currently visible output
+      * component.
+      */
+    function showControlBar() {
+        currentOutput.showControlBar();
     }
 
     /**
@@ -54,33 +98,35 @@ FocusScope {
       * Method used to "go on" to next media or inside the media.
       */
     function goOnMedia() {
-        if (state === "VIDEO")
-            videoOutput.goOnMedia();
-        else if (state === "IMAGE")
-            imageOutput.goOnMedia();
+        currentOutput.goOnMedia();
     }
 
     /**
       * Method to "go back" to prev media or inside the media.
       */
     function goBackMedia() {
-        if (state === "VIDEO")
-            videoOutput.goBackMedia();
-        else if (state === "IMAGE")
-            imageOutput.goBackMedia();
+        currentOutput.goBackMedia();
     }
 
-    onFocusChanged: {
-        if (activeFocus && state === "VIDEO") {
-            console.log("Giving focus to the video output.");
-            videoOutput.focus = true;
+    onStateChanged: {
+        // Disable previous output surface.
+        currentOutput.enabled = false;
+
+        // Switch.
+        switch (state) {
+        case "VIDEO":
+            currentOutput = videoOutput;
+            break;
+        case "IMAGE":
+            currentOutput = imageOutput;
+            break;
+        default:
+            console.log("Unknown media output status!");
+            break;
         }
-        else if (activeFocus && state === "IMAGE") {
-            console.log("Giving focus to the image output.");
-            imageOutput.focus = true;
-        }
-        else
-            console.log("What kinda status is this?!");
+
+        // Enable the new one.
+        currentOutput.enabled = true;
     }
 
     states: [

@@ -53,12 +53,19 @@ Rectangle {
         function volumeDown() {
             volume = (volume - 0.1 < 0) ? 0 : volume - 0.1;
         }
+
+        // Only used for debugging purposes.
+        onStopped: {
+            console.log("Stopped signal received!");
+        }
     }
 
     // Generic media output for images, videos and audio.
     POC_MediaOutput {
         objectName: "mediaOutput"
         id: mediaOutput
+
+        onControlBarDismissed: parent.focus = true
     }
 
     // The legend.
@@ -66,9 +73,7 @@ Rectangle {
         id: legend
 
         // The element unfocuses.
-        onFocusRelinquished: {
-            parent.focus = true;
-        }
+        onFocusRelinquished: parent.focus = true
     }
 
     // The metadata.
@@ -77,9 +82,7 @@ Rectangle {
         source:  mediaPlayer
 
         // The element unfocuses.
-        onFocusRelinquished: {
-            parent.focus = true;
-        }
+        onFocusRelinquished: parent.focus = true
     }
 
     // File browser.
@@ -116,7 +119,7 @@ Rectangle {
         else if (event.key === Qt.Key_Minus)
             mediaPlayer.volumeDown();
         else if (event.key === Qt.Key_Down)
-            mediaOutput.focus = true;
+            mediaOutput.showControlBar();
         else if (event.key === Qt.Key_Right)
             mediaOutput.goOnMedia();
         else if (event.key === Qt.Key_Left)

@@ -26,14 +26,36 @@ import QtMultimedia 5.0
 
 // The unique video surface.
 VideoOutput {
+    signal controlBarDismissed()
+
     height: parent.height
     width:  parent.width
 
     fillMode: VideoOutput.Stretch
 
+    // Used to show the control bar.
+    MouseArea {
+        anchors.fill: parent
+        onClicked:
+            controlBar.toggleAnimated();
+
+        z: 0
+    }
+
     // The control bar.
     POC_ControlBarVideo {
         id: controlBar
+
+        z: 1
+
+        onControlBarDismissed: parent.controlBarDismissed()
+    }
+
+    /**
+      * Shows and give focus to the control bar.
+      */
+    function showControlBar() {
+        controlBar.showAnimated();
     }
 
     /**

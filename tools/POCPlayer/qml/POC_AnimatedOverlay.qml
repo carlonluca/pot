@@ -37,6 +37,7 @@ Rectangle {
     width:   parent.width*5/6
     height:  parent.height*4/6
     opacity: 0.0
+    enabled: false
 
     // Catch any mouse input.
     MouseArea {
@@ -45,7 +46,6 @@ Rectangle {
         y: 0
         width: mainView.width
         height: mainView.height
-        enabled: false
 
         onPressed: hideAnimated();
     }
@@ -74,14 +74,14 @@ Rectangle {
 
     function showAnimated() {
         opacity = 0.5;
+        enabled = true;
         focus = true;
-        mouseCatcher.enabled = true;
     }
 
     function hideAnimated() {
         opacity = 0.0;
         focus = false;
-        mouseCatcher.enabled = false;
+        enabled = false;
         focusRelinquished();
     }
 }

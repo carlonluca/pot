@@ -24,21 +24,38 @@
 import QtQuick 2.0
 
 Item {
+    signal controlBarDismissed()
+
     property var currentSurface: outputSurface_1
+    property bool isControlBarVisible: false
 
     width:  parent.width
     height: parent.height
+
+    // Used to show the control bar.
+    MouseArea {
+        anchors.fill: parent
+        onClicked: {
+            controlBar.toggleAnimated();
+        }
+
+        z: 1
+    }
 
     // This component cannot be the parent of all the others because
     // rotation would result in a rotation of all the contained components.
     POC_ImageOutputSurface {
         id: outputSurface_1
         opacity: 1.0
+
+        z: 0
     }
 
     POC_ImageOutputSurface {
         id: outputSurface_2
         opacity: 0.0
+
+        z: 0
     }
 
     // The control bar.
@@ -50,6 +67,10 @@ Item {
         onPrevImage:     goBackMedia()
         onRotateClock:   currentSurface.rotateClock();
         onRotateCounter: currentSurface.rotateCounter();
+
+        z: 2
+
+        onControlBarDismissed: parent.controlBarDismissed()
     }
 
     /**
@@ -57,6 +78,13 @@ Item {
       */
     function showImage(fileUri) {
         currentSurface.source = fileUri;
+    }
+
+    /**
+      * Shows and give focus to the control bar.
+      */
+    function showControlBar() {
+        controlBar.showAnimated();
     }
 
     /**
@@ -94,13 +122,5 @@ Item {
         currentSurface.opacity = 0.0;
         nextSurface.opacity    = 1.0;
         currentSurface = nextSurface;
-    }
-
-    // Automatically pass the focus to the control bar.
-    onFocusChanged: {
-        if (focus) {
-            console.log("Giving focus to the image control bar...");
-            controlBar.focus = true;
-        }
     }
 }

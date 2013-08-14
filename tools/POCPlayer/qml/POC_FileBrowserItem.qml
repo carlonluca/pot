@@ -82,10 +82,6 @@ Rectangle {
             handleUserChoice();
         else if (event.key === Qt.Key_Return)
             handleUserChoice();
-        else
-            return;
-
-        event.accepted = true;
     }
 
     // Handle user choice.
