@@ -823,16 +823,35 @@ void OMX_MediaProcessor::mediaDecoding()
       }
    }
 
-   emit playbackCompleted();
-
    LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
    m_av_clock->OMXResume();
    m_av_clock->OMXStop();
    m_av_clock->OMXStateIdle();
    m_av_clock->OMXStateExecute();
 
-   // Actually change the state here and reset flags.
+   // Restart if EOF.
+   if (m_omx_reader->IsEof()) {
+      m_player_video->Close();
+      if (m_has_video)
+         if (!m_player_video->Open(
+                *m_hints_video,
+                m_av_clock,
+                m_textureData,
+                false,                  /* deinterlace */
+                ENABLE_HDMI_CLOCK_SYNC,
+                true,                   /* threaded */
+                1.0,                    /* display aspect, unused */
+                m_video_queue_size, m_video_fifo_size
+                )) {
+            LOG_ERROR(LOG_TAG, "Failed to reopen media.");
+         }
+         // TODO: Handle failure.
+   }
+
    setState(STATE_STOPPED);
+   emit playbackCompleted();
+
+   // Actually change the state here and reset flags.
    m_mutexPending.lock();
    if (m_pendingStop) {
       m_pendingStop = false;

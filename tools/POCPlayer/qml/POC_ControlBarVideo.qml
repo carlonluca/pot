@@ -168,18 +168,10 @@ POC_ControlBar {
             KeyNavigation.up:    buttonOpen
         }
 
-        // Set the play/pause button.
-        onFocusChanged: {
-            if (activeFocus)
-                sliderPosition.focus = true;
-        }
-
         // If esc if pressed, focus to the parent.
         Keys.onPressed: {
-            if (event.key === Qt.Key_Escape) {
-                controlBar.parent.parent.parent.focus = true;
-                controlBarDismissed();
-            }
+            if (event.key === Qt.Key_Escape)
+                hideAnimated();
         }
     }
 
@@ -218,11 +210,6 @@ POC_ControlBar {
                 event.accepted   = true;
             }
         }
-
-        onFocusChanged: {
-            if (activeFocus)
-                sliderVolume.focus = true;
-        }
     }
 
     // When focused pass the focus to the currently visible layout.
@@ -239,6 +226,18 @@ POC_ControlBar {
                 barVolume.focus = true;
             }
         }
+    }
+
+    /**
+      * Give focus to the first component.
+      */
+    function acquireFocus() {
+        if (state == "MAIN")
+            sliderPosition.focus = true;
+        else if (state == "VOLUME")
+            sliderVolume.focus = true;
+        else
+            console.log("Unknown state!");
     }
 
     // The states.

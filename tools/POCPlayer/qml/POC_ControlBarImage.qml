@@ -26,22 +26,23 @@ import QtQuick.Layouts 1.0
 import QtQuick.Controls 1.0
 
 POC_ControlBar {
-    signal nextImage
-    signal prevImage
-    signal rotateCounter
-    signal rotateClock
+    signal nextImage()
+    signal prevImage()
+    signal rotateCounter()
+    signal rotateClock()
+
+    property bool isHidden
 
     // Layout containing the main buttons.
     RowLayout {
         id:     barMain
         width:  parent.width
         height: parent.height
-        opacity: 1.0
 
         Button {
             id: buttonPrevImage
             Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
-            text: "Previous Image"
+            text: qsTr("Previous Image")
             onClicked: prevImage()
 
             KeyNavigation.right: buttonNextImage
@@ -90,29 +91,17 @@ POC_ControlBar {
             KeyNavigation.up:    buttonRotateCounter
         }
 
-        // Focus to prev image.
-        onFocusChanged: {
-            if (activeFocus)
-                buttonPrevImage.focus = true;
-        }
-
         // If esc if pressed, focus to the parent.
         Keys.onPressed: {
-            if (event.key === Qt.Key_Escape) {
-                // TODO: Bring this back into the signal handler.
-                controlBar.parent.parent.parent.focus = true;
-                controlBarDismissed();
-            }
+            if (event.key === Qt.Key_Escape)
+                hideAnimated();
         }
     }
 
-    // When focused pass the focus to the currently visible layout.
-    onFocusChanged: {
-        if (focus) {
-            // Exiting from the main bar means dismiss the control bar.
-            controlBarEnabled();
-            console.log("Giving focus to the main bar...");
-            barMain.focus = true;
-        }
+    /**
+      * Give focus to the first component.
+      */
+    function acquireFocus() {
+        buttonPrevImage.focus = true;
     }
 }

@@ -24,6 +24,8 @@
 import QtQuick 2.0
 
 Item {
+    property bool isHidden: true
+
     signal controlBarDismissed
     signal controlBarEnabled
 
@@ -56,17 +58,9 @@ Item {
         target: controlBar; property: "x"; to: parent.width
     }
 
-    onControlBarEnabled: {
-        showAnimated();
-    }
-
-    onControlBarDismissed: {
-        hideAnimated();
-    }
-
     // Methods to show and hide.
     function toggleAnimated() {
-        if (x === 0)
+        if (!isHidden)
             hideAnimated();
         else
             showAnimated();
@@ -74,9 +68,14 @@ Item {
 
     function showAnimated() {
         animationShow.running = true;
+        acquireFocus();
+        isHidden = false;
+        controlBarEnabled();
     }
 
     function hideAnimated() {
         animationHide.running = true;
+        isHidden = true;
+        controlBarDismissed();
     }
 }
