@@ -27,7 +27,9 @@ POC_AnimatedOverlay {
     Text {
         anchors.fill: parent
         color: "white"
-        text:  "Media Player - Stop [s]\n" +
+        font.pixelSize: 30
+        text:  "LEGEND\n" +
+               "Media Player - Stop [s]\n" +
                "Media Player - Play/Pause [p]\n" +
                "Media Player - Volume Up [+]\n" +
                "Media Player - Volume Down [-]\n" +

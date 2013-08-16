@@ -39,14 +39,14 @@ VideoOutput {
         onClicked:
             controlBar.toggleAnimated();
 
-        z: 0
+        z: 1
     }
 
     // The control bar.
     POC_ControlBarVideo {
         id: controlBar
 
-        z: 1
+        z: 2
 
         onControlBarDismissed: parent.controlBarDismissed()
     }

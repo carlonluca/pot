@@ -104,7 +104,7 @@ Rectangle {
 
         onFocusRelinquished: parent.focus = true
 
-        onUrlSelected: mediaPlayer.source = url
+        onUrlSelected: mediaOutput.showUrlMedia(url)
     }
 
     // These are shortcuts for common functionalities.

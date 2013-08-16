@@ -35,9 +35,7 @@ Item {
     // Used to show the control bar.
     MouseArea {
         anchors.fill: parent
-        onClicked: {
-            controlBar.toggleAnimated();
-        }
+        onClicked: controlBar.toggleAnimated()
 
         z: 1
     }

@@ -32,7 +32,9 @@ POC_AnimatedOverlay {
     Text {
         anchors.fill: parent
         color: "white"
-        text: "Title: " + formatString(source.metaData.title) + "\n" +
+        font.pixelSize: 30
+        text: "METADATA\n" +
+              "Title: " + formatString(source.metaData.title) + "\n" +
               "Subtitle: " + formatString(source.metaData.subTitle) + "\n" +
               "Artist: " + formatString(source.metaData.author) + "\n" +
               "Date of the Media: " + formatString(source.metaData.date) + "\n" +

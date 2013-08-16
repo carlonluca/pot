@@ -32,11 +32,6 @@ Item {
     height: parent.height
     state:  "VIDEO"
 
-    MouseArea {
-        anchors.fill: parent
-        onPressed: parent.focus = true
-    }
-
     // The video output component.
     POC_VideoOutput {
         id:     videoOutput
@@ -48,6 +43,8 @@ Item {
     // The image output.
     POC_ImageOutput {
         id: imageOutput
+        opacity: 0.0
+        enabled: false
 
         onControlBarDismissed: parent.controlBarDismissed()
     }
@@ -57,11 +54,15 @@ Item {
       */
     function showLocalMedia(mediaPath) {
         var mediaUri = "file://" + mediaPath;
-        if (utils.isSupportedAudio(mediaPath));
+        showUrlMedia(mediaUri);
+    }
+
+    function showUrlMedia(mediaUri) {
+        if (utils.isSupportedAudio(mediaUri));
             // TODO: Implement!
-        else if (utils.isSupportedImage(mediaPath))
+        else if (utils.isSupportedImage(mediaUri))
             showImage(mediaUri);
-        else if (utils.isSupportedVideo(mediaPath))
+        else if (utils.isSupportedVideo(mediaUri))
             showVideo(mediaUri);
         else
             // TODO: Implement dialog here.
