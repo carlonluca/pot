@@ -50,17 +50,20 @@ const QStringList& POC_Utils::getSupportedImageFormats()
 +---------------------------------------------------------------------*/
 const QStringList& POC_Utils::getSupportedImageExtensions()
 {
-   const QStringList supported = POC_Utils::getSupportedImageFormats();
    static QStringList ret;
+   if (!ret.isEmpty())
+      return ret;
+
+   const QStringList supported = POC_Utils::getSupportedImageFormats();
 
    foreach (QString a, supported) {
-      if (!supported.contains(a)) {
+      QStringList mimes = getMimeToExtMap().values(a);
+      if (mimes.isEmpty()) {
          qDebug("Can't find extension for %s.", qPrintable(a));
          continue;
       }
 
-      QStringList extensions = getMimeToExtMap().values(a);
-      foreach (QString b, extensions)
+      foreach (QString b, mimes)
          ret.append(b.toLocal8Bit());
    }
 
@@ -82,6 +85,17 @@ const QStringList& POC_Utils::getSupportedVideoExtensions()
    }
 
    return supported;
+}
+
+/*----------------------------------------------------------------------
+|    POC_Utils::getFilterFromExtensions
++---------------------------------------------------------------------*/
+const QStringList POC_Utils::getFilterFromExts(const QStringList& extensions)
+{
+   QStringList ret;
+   foreach (QString a, extensions)
+      ret.append(QString("*.") + a);
+   return ret;
 }
 
 /*----------------------------------------------------------------------
