@@ -117,7 +117,11 @@ QString POC_QMLUtils::getNextImage(QString imageAbsPath)
    QDir dir = fileInfo.absoluteDir();
 
    // List the files in the directory.
-   QFileInfoList files = dir.entryInfoList(QStringList() << "*.jpg", QDir::Files, QDir::Name);
+   const QStringList& extensions = POC_Utils::getSupportedImageExtensions();
+   QFileInfoList files = dir.entryInfoList(POC_Utils::getFilterFromExts(extensions), QDir::Files, QDir::Name);
+   if (files.size() <= 0)
+      return QString();
+
    int index = files.lastIndexOf(QFileInfo(imageAbsPath));
    if (index < -1)
       return QString();
@@ -141,7 +145,11 @@ QString POC_QMLUtils::getPrevImage(QString imageAbsPath)
    QDir dir = fileInfo.absoluteDir();
 
    // List the files in the directory.
-   QFileInfoList files = dir.entryInfoList(QStringList() << "*.jpg", QDir::Files, QDir::Name);
+   const QStringList& extensions = POC_Utils::getSupportedImageExtensions();
+   QFileInfoList files = dir.entryInfoList(POC_Utils::getFilterFromExts(extensions), QDir::Files, QDir::Name);
+   if (files.size() <= 0)
+      return QString();
+
    int index = files.lastIndexOf(QFileInfo(imageAbsPath));
    if (index < -1)
       return QString();

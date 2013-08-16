@@ -38,8 +38,9 @@ class POC_Utils
 public:
    static const QStringList& getSupportedImageFormats();
    static const QStringList& getSupportedImageExtensions();
-
    static const QStringList& getSupportedVideoExtensions();
+
+   static const QStringList getFilterFromExts(const QStringList& extensions);
 
    static bool isSupportedVideo(QString file);
    static bool isSupportedImage(QString file);
