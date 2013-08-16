@@ -357,7 +357,8 @@ void OpenMAXILPlayerControl::setMedia(const QMediaContent& content, QIODevice* s
    LOG_DEBUG(LOG_TAG, "setMedia thread is: 0x%x.", (unsigned int)QThread::currentThread());
 
    LOG_VERBOSE(LOG_TAG, "Deferring setMedia()...");
-   if (!QFile(content.canonicalUrl().path()).exists()) {
+   QUrl url = content.canonicalUrl();
+   if (url.isLocalFile() && !QFile(url.path()).exists()) {
       LOG_DEBUG(LOG_TAG, "Does not exist!");
       return;
    }
@@ -376,7 +377,9 @@ void OpenMAXILPlayerControl::setMediaInt(const QMediaContent& mediaContent)
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
    m_mediaProcessor->stop();
-   if (!m_mediaProcessor->setFilename(mediaContent.canonicalUrl().path(), m_textureData))
+
+   m_textureData = NULL;
+   if (!m_mediaProcessor->setFilename(mediaContent.canonicalUrl().toString(), m_textureData))
       return;
    m_currentResource = mediaContent;
    emit mediaChanged(mediaContent);
@@ -460,7 +463,7 @@ int OpenMAXILPlayerControl::bufferStatus() const
 +-----------------------------------------------------------------------------*/
 qint64 OpenMAXILPlayerControl::duration() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   //LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
    return m_mediaProcessor->streamLength();
 }
@@ -565,7 +568,7 @@ int OpenMAXILPlayerControl::volume() const
 +-----------------------------------------------------------------------------*/
 qint64 OpenMAXILPlayerControl::position() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   //LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
    return m_mediaProcessor->streamPosition();
 }
