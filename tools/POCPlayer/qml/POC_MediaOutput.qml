@@ -50,16 +50,19 @@ Item {
     }
 
     /**
-      * Determines the type of media and plays it.
+      * Determines the type of media and plays it using the passed path.
       */
     function showLocalMedia(mediaPath) {
         var mediaUri = "file://" + mediaPath;
         showUrlMedia(mediaUri);
     }
 
+    /**
+      * Determines the type of media and plays it.
+      */
     function showUrlMedia(mediaUri) {
-        if (utils.isSupportedAudio(mediaUri));
-            // TODO: Implement!
+        if (utils.isSupportedAudio(mediaUri))
+            showAudio(mediaUri);
         else if (utils.isSupportedImage(mediaUri))
             showImage(mediaUri);
         else if (utils.isSupportedVideo(mediaUri))
@@ -93,6 +96,15 @@ Item {
         mediaPlayer.stop();
         state = "IMAGE";
         imageOutput.showImage(imageUri);
+    }
+
+    /**
+      * Starts to play the audio.
+      */
+    function showAudio(audioUri) {
+        state = "VIDEO";
+        mediaPlayer.source = audioUri;
+        mediaPlayer.play();
     }
 
     /**

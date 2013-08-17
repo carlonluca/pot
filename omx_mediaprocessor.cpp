@@ -27,6 +27,7 @@
 #include <QStringList>
 #include <QOpenGLContext>
 #include <QElapsedTimer>
+#include <QUrl>
 
 #include <cstring>
 
@@ -228,7 +229,13 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
       return false; // TODO: Reimplement.
    }
 
-   LOG_VERBOSE(LOG_TAG, "Opening...");
+   LOG_VERBOSE(LOG_TAG, "Opening %s...", qPrintable(filename));
+
+   // It seems that omxplayer expects path and not local URIs.
+   QUrl url(filename);
+   if (url.isLocalFile() && filename.startsWith("file://"))
+      filename = url.path();
+
    if (!m_omx_reader->Open(filename.toStdString(), true)) {
       LOG_ERROR(LOG_TAG, "Failed to open source.");
       return false;
