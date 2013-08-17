@@ -39,6 +39,7 @@ public:
    static const QStringList& getSupportedImageFormats();
    static const QStringList& getSupportedImageExtensions();
    static const QStringList& getSupportedVideoExtensions();
+   static const QStringList& getSupportedAudioExtensions();
 
    static const QStringList getFilterFromExts(const QStringList& extensions);
 

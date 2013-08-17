@@ -46,7 +46,7 @@ const QStringList& POC_Utils::getSupportedImageFormats()
 }
 
 /*----------------------------------------------------------------------
-|    POC_Utils::supportedImageExtensions
+|    POC_Utils::getSupportedImageExtensions
 +---------------------------------------------------------------------*/
 const QStringList& POC_Utils::getSupportedImageExtensions()
 {
@@ -71,7 +71,7 @@ const QStringList& POC_Utils::getSupportedImageExtensions()
 }
 
 /*----------------------------------------------------------------------
-|    POC_Utils::supportedVideoExtensions
+|    POC_Utils::getSupportedVideoExtensions
 +---------------------------------------------------------------------*/
 const QStringList& POC_Utils::getSupportedVideoExtensions()
 {
@@ -80,6 +80,23 @@ const QStringList& POC_Utils::getSupportedVideoExtensions()
       supported.append("mp4");
       supported.append("mov");
       supported.append("mkv");
+
+      // TODO: Add the other supported extensions.
+   }
+
+   return supported;
+}
+
+/*----------------------------------------------------------------------
+|    POC_Utils::getSupportedAudioExtensions
++---------------------------------------------------------------------*/
+const QStringList& POC_Utils::getSupportedAudioExtensions()
+{
+   static QStringList supported;
+   if (supported.isEmpty()) {
+      supported.append("mp3");
+      supported.append("ogg");
+      supported.append("wma");
 
       // TODO: Add the other supported extensions.
    }
@@ -103,11 +120,12 @@ const QStringList POC_Utils::getFilterFromExts(const QStringList& extensions)
 +---------------------------------------------------------------------*/
 bool POC_Utils::isSupportedAudio(QString file)
 {
-   Q_UNUSED(file);
-   Q_UNIMPLEMENTED();
+   QString ext = getFileExtension(file);
+   if (ext.isNull())
+      return false;
 
-   // TODO: Implement audio.
-   return false;
+   QStringList supported = getSupportedAudioExtensions();
+   return supported.contains(ext);
 }
 
 /*----------------------------------------------------------------------
