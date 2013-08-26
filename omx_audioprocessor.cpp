@@ -218,7 +218,6 @@ void OMX_AudioProcessor::audioDecoding()
     //int phase      = 0;
     //int inc        = 256 << 16;
     //int dinc       = 0;
-    LOG_DEBUG(LOG_TAG, "Size: %d.", sizeof(float));
     //uint8_t inbuf[AUDIO_INBUF_SIZE + FF_INPUT_BUFFER_PADDING_SIZE];
     uint8_t* inbuf;
     assert(posix_memalign((void**)&inbuf, 16, AUDIO_INBUF_SIZE + FF_INPUT_BUFFER_PADDING_SIZE) >= 0);
@@ -250,7 +249,6 @@ void OMX_AudioProcessor::audioDecoding()
         portFormat.nIndex = i;
         OMX_ERRORTYPE err = compDecoder->GetParameter(OMX_IndexParamAudioPortFormat, &portFormat);
         assert(err != OMX_ErrorNoMore);
-        LOG_DEBUG(LOG_TAG, "Encoding: %d.", portFormat.eEncoding);
     }
 #endif
 
@@ -274,7 +272,6 @@ void OMX_AudioProcessor::audioDecoding()
     portdef.nBufferSize        = bufferSize >> 2;
     portdef.nBufferCountActual = 300;
     compRenderer->SetParameter(OMX_IndexParamPortDefinition, &portdef);
-    LOG_DEBUG(LOG_TAG, "OMX buffer size set to: %d.", bufferSize >> 2);
 
     // set the pcm parameters
     OMX_AUDIO_PARAM_PCMMODETYPE pcm;
@@ -512,7 +509,6 @@ void OMX_AudioProcessor::audioDecoding()
         // Try and wait for a minimum latency time (in ms) before
         // sending the next packet
 #if 0
-        LOG_DEBUG(LOG_TAG, "Waiting for latency...");
         latency = getLatency(compRenderer->GetHandle());
         while (latency > (sampleRate*(MIN_LATENCY_TIME + CTTW_SLEEP_TIME)/1000))
             usleep(CTTW_SLEEP_TIME*1000);

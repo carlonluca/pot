@@ -40,7 +40,7 @@ echo "Prefix to $PWD..."
 --cpu=arm1176jzf-s \
 --target-os=linux \
 --disable-hwaccels \
---disable-parsers \
+--enable-parsers \
 --disable-muxers \
 --disable-filters \
 --disable-encoders \

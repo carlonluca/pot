@@ -118,7 +118,7 @@ struct PlayerCommandFreeTextureData : public PlayerCommand
 /*------------------------------------------------------------------------------
 |    OpenMAXILPlayerControl class
 +-----------------------------------------------------------------------------*/
-class OpenMAXILPlayerControl : public QMediaPlayerControl, public OMX_TextureProvider
+class OpenMAXILPlayerControl : public QMediaPlayerControl
 {
     Q_OBJECT
 public:
@@ -154,10 +154,6 @@ public:
 
     QVariantMap getMetaData();
 
-    // OMX_TextureProvider interface.
-    OMX_TextureData* instantiateTexture(QSize size);
-    void freeTexture(OMX_TextureData* textureData);
-
 public Q_SLOTS:
     void setPosition(qint64 pos);
 
@@ -182,7 +178,6 @@ private slots:
     void playInt();
     void pauseInt();
     void stopInt();
-    void freeTextureInt(OMX_TextureData* textureData);
 
 private:
     void appendCommand(PlayerCommand* command);

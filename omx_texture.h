@@ -130,7 +130,7 @@ public:
     }
 
     inline void setTexture(GLuint textureId, QSize textureSize) {
-        LOG_DEBUG(LOG_TAG, "Setting tex: %u.", textureId);
+        LOG_VERBOSE(LOG_TAG, "Setting tex: %u.", textureId);
         this->m_textureId   = textureId;
         this->m_textureSize = textureSize;
     }

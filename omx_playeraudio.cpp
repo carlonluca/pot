@@ -60,8 +60,10 @@ OMX_PlayerAudio::~OMX_PlayerAudio()
  */
 void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
 {
-   if (!linear)
-      OMXPlayerAudio::SetCurrentVolume(volume);
+   if (!linear) {
+      OMXPlayerAudio::SetVolume(volume);
+      return;
+   }
 
    // I supposed it was possible to get the available range from OpenMAX
    // but it seems to always return 0.
@@ -81,7 +83,6 @@ void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
    // Determine the mB value to be used.
    OMX_S32 mbMax = omxVolume.sVolume.nMax;
    OMX_S32 mbMin = omxVolume.sVolume.nMin;
-   LOG_DEBUG(LOG_TAG, "linMax: %d, linMin: %d, val: %d..", mbMax, mbMin, omxVolume.sVolume.nValue);
 #else
    OMX_S32 mbMax = 2;
    OMX_S32 mbMin = -6;
@@ -90,14 +91,17 @@ void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
    double expMin   = exp(mbMin);
    double expMax   = exp(mbMax);
    double mbVolume = log((double)volume/100*(expMax - expMin) + expMin);
-   LOG_DEBUG(LOG_TAG, "Setting volume to %fmB.", mbVolume);
+   LOG_VERBOSE(LOG_TAG, "Setting volume to %fmB.", mbVolume);
 
    // omxplayer expects millibels here.
-   OMXPlayerAudio::SetCurrentVolume(mbVolume*1000);
+   OMXPlayerAudio::SetVolume(mbVolume*1000);
 }
 
 long OMX_PlayerAudio::GetCurrentVolume(bool linear)
 {
+   return 0;
+
+#if 0
    long mbVol = OMXPlayerAudio::GetCurrentVolume();
    if (!linear)
       return mbVol;
@@ -109,6 +113,7 @@ long OMX_PlayerAudio::GetCurrentVolume(bool linear)
    double num = 100*exp(mbVol/1000) - expMin;
    double den = expMax - expMin;
 
-   LOG_DEBUG(LOG_TAG, "Volume%: %ld.", (long)(num/den));
+   LOG_VERBOSE(LOG_TAG, "Volume: %ld.", (long)(num/den));
    return (long)(num/den);
+#endif
 }

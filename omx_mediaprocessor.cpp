@@ -82,7 +82,7 @@ static int get_mem_gpu(void)
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::OMX_MediaProcessor
 +-----------------------------------------------------------------------------*/
-OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
+OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProviderSh provider) :
    m_textureData(NULL),
    m_state(STATE_INACTIVE),
 #ifdef ENABLE_SUBTITLES
@@ -132,6 +132,11 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
 #ifdef ENABLE_SUBTITLES
    m_player_subtitles = new OMXPlayerSubtitles;
 #endif
+
+   connect(m_player_video, SIGNAL(textureDataReady(const OMX_TextureData*)),
+           this, SLOT(onTextureReady(const OMX_TextureData*)), Qt::DirectConnection);
+   connect(m_player_video, SIGNAL(textureDataReady(const OMX_TextureData*)),
+           this, SIGNAL(textureReady(const OMX_TextureData*)), Qt::DirectConnection);
 
    // Move to a new thread.
    moveToThread(&m_thread);
@@ -257,7 +262,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 #endif
 
    LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
-   if (!m_av_clock->OMXInitialize(m_has_video, m_has_audio))
+   if (!m_av_clock->OMXInitialize())
       return false;
 
    if (ENABLE_HDMI_CLOCK_SYNC && !m_av_clock->HDMIClockSync())
@@ -286,16 +291,13 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
              *m_hints_video,
              m_av_clock,
              textureData,
-             false,                  /* deinterlace */
+             VS_DEINTERLACEMODE_OFF, /* deinterlace */
              ENABLE_HDMI_CLOCK_SYNC,
              true,                   /* threaded */
              1.0,                    /* display aspect, unused */
              m_video_queue_size, m_video_fifo_size
              ))
          return false;
-
-      m_textureData = textureData;
-      emit textureReady(textureData);
    }
 
 #ifdef ENABLE_SUBTITLES
@@ -332,20 +334,22 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 
 
    LOG_VERBOSE(LOG_TAG, "Opening audio using OMX...");
-   if (m_has_audio)
+   if (m_has_audio) {
       if (!m_player_audio->Open(
              *m_hints_audio,
              m_av_clock,
              m_omx_reader,
              "omx:hdmi",         /* TODO: implement way to change */
              false,              /* TODO: passthrough */
-             0,                  /* TODO: initial_volume */
              false,              /* TODO: hw decode */
              false,              /* TODO: downmix boost */
              true,               /* threaded */
              m_audio_queue_size, m_audio_fifo_size
              ))
          return false;
+      if (m_has_audio)
+          m_player_audio->SetVolume(pow(10, 0 / 2000.0));
+   }
 
    setState(STATE_STOPPED);
    return true;
@@ -373,16 +377,20 @@ bool OMX_MediaProcessor::play()
    case STATE_STOPPED: {
       setState(STATE_PLAYING);
 
+#if 1
       if (!m_omx_reader->SeekTime(0, true, &startpts)) {
          LOG_WARNING(LOG_TAG, "Failed to seek to the beginning.");
          return false;
       }
 
       flushStreams(startpts);
+#endif
 
-      m_av_clock->OMXStart(0.0);
+      //m_av_clock->OMXStart(0.0);
+      m_av_clock->OMXPause();
       m_av_clock->OMXStateExecute();
-      m_av_clock->OMXMediaTime(0.0D);
+      m_av_clock->OMXResume();
+      //m_av_clock->OMXMediaTime(0.0D);
 
       LOG_VERBOSE(LOG_TAG, "Starting thread.");
       return QMetaObject::invokeMethod(this, "mediaDecoding");
@@ -499,6 +507,15 @@ bool OMX_MediaProcessor::seek(long position)
 }
 
 /*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::onTextureReady
++-----------------------------------------------------------------------------*/
+void OMX_MediaProcessor::onTextureReady(const OMX_TextureData* textureData)
+{
+   // It should be safe to const_cast here.
+   m_textureData = const_cast<OMX_TextureData*>(textureData);
+}
+
+/*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::currentPosition
 +-----------------------------------------------------------------------------*/
 qint64 OMX_MediaProcessor::streamPosition()
@@ -538,8 +555,8 @@ long OMX_MediaProcessor::volume(bool linear)
 void OMX_MediaProcessor::mediaDecoding()
 {
    // See description in the qmakefile.
-   //#define ENABLE_PROFILE_MAIN_LOOP
-   //#define ENABLE_PAUSE_FOR_BUFFERING
+//#define ENABLE_PROFILE_MAIN_LOOP
+//#define ENABLE_PAUSE_FOR_BUFFERING
 
    LOG_VERBOSE(LOG_TAG, "Decoding thread started.");
    emit playbackStarted();
@@ -556,6 +573,7 @@ void OMX_MediaProcessor::mediaDecoding()
    bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
    float m_threshold = 0.1f; //std::min(0.1f, audio_fifo_size * 0.1f);
 #endif // ENABLE_PAUSE_FOR_BUFFERING
+   bool sentStarted = false;
 
    bool sendEos = false;
 
@@ -602,6 +620,8 @@ void OMX_MediaProcessor::mediaDecoding()
          if (m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
             flushStreams(startpts);
 
+         // TODO: Reimplement this.
+
 #if 0
          m_player_video->Close();
          if (m_has_video && !m_player_video->Open(
@@ -616,6 +636,7 @@ void OMX_MediaProcessor::mediaDecoding()
                 ))
             //goto do_exit;
             break;
+         sentStarted = false;
 #endif
 
          CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
@@ -683,12 +704,6 @@ void OMX_MediaProcessor::mediaDecoding()
       audio_fifo = audio_pts == DVD_NOPTS_VALUE ? 0.0f : audio_pts / DVD_TIME_BASE - stamp * 1e-6;
       video_fifo = video_pts == DVD_NOPTS_VALUE ? 0.0f : video_pts / DVD_TIME_BASE - stamp * 1e-6;
       threshold  = min(0.1f, (float)m_player_audio->GetCacheTotal()*0.1f);
-#ifdef ENABLE_PROFILE_MAIN_LOOP
-      static int ciccio = 0;
-      if ((ciccio++)%15 == 0) {
-         LOG_DEBUG(LOG_TAG, "Fifo: %f, %f.", audio_fifo, video_fifo);
-      }
-#endif // ENABLE_PROFILE_MAIN_LOOP
 #endif // ENABLE_PAUSE_FOR_BUFFERING
 
 #if 0
@@ -723,6 +738,12 @@ void OMX_MediaProcessor::mediaDecoding()
          }
       }
 #endif
+      if (!sentStarted)
+      {
+         CLog::Log(LOGDEBUG, "COMXPlayer::HandleMessages - player started RESET");
+         m_av_clock->OMXReset(m_has_video, m_has_audio);
+         sentStarted = true;
+      }
 
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
       if (audio_pts != DVD_NOPTS_VALUE) {
@@ -744,15 +765,15 @@ void OMX_MediaProcessor::mediaDecoding()
 
       // Enable this to enable pause for buffering.
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
-      if (!m_Pause && (m_omx_reader.IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high)))
+      if (m_state != STATE_PAUSED && (m_omx_reader->IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high)))
       {
          if (m_av_clock->OMXIsPaused())
          {
-            CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader.IsEof(), m_omx_pkt);
+            CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader->IsEof(), m_omx_pkt);
             m_av_clock->OMXResume();
          }
       }
-      else if (m_Pause || audio_fifo_low || video_fifo_low)
+      else if (m_state == STATE_PAUSED || audio_fifo_low || video_fifo_low)
       {
          if (!m_av_clock->OMXIsPaused())
          {
@@ -831,29 +852,30 @@ void OMX_MediaProcessor::mediaDecoding()
    }
 
    LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
-   m_av_clock->OMXResume();
+   //m_av_clock->OMXResume();
    m_av_clock->OMXStop();
    m_av_clock->OMXStateIdle();
-   m_av_clock->OMXStateExecute();
+   //m_av_clock->OMXStateExecute();
+   //m_av_clock->OMXReset(m_has_video, m_has_audio);
 
-   // Restart if EOF.
-   if (m_omx_reader->IsEof()) {
-      m_player_video->Close();
-      if (m_has_video)
-         if (!m_player_video->Open(
-                *m_hints_video,
-                m_av_clock,
-                m_textureData,
-                false,                  /* deinterlace */
-                ENABLE_HDMI_CLOCK_SYNC,
-                true,                   /* threaded */
-                1.0,                    /* display aspect, unused */
-                m_video_queue_size, m_video_fifo_size
-                )) {
-            LOG_ERROR(LOG_TAG, "Failed to reopen media.");
-         }
-         // TODO: Handle failure.
-   }
+   // Restart video player. It seems it is necessary to close
+   // and open again. omxplayer does this also when seeking so
+   // maybe there is no other way to restart it.
+   m_player_video->Close();
+   if (m_has_video)
+      if (!m_player_video->Open(
+             *m_hints_video,
+             m_av_clock,
+             m_textureData,
+             VS_DEINTERLACEMODE_OFF, /* deinterlace */
+             ENABLE_HDMI_CLOCK_SYNC,
+             true,                   /* threaded */
+             1.0,                    /* display aspect, unused */
+             m_video_queue_size, m_video_fifo_size
+             )) {
+         LOG_ERROR(LOG_TAG, "Failed to reopen media.");
+      }
+   // TODO: Handle failure.
 
    setState(STATE_STOPPED);
    emit playbackCompleted();

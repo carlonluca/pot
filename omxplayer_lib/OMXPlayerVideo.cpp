@@ -39,7 +39,7 @@
 
 #define MAX_DATA_SIZE    10 * 1024 * 1024
 
-OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProvider* provider)
+OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProviderSh provider)
 {
   m_open          = false;
   m_stream_id     = -1;
@@ -57,6 +57,7 @@ OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProvider* provider)
   m_provider       = provider;
   m_max_data_size = 10 * 1024 * 1024;
   m_fifo_size     = (float)80*1024*60 / (1024*1024);
+  m_history_valid_pts = 0;
 
   pthread_cond_init(&m_packet_cond, NULL);
   pthread_cond_init(&m_picture_cond, NULL);
@@ -67,7 +68,6 @@ OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProvider* provider)
 
 OMXPlayerVideo::~OMXPlayerVideo()
 {
-  delete m_provider;
   Close();
 
   pthread_cond_destroy(&m_packet_cond);
@@ -117,7 +117,7 @@ bool OMXPlayerVideo::Open(
         COMXStreamInfo &hints,
         OMXClock *av_clock,
         OMX_TextureData*& textureData,
-        bool deinterlace,
+        EDEINTERLACEMODE deinterlace,
         bool hdmi_clock_sync,
         bool use_thread,
         float display_aspect,
@@ -198,6 +198,14 @@ bool OMXPlayerVideo::Close()
   return true;
 }
 
+static unsigned count_bits(int32_t value)
+{
+  unsigned bits = 0;
+  for(;value;++bits)
+    value &= value - 1;
+  return bits;
+}
+
 bool OMXPlayerVideo::Decode(OMXPacket *pkt)
 {
   if(!pkt)
@@ -276,13 +284,22 @@ bool OMXPlayerVideo::Decode(OMXPacket *pkt)
   {
     if((int)m_decoder->GetFreeSpace() > pkt->size)
     {
-      if(pkt->pts != DVD_NOPTS_VALUE)
-        m_iCurrentPts = pkt->pts;
-      else if(pkt->dts != DVD_NOPTS_VALUE)
-        m_iCurrentPts = pkt->dts;
+      // some packed bitstream AVI files set almost all pts values to DVD_NOPTS_VALUE, but have a scattering of real pts values.
+      // the valid pts values match the dts values.
+      // if a stream has had more than 4 valid pts values in the last 16, the use UNKNOWN, otherwise use dts
+      m_history_valid_pts = (m_history_valid_pts << 1) | (pkt->pts != DVD_NOPTS_VALUE);
+      double pts = pkt->pts;
+      if(pkt->pts == DVD_NOPTS_VALUE && count_bits(m_history_valid_pts & 0xffff) < 4)
+        pts = pkt->dts;
+
+      if (pts != DVD_NOPTS_VALUE)
+        pts += m_iVideoDelay;
+
+      if(pts != DVD_NOPTS_VALUE)
+        m_iCurrentPts = pts;
 
       CLog::Log(LOGINFO, "CDVDPlayerVideo::Decode dts:%.0f pts:%.0f cur:%.0f, size:%d", pkt->dts, pkt->pts, m_iCurrentPts, pkt->size);
-      m_decoder->Decode(pkt->data, pkt->size, pkt->dts, pkt->pts);
+      m_decoder->Decode(pkt->data, pkt->size, pts);
       ret = true;
     }
     else
@@ -416,7 +433,7 @@ bool OMXPlayerVideo::AddPacket(OMXPacket *pkt)
   return ret;
 }
 
-bool OMXPlayerVideo::OpenDecoder(OMX_TextureData*& textureData)
+bool OMXPlayerVideo::OpenDecoder(OMX_TextureData* textureData)
 {
   if (m_hints.fpsrate && m_hints.fpsscale)
     m_fps = DVD_TIME_BASE / OMXReader::NormalizeFrameduration((double)DVD_TIME_BASE * m_hints.fpsscale / m_hints.fpsrate);
@@ -432,7 +449,10 @@ bool OMXPlayerVideo::OpenDecoder(OMX_TextureData*& textureData)
   m_frametime = (double)DVD_TIME_BASE / m_fps;
 
   m_decoder = new COMXVideo(m_provider);
-  if (!m_decoder->Open(m_hints, m_av_clock, textureData, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync, m_fifo_size))
+  connect(m_decoder, SIGNAL(textureDataReady(const OMX_TextureData*)),
+          this, SIGNAL(textureDataReady(const OMX_TextureData*)), Qt::DirectConnection);
+
+  if(!m_decoder->Open(m_hints, m_av_clock, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync, m_fifo_size, textureData))
   {
     CloseDecoder();
     return false;
@@ -442,6 +462,9 @@ bool OMXPlayerVideo::OpenDecoder(OMX_TextureData*& textureData)
     printf("Video codec %s width %d height %d profile %d fps %f\n",
         m_decoder->GetDecoderName().c_str() , m_hints.width, m_hints.height, m_hints.profile, m_fps);
   }
+
+  // start from assuming all recent frames had valid pts
+  m_history_valid_pts = ~0;
 
   return true;
 }
