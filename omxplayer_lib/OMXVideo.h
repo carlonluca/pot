@@ -24,6 +24,8 @@
 
 #include <QObject>
 
+#include <memory>
+
 #include "OMXCore.h"
 #include "OMXStreamInfo.h"
 
@@ -34,12 +36,23 @@
 
 #include "guilib/Geometry.h"
 
+using namespace std;
+
 class OMX_VideoSurfaceElement;
 class OMX_TextureProvider;
 class OMX_TextureData;
 
+typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
+
 
 #define VIDEO_BUFFERS 60
+
+enum EDEINTERLACEMODE
+{
+  VS_DEINTERLACEMODE_OFF=0,
+  VS_DEINTERLACEMODE_AUTO=1,
+  VS_DEINTERLACEMODE_FORCE=2
+};
 
 #define CLASSNAME "COMXVideo"
 
@@ -49,39 +62,41 @@ class COMXVideo : public QObject
 {
     Q_OBJECT
 public:
-  COMXVideo(OMX_TextureProvider* provider);
+  COMXVideo(OMX_TextureProviderSh provider);
   ~COMXVideo();
 
   // Required overrides
   bool SendDecoderConfig();
   bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *in_extradata, int in_extrasize);
-  bool Open(
-          COMXStreamInfo &hints,
+  bool Open(COMXStreamInfo &hints,
           OMXClock *clock,
-          OMX_TextureData*& textureId,
           float display_aspect = 0.0f,
-          bool deinterlace = false,
-          bool hdmi_clock_sync = false
-          , float fifo_size = 0.0f
+          EDEINTERLACEMODE deinterlace = VS_DEINTERLACEMODE_OFF,
+          bool hdmi_clock_sync = false,
+          float fifo_size = 0.0f,
+          OMX_TextureData* textureData = NULL
           );
+  bool PortSettingsChanged();
   void Close(void);
   unsigned int GetFreeSpace();
   unsigned int GetSize();
   OMXPacket *GetText();
   int  DecodeText(uint8_t *pData, int iSize, double dts, double pts);
-  int  Decode(uint8_t *pData, int iSize, double dts, double pts);
+  int  Decode(uint8_t *pData, int iSize, double pts);
   void Reset(void);
   void SetDropState(bool bDrop);
-  bool Pause();
-  bool Resume();
   std::string GetDecoderName() { return m_video_codec_name; };
   void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
+  bool SetVideoEGL();
+  bool SetVideoEGLOutputPort();
   int GetInputBufferSize();
   void SubmitEOS();
   bool IsEOS();
+  bool SubmittedEOS() { return m_submitted_eos; }
+  bool BadState() { return m_omx_decoder.BadState(); };
 
 signals:
-  void textureReady(const uint& textureId);
+  void textureDataReady(const OMX_TextureData* textureData);
 
 protected:
   // Video format
@@ -106,7 +121,6 @@ protected:
   COMXCoreTunel     m_omx_tunnel_image_fx;
   bool              m_is_open;
 
-  bool              m_Pause;
   bool              m_setStartTime;
   bool              m_setStartTimeText;
 
@@ -116,11 +130,18 @@ protected:
   std::string       m_video_codec_name;
 
   bool              m_deinterlace;
+  EDEINTERLACEMODE  m_deinterlace_request;
   bool              m_hdmi_clock_sync;
   bool              m_first_text;
-  OMX_TextureProvider* m_provider;
+  OMX_TextureProviderSh m_provider;
   OMX_BUFFERHEADERTYPE* m_eglBuffer;
+  COMXStreamInfo    m_hints;
+  OMX_TextureData*  m_textureData; // Only used in case of re-use of the texture.
   uint32_t          m_history_valid_pts;
+  float             m_pixel_aspect;
+  bool              m_submitted_eos;
+  OMX_DISPLAYTRANSFORMTYPE m_transform;
+  bool              m_settings_changed;
 };
 
 #endif

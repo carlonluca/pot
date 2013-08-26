@@ -35,6 +35,7 @@
 
 #include <deque>
 #include <sys/types.h>
+#include <memory>
 
 #include "OMXOverlayCodec.h"
 #include "OMXOverlayText.h"
@@ -44,14 +45,16 @@
 
 #include <QObject>
 
+using namespace std;
+
 class OMX_TextureProvider;
 class OMX_VideoSurfaceElement;
 
-using namespace std;
+typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
 
 class OMXPlayerVideo : public QObject, public OMXThread
 {
-    Q_OBJECT
+  Q_OBJECT
 protected:
   AVStream                  *m_pStream;
   int                       m_stream_id;
@@ -74,7 +77,7 @@ protected:
   COMXVideo                 *m_decoder;
   float                     m_fps;
   double                    m_frametime;
-  int                       m_Deinterlace;
+  EDEINTERLACEMODE          m_Deinterlace;
   float                     m_display_aspect;
   bool                      m_bAbort;
   bool                      m_use_thread;
@@ -86,7 +89,8 @@ protected:
   double                    m_iVideoDelay;
   double                    m_iSubtitleDelay;
   COMXOverlayCodec          *m_pSubtitleCodec;
-  OMX_TextureProvider*      m_provider;
+  OMX_TextureProviderSh     m_provider;
+  uint32_t                  m_history_valid_pts;
 
   void Lock();
   void UnLock();
@@ -96,16 +100,16 @@ protected:
   void UnLockSubtitles();
 private:
 public:
-  OMXPlayerVideo(OMX_TextureProvider* provider);
+  OMXPlayerVideo(OMX_TextureProviderSh provider);
   virtual ~OMXPlayerVideo();
-  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMX_TextureData*& textureId, bool deinterlace, bool hdmi_clock_sync, bool use_thread, float display_aspect, float queue_size, float fifo_size);
+  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMX_TextureData*& textureId, EDEINTERLACEMODE deinterlace, bool hdmi_clock_sync, bool use_thread, float display_aspect, float queue_size, float fifo_size);
   bool Close();
   bool Decode(OMXPacket *pkt);
   void Process();
   void FlushSubtitles();
   void Flush();
   bool AddPacket(OMXPacket *pkt);
-  bool OpenDecoder(OMX_TextureData*& textureData);
+  bool OpenDecoder(OMX_TextureData* textureData);
   bool CloseDecoder();
   int  GetDecoderBufferSize();
   int  GetDecoderFreeSpace();
@@ -121,5 +125,8 @@ public:
   double GetSubtitleDelay()                                { return m_iSubtitleDelay; }
   void SetSubtitleDelay(double delay)                      { m_iSubtitleDelay = delay; }
   std::string GetText();
+
+signals:
+  void textureDataReady(const OMX_TextureData* textureData);
 };
 #endif

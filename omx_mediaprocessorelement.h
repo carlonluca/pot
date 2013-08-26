@@ -61,6 +61,8 @@ public slots:
     Q_INVOKABLE long streamLength();
     Q_INVOKABLE long streamPosition();
 
+    void onTextureDataReady(const OMX_TextureData* textureData);
+
 signals:
     void textureReady(const OMX_TextureData* textureId);
     void textureInvalidated();
@@ -73,8 +75,8 @@ protected:
     QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*);
 
 private:
-    OMX_MediaProcessor* m_mediaProc;
-    OMX_TextureProvider* m_texProvider;
+    OMX_MediaProcessor*   m_mediaProc;
+    OMX_TextureProviderSh m_texProvider;
 
     QString m_source;
     volatile bool m_pendingOpen;
