@@ -60,10 +60,8 @@ OMX_PlayerAudio::~OMX_PlayerAudio()
  */
 void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
 {
-   if (!linear) {
-      OMXPlayerAudio::SetVolume(volume);
-      return;
-   }
+   if (!linear)
+      OMXPlayerAudio::SetCurrentVolume(volume);
 
    // I supposed it was possible to get the available range from OpenMAX
    // but it seems to always return 0.
@@ -94,14 +92,11 @@ void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
    LOG_VERBOSE(LOG_TAG, "Setting volume to %fmB.", mbVolume);
 
    // omxplayer expects millibels here.
-   OMXPlayerAudio::SetVolume(mbVolume*1000);
+   OMXPlayerAudio::SetCurrentVolume(mbVolume*1000);
 }
 
 long OMX_PlayerAudio::GetCurrentVolume(bool linear)
 {
-   return 0;
-
-#if 0
    long mbVol = OMXPlayerAudio::GetCurrentVolume();
    if (!linear)
       return mbVol;
@@ -115,5 +110,4 @@ long OMX_PlayerAudio::GetCurrentVolume(bool linear)
 
    LOG_VERBOSE(LOG_TAG, "Volume: %ld.", (long)(num/den));
    return (long)(num/den);
-#endif
 }

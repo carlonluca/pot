@@ -76,7 +76,7 @@ typedef enum {CONF_FLAGS_FORMAT_NONE, CONF_FLAGS_FORMAT_SBS, CONF_FLAGS_FORMAT_T
 enum PCMChannels  *m_pChannelMap        = NULL;
 volatile sig_atomic_t g_abort           = false;
 bool              m_passthrough         = false;
-long              m_Volume              = 0;
+long              m_initialVolume       = 0;
 bool              m_Deinterlace         = false;
 bool              m_NoDeinterlace       = false;
 bool              m_HWDecode            = false;
@@ -562,7 +562,6 @@ int main(int argc, char *argv[])
   double                startpts              = 0;
   CRect                 DestRect              = {0,0,0,0};
   bool                  m_blank_background    = false;
-  bool sentStarted = false;
   float audio_fifo_size = 0.0; // zero means use default
   float video_fifo_size = 0.0;
   float audio_queue_size = 0.0;
@@ -744,7 +743,7 @@ int main(int argc, char *argv[])
 	sscanf(optarg, "%f %f %f %f", &DestRect.x1, &DestRect.y1, &DestRect.x2, &DestRect.y2);
         break;
       case vol_opt:
-	m_Volume = atoi(optarg);
+	m_initialVolume = atoi(optarg);
         break;
       case boost_on_downmix_opt:
         m_boost_on_downmix = true;
@@ -888,11 +887,11 @@ int main(int argc, char *argv[])
   if (m_refresh && !m_no_hdmi_clock_sync)
     m_hdmi_clock_sync = true;
 
-  if(!m_av_clock->OMXInitialize())
+  if(!m_av_clock->OMXInitialize(m_has_video, m_has_audio))
     goto do_exit;
 
   if(m_hdmi_clock_sync && !m_av_clock->HDMIClockSync())
-    goto do_exit;
+      goto do_exit;
 
   m_omx_reader.GetHints(OMXSTREAM_AUDIO, m_hints_audio);
   m_omx_reader.GetHints(OMXSTREAM_VIDEO, m_hints_video);
@@ -926,7 +925,7 @@ int main(int argc, char *argv[])
         m_omx_reader.SeekTime(m_seek_pos * 1000.0f, false, &startpts);  // from seconds to DVD_TIME_BASE
   }
   
-  if(m_has_video && !m_player_video.Open(m_hints_video, m_av_clock, DestRect, m_Deinterlace ? VS_DEINTERLACEMODE_FORCE:m_NoDeinterlace ? VS_DEINTERLACEMODE_OFF:VS_DEINTERLACEMODE_AUTO,
+  if(m_has_video && !m_player_video.Open(m_hints_video, m_av_clock, DestRect, m_Deinterlace ? 1:m_NoDeinterlace ? -1:0,
                                          m_hdmi_clock_sync, m_thread_player, m_display_aspect, video_queue_size, video_fifo_size))
     goto do_exit;
 
@@ -986,13 +985,11 @@ int main(int argc, char *argv[])
     m_passthrough = false;
 
   if(m_has_audio && !m_player_audio.Open(m_hints_audio, m_av_clock, &m_omx_reader, deviceString, 
-                                         m_passthrough, m_use_hw_audio,
+                                         m_passthrough, m_initialVolume, m_use_hw_audio,
                                          m_boost_on_downmix, m_thread_player, audio_queue_size, audio_fifo_size))
     goto do_exit;
 
-  if(m_has_audio)
-    m_player_audio.SetVolume(pow(10, m_Volume / 2000.0));
-
+  m_av_clock->OMXStart(0.0);
   m_av_clock->OMXPause();
   m_av_clock->OMXStateExecute();
 
@@ -1249,18 +1246,16 @@ int main(int argc, char *argv[])
         }
         break;
       case KeyConfig::ACTION_DECREASE_VOLUME:
-        m_Volume -= 300;
-        m_player_audio.SetVolume(pow(10, m_Volume / 2000.0));
+        m_player_audio.SetCurrentVolume(m_player_audio.GetCurrentVolume() - 300);
         DISPLAY_TEXT_SHORT(strprintf("Volume: %.2f dB",
-          m_Volume / 100.0f));
-        printf("Current Volume: %.2fdB\n", m_Volume / 100.0f);
+          m_player_audio.GetCurrentVolume() / 100.0f));
+        printf("Current Volume: %.2fdB\n", m_player_audio.GetCurrentVolume() / 100.0f);
         break;
       case KeyConfig::ACTION_INCREASE_VOLUME:
-        m_Volume += 300;
-        m_player_audio.SetVolume(pow(10, m_Volume / 2000.0));
+        m_player_audio.SetCurrentVolume(m_player_audio.GetCurrentVolume() + 300);
         DISPLAY_TEXT_SHORT(strprintf("Volume: %.2f dB",
-          m_Volume / 100.0f));
-        printf("Current Volume: %.2fdB\n", m_Volume / 100.0f);
+          m_player_audio.GetCurrentVolume() / 100.0f));
+        printf("Current Volume: %.2fdB\n", m_player_audio.GetCurrentVolume() / 100.0f);
         break;
       default:
         break;
@@ -1271,8 +1266,7 @@ int main(int argc, char *argv[])
       double seek_pos     = 0;
       double pts          = 0;
 
-      if(m_has_subtitle)
-        m_player_subtitles.Pause();
+      m_av_clock->OMXPause();
 
       pts = m_av_clock->OMXMediaTime();
 
@@ -1295,20 +1289,12 @@ int main(int argc, char *argv[])
       }
 
       m_player_video.Close();
-
-      sentStarted = false;
-
-      if(m_has_video && !m_player_video.Open(m_hints_video, m_av_clock, DestRect, m_Deinterlace ? VS_DEINTERLACEMODE_FORCE:m_NoDeinterlace ? VS_DEINTERLACEMODE_OFF:VS_DEINTERLACEMODE_AUTO,
+      if(m_has_video && !m_player_video.Open(m_hints_video, m_av_clock, DestRect, m_Deinterlace ? 1:m_NoDeinterlace ? -1:0,
                                          m_hdmi_clock_sync, m_thread_player, m_display_aspect, video_queue_size, video_fifo_size))
         goto do_exit;
 
       CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
 
-      m_av_clock->OMXPause();
-      m_av_clock->OMXStateExecute();
-
-      if(m_has_subtitle)
-        m_player_subtitles.Resume();
       m_packet_after_seek = false;
       m_seek_flush = false;
     }
@@ -1397,13 +1383,6 @@ int main(int argc, char *argv[])
       }
     }
 
-    if (!sentStarted)
-    {
-      CLog::Log(LOGDEBUG, "COMXPlayer::HandleMessages - player started RESET");
-      m_av_clock->OMXReset(m_has_video, m_has_audio);
-      sentStarted = true;
-    }
-
     if (audio_pts != DVD_NOPTS_VALUE)
     {
       audio_fifo_low = m_has_audio && audio_fifo < threshold;
@@ -1414,10 +1393,9 @@ int main(int argc, char *argv[])
       video_fifo_low = m_has_video && video_fifo < threshold;
       video_fifo_high = !m_has_video || (video_pts != DVD_NOPTS_VALUE && video_fifo > 2.0f * m_threshold);
     }
-
-    //printf("Normal M:%.0f (A:%.0f V:%.0f) P:%d A:%.2f V:%.2f/T:%.2f (%d,%d,%d,%d) A:%d%% V:%d%% (%.2f,%.2f)\n", stamp, audio_pts, video_pts, m_av_clock->OMXIsPaused(), 
-    //  audio_pts == DVD_NOPTS_VALUE ? 0.0:audio_fifo, video_pts == DVD_NOPTS_VALUE ? 0.0:video_fifo, 2.0f * m_threshold, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high,
-    //  m_player_audio.GetLevel(), m_player_video.GetLevel(), m_player_audio.GetDelay(), (float)m_player_audio.GetCacheTotal());
+    CLog::Log(LOGDEBUG, "Normal M:%.0f (A:%.0f V:%.0f) P:%d A:%.2f V:%.2f/T:%.2f (%d,%d,%d,%d) A:%d%% V:%d%% (%.2f,%.2f)\n", stamp, audio_pts, video_pts, m_av_clock->OMXIsPaused(), 
+      audio_pts == DVD_NOPTS_VALUE ? 0.0:audio_fifo, video_pts == DVD_NOPTS_VALUE ? 0.0:video_fifo, 2.0f * m_threshold, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high,
+      m_player_audio.GetLevel(), m_player_video.GetLevel(), m_player_audio.GetDelay(), (float)m_player_audio.GetCacheTotal());
 
     if(!m_Pause && (m_omx_reader.IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high)))
     {
@@ -1520,6 +1498,7 @@ do_exit:
 
   m_av_clock->OMXStop();
   m_av_clock->OMXStateIdle();
+  m_av_clock->OMXStateExecute();
 
   m_player_subtitles.Close();
   m_player_video.Close();

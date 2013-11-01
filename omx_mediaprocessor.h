@@ -35,7 +35,6 @@
 
 #include <GLES2/gl2.h>
 #include <stdexcept>
-#include <memory>
 
 #include "omx_qthread.h"
 #include "lgl_logging.h"
@@ -63,8 +62,6 @@ class CRBP;
 class COMXCore;
 class COMXStreamInfo;
 
-typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
-
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor class
@@ -90,7 +87,7 @@ public:
         ERROR_WRONG_THREAD
     };
 
-    OMX_MediaProcessor(OMX_TextureProviderSh provider);
+    OMX_MediaProcessor(OMX_TextureProvider* provider);
     ~OMX_MediaProcessor();
 
     bool setFilename(QString filename, OMX_TextureData*& textureData);
@@ -123,8 +120,7 @@ public slots:
     bool play();
     bool stop();
     bool pause();
-    bool seek(long position);
-    void onTextureReady(const OMX_TextureData* textureData);
+    bool seek(qint64 position);
 
 signals:
     void metadataChanged(const QVariantMap metadata);
@@ -183,7 +179,7 @@ private:
     int m_subtitle_index;
     int m_audio_index;
 
-    OMX_TextureProviderSh m_provider;
+    OMX_TextureProvider* m_provider;
 
     QMutex m_mutexPending;
     QWaitCondition m_waitPendingCommand;

@@ -82,7 +82,7 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
  * for the texture provider.
  * @param provider
  */
-COMXVideo::COMXVideo(OMX_TextureProviderSh provider)
+COMXVideo::COMXVideo(OMX_TextureProvider* provider)
 {
   m_is_open           = false;
   m_extradata         = NULL;
@@ -238,7 +238,6 @@ bool COMXVideo::PortSettingsChanged()
   }
 
 #if 0
-  // lcarlon: this is not valid for egl_render.
   OMX_CONFIG_DISPLAYREGIONTYPE configDisplay;
   OMX_INIT_STRUCTURE(configDisplay);
   configDisplay.nPortIndex = m_omx_render.GetInputPort();
@@ -251,7 +250,7 @@ bool COMXVideo::PortSettingsChanged()
     CLog::Log(LOGWARNING, "%s::%s - could not set transform : %d", CLASSNAME, __func__, m_transform);
     return false;
   }
-#endif
+#endif // 0
 
   SetVideoEGL();
 

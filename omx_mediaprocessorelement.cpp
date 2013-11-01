@@ -21,18 +21,14 @@
  * along with PiOmxTextures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <memory>
-
 #include "omx_mediaprocessorelement.h"
 #include "omx_textureprovider.h"
 #include "lgl_logging.h"
 
-using namespace std;
-
-#define CHECK_MEDIA_PROCESSOR                                             \
-    if (!m_mediaProc) {                                                   \
-       LOG_WARNING(LOG_TAG, "The media processor is not available yet."); \
-       return false;                                                      \
+#define CHECK_MEDIA_PROCESSOR                                              \
+    if (!m_mediaProc) {                                                    \
+    LOG_WARNING(LOG_TAG, "The media processor is not available yet."); \
+    return false;                                                      \
     }
 
 OMX_MediaProcessorElement::OMX_MediaProcessorElement(QQuickItem *parent) :
@@ -50,6 +46,7 @@ OMX_MediaProcessorElement::OMX_MediaProcessorElement(QQuickItem *parent) :
 OMX_MediaProcessorElement::~OMX_MediaProcessorElement()
 {
     delete m_mediaProc;
+    delete m_texProvider;
     delete m_textureData;
 }
 
@@ -141,7 +138,7 @@ bool OMX_MediaProcessorElement::seek(long millis)
 void OMX_MediaProcessorElement::instantiateMediaProcessor()
 {
     if (!m_texProvider)
-        m_texProvider = make_shared<OMX_TextureProviderQQuickItem>();
+        m_texProvider = new OMX_TextureProviderQQuickItem(this);
     if (!m_mediaProc) {
         m_mediaProc = new OMX_MediaProcessor(m_texProvider);
         connect(m_mediaProc, SIGNAL(playbackCompleted()), this, SIGNAL(playbackCompleted()));
