@@ -65,7 +65,7 @@ protected:
   std::string               m_device;
   bool                      m_use_passthrough;
   bool                      m_use_hw_decode;
-  bool                      m_passthrough;
+  COMXAudio::EEncoded       m_passthrough;
   bool                      m_hw_decode;
   bool                      m_boost_on_downmix;
   bool                      m_bAbort;
@@ -76,6 +76,7 @@ protected:
   unsigned int              m_max_data_size;
   float                     m_fifo_size;
   COMXAudioCodecOMX         *m_pAudioCodec;
+  long                      m_initialVolume;
   bool   m_player_error;
 
   void Lock();
@@ -87,7 +88,7 @@ public:
   OMXPlayerAudio();
   virtual ~OMXPlayerAudio();
   bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMXReader *omx_reader,
-            std::string device, bool passthrough, bool hw_decode,
+            std::string device, bool passthrough, long initialVolume, bool hw_decode,
             bool boost_on_downmix, bool use_thread, float queue_size, float fifo_size);
   bool Close();
   bool Decode(OMXPacket *pkt);
@@ -96,7 +97,7 @@ public:
   bool AddPacket(OMXPacket *pkt);
   bool OpenAudioCodec();
   void CloseAudioCodec();      
-  bool IsPassthrough(COMXStreamInfo hints);
+  COMXAudio::EEncoded IsPassthrough(COMXStreamInfo hints);
   bool OpenDecoder();
   bool CloseDecoder();
   double GetDelay();
@@ -109,7 +110,8 @@ public:
   unsigned int GetCached() { return m_cached_size; };
   unsigned int GetMaxCached() { return m_max_data_size; };
   unsigned int GetLevel() { return m_max_data_size ? 100 * m_cached_size / m_max_data_size : 0; };
-  void SetVolume(float nVolume);
+  void SetCurrentVolume(long nVolume);
+  long GetCurrentVolume();
   bool Error() { return !m_player_error; };
 };
 #endif

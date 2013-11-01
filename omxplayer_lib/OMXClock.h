@@ -59,11 +59,10 @@ class OMXClock
 {
 protected:
   bool              m_pause;
-  pthread_mutex_t   m_lock;
+  bool              m_has_video;
+  bool              m_has_audio;
   int               m_omx_speed;
-  OMX_U32           m_WaitMask;
-  OMX_TIME_CLOCKSTATE   m_eState;
-  OMX_TIME_REFCLOCKTYPE m_eClock;
+  pthread_mutex_t   m_lock;
 private:
   COMXCoreComponent m_omx_clock;
   DllAvFormat       m_dllAvFormat;
@@ -72,14 +71,13 @@ public:
   ~OMXClock();
   void Lock();
   void UnLock();
-  void OMXSetClockPorts(OMX_TIME_CONFIG_CLOCKSTATETYPE *clock, bool has_video, bool has_audio);
-  bool OMXSetReferenceClock(bool has_audio, bool lock = true);
-  bool OMXInitialize();
+  bool OMXInitialize(bool has_video, bool has_audio);
   void OMXDeinitialize();
   bool OMXIsPaused() { return m_pause; };
   bool OMXStop(bool lock = true);
+  bool OMXStart(double pts, bool lock = true);
   bool OMXStep(int steps = 1, bool lock = true);
-  bool OMXReset(bool has_video, bool has_audio, bool lock = true);
+  bool OMXReset(bool lock = true);
   double OMXMediaTime(bool lock = true);
   double OMXClockAdjustment(bool lock = true);
   bool OMXMediaTime(double pts, bool lock = true);

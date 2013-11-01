@@ -39,7 +39,7 @@
 
 #define MAX_DATA_SIZE    10 * 1024 * 1024
 
-OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProviderSh provider)
+OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProvider* provider)
 {
   m_open          = false;
   m_stream_id     = -1;
@@ -68,6 +68,7 @@ OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProviderSh provider)
 
 OMXPlayerVideo::~OMXPlayerVideo()
 {
+  delete m_provider;
   Close();
 
   pthread_cond_destroy(&m_packet_cond);
@@ -452,7 +453,7 @@ bool OMXPlayerVideo::OpenDecoder(OMX_TextureData* textureData)
   connect(m_decoder, SIGNAL(textureDataReady(const OMX_TextureData*)),
           this, SIGNAL(textureDataReady(const OMX_TextureData*)), Qt::DirectConnection);
 
-  if(!m_decoder->Open(m_hints, m_av_clock, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync, m_fifo_size, textureData))
+  if (!m_decoder->Open(m_hints, m_av_clock, m_display_aspect, m_Deinterlace, m_hdmi_clock_sync, m_fifo_size, textureData))
   {
     CloseDecoder();
     return false;

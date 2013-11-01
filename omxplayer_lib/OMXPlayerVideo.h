@@ -35,7 +35,6 @@
 
 #include <deque>
 #include <sys/types.h>
-#include <memory>
 
 #include "OMXOverlayCodec.h"
 #include "OMXOverlayText.h"
@@ -45,12 +44,10 @@
 
 #include <QObject>
 
-using namespace std;
-
 class OMX_TextureProvider;
 class OMX_VideoSurfaceElement;
 
-typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
+using namespace std;
 
 class OMXPlayerVideo : public QObject, public OMXThread
 {
@@ -89,7 +86,7 @@ protected:
   double                    m_iVideoDelay;
   double                    m_iSubtitleDelay;
   COMXOverlayCodec          *m_pSubtitleCodec;
-  OMX_TextureProviderSh     m_provider;
+  OMX_TextureProvider*      m_provider;
   uint32_t                  m_history_valid_pts;
 
   void Lock();
@@ -100,7 +97,7 @@ protected:
   void UnLockSubtitles();
 private:
 public:
-  OMXPlayerVideo(OMX_TextureProviderSh provider);
+  OMXPlayerVideo(OMX_TextureProvider* provider);
   virtual ~OMXPlayerVideo();
   bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMX_TextureData*& textureId, EDEINTERLACEMODE deinterlace, bool hdmi_clock_sync, bool use_thread, float display_aspect, float queue_size, float fifo_size);
   bool Close();
