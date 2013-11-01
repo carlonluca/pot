@@ -611,24 +611,33 @@ void OMX_MediaProcessor::mediaDecoding()
          double pts      = m_av_clock->OMXMediaTime();
          seek_pos        = (pts / DVD_TIME_BASE) + m_incr;
          seek_pos        *= 1000.0;
-         m_incr          = 0;
 
          if (m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
             flushStreams(startpts);
 
-         m_player_video->Close();
-         if (m_has_video && !m_player_video->Open(
-                *m_hints_video,
-                m_av_clock,
-                m_textureData,
-                VS_DEINTERLACEMODE_OFF, /* deinterlace */
-                ENABLE_HDMI_CLOCK_SYNC,
-                true,                   /* threaded */
-                1.0,                    /* display aspect, unused */
-                m_video_queue_size, m_video_fifo_size
-                ))
-            //goto do_exit;
-            break;
+//#define ENABLE_FAST_FORWARD_SEEK
+#ifdef ENABLE_FAST_FORWARD_SEEK
+         if (m_incr < 0.0f) {
+#endif
+            m_player_video->Close();
+            if (m_has_video && !m_player_video->Open(
+                   *m_hints_video,
+                   m_av_clock,
+                   m_textureData,
+                   VS_DEINTERLACEMODE_OFF, /* deinterlace */
+                   ENABLE_HDMI_CLOCK_SYNC,
+                   true,                   /* threaded */
+                   1.0,                    /* display aspect, unused */
+                   m_video_queue_size, m_video_fifo_size
+                   )) {
+               m_incr = 0;
+               break;
+            }
+#ifdef ENABLE_FAST_FORWARD_SEEK
+         }
+#endif
+
+         m_incr = 0;
 
 #ifdef ENABLE_SUBTITLES
          if (m_has_subtitle)
