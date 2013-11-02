@@ -51,7 +51,7 @@
 #include "stat_utf8.h"
 #include "utils/StdString.h"
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 /*------------------------------------------------------------------------------
 |    definitions
@@ -111,21 +111,21 @@ void CLog::Log(int loglevel, const char *format, ... )
    va_start(args, format);
    switch (loglevel) {
    case LOGDEBUG:
-      log_debug("", format, args); break;
+      log_debug_v(format, args); break;
    case LOGINFO:
-      log_verbose("", format, args); break;
+      log_verbose_v(format, args); break;
    case LOGNOTICE:
-      log_info("", format, args); break;
+      log_info_v(format, args); break;
    case LOGWARNING:
-      log_warn("", format, args); break;
+      log_warn_v(format, args); break;
    case LOGERROR:
-      log_err("", format, args); break;
+      log_err_v(format, args); break;
    case LOGSEVERE:
-      log_err("", format, args); break;
+      log_err_v(format, args); break;
    case LOGFATAL:
-      log_critical("", format, args); break;
+      log_critical_v(format, args); break;
    default:
-      log_verbose("", format, args); break;
+      log_verbose_v(format, args); break;
    }
    va_end(args);
 #else

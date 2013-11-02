@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <bcm_host.h>
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 using namespace std;
 

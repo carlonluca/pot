@@ -4,7 +4,7 @@
 #include <stdexcept>
 
 #include "omxtunnel.h"
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 using namespace std;
 

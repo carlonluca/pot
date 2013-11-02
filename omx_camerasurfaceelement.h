@@ -34,7 +34,7 @@
 #include <QImage>
 
 #include "omx_textureprovider.h"
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 class OMX_SGTexture;
 

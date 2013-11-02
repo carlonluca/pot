@@ -43,7 +43,7 @@ headers.files  = \
    omx_textureprovider.h \
    omx_qthread.h \
    omx_globals.h \
-   lgl_logging.h
+   lc_logging.h
 headers.path   = $$OUT_PWD/piomxtextures
 
 omxplayer_headers.files = \
@@ -148,8 +148,11 @@ DEFINES += ENABLE_IMPROVED_BUFFERING
 # Can also be enabled in omx_mediaprocessor.h.
 #DEFINES += ENABLE_PAUSE_FOR_BUFFERING
 
+# This enables logs coming from omxplayer core.
+#DEFINES += ENABLE_OMXPLAYER_LOGS
+
 # For omxplayer.
-QMAKE_CXXFLAGS += -std=c++0x -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS             \
+QMAKE_CXXFLAGS += -std=c++11 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS             \
    -DTARGET_POSIX -D_LINUX -fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE               \
    -D_FILE_OFFSET_BITS=64 -DHAVE_CMAKE_CONFIG -D__VIDEOCORE4__                          \
    -U_FORTIFY_SOURCE -DUSE_EXTERNAL_FFMPEG  -DHAVE_LIBAVCODEC_AVCODEC_H                 \
@@ -196,6 +199,10 @@ SOURCES += \
     omx_playeraudio.cpp \
     omx_reader.cpp
 
+# This is the PiOmxTextures implementation of the logging class
+# in omxplayer.
+SOURCES += omx_omxplayer_logging.cpp
+
 SOURCES += \
     omxplayer_lib/Srt.cpp \
     omxplayer_lib/Unicode.cpp \
@@ -220,8 +227,11 @@ SOURCES += \
     omxplayer_lib/linux/XMemUtils.cpp \
     omxplayer_lib/linux/RBP.cpp \
     omxplayer_lib/utils/RegExp.cpp \
-    omxplayer_lib/utils/PCMRemap.cpp \
-    omxplayer_lib/utils/log.cpp
+    omxplayer_lib/utils/PCMRemap.cpp
+
+# Define log.cpp only if you want to use the omxplayer CLog
+# implementation. Otherwise use omx_omxplayer_loggin.cpp.
+#SOURCES += omxplayer_lib/utils/log.cpp
 
 HEADERS  += \
     openmaxiltextureloader.h \
@@ -232,7 +242,7 @@ HEADERS  += \
     omx_wrapper/OMXComponent.h \
     omx_wrapper/MyDeleter.h \
 #    glwidget.h \
-    lgl_logging.h \
+    lc_logging.h \
 #    ilclient/ilclient.h \
     omx_wrapper/omxtunnel.h \
     omx_imageelement.h \
@@ -291,6 +301,8 @@ OTHER_FILES += \
     tools/extract_h264_stream.sh \
     tools/prepare_openmaxil_backend.sh \
     omxplayer_lib/omxplayer.cpp \
+    omxplayer_lib/Keyboard.h \
+    omxplayer_lib/Keyboard.cpp \
     omxplayer_lib/OMXPLAYER_VERSION
 
 contains(DEFINES, CONFIG_APP) {

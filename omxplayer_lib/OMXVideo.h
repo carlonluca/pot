@@ -24,6 +24,8 @@
 
 #include <QObject>
 
+#include <memory>
+
 #include "OMXCore.h"
 #include "OMXStreamInfo.h"
 
@@ -33,10 +35,15 @@
 #include "OMXReader.h"
 
 #include "guilib/Geometry.h"
+#include "utils/SingleLock.h"
+
+using namespace std;
 
 class OMX_VideoSurfaceElement;
 class OMX_TextureProvider;
 class OMX_TextureData;
+
+typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
 
 
 #define VIDEO_BUFFERS 60
@@ -56,7 +63,7 @@ class COMXVideo : public QObject
 {
     Q_OBJECT
 public:
-  COMXVideo(OMX_TextureProvider* provider);
+  COMXVideo(OMX_TextureProviderSh provider);
   ~COMXVideo();
 
   // Required overrides
@@ -127,15 +134,17 @@ protected:
   EDEINTERLACEMODE  m_deinterlace_request;
   bool              m_hdmi_clock_sync;
   bool              m_first_text;
-  OMX_TextureProvider* m_provider;
+  // lcarlon: modified members.
+  OMX_TextureProviderSh m_provider;
   OMX_BUFFERHEADERTYPE* m_eglBuffer;
-  COMXStreamInfo    m_hints;
   OMX_TextureData*  m_textureData; // Only used in case of re-use of the texture.
-  uint32_t          m_history_valid_pts;
+  // ====
   float             m_pixel_aspect;
   bool              m_submitted_eos;
+  bool              m_failed_eos;
   OMX_DISPLAYTRANSFORMTYPE m_transform;
   bool              m_settings_changed;
+  CCriticalSection  m_critSection;
 };
 
 #endif

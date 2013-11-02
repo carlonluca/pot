@@ -8,7 +8,7 @@ standalone.
 Downloading OMXPlayer
 ---------------------
 
-    git clone git://github.com/huceke/omxplayer.git
+    git clone https://github.com/popcornmix/omxplayer.git
 
 Compiling OMXPlayer
 -------------------
@@ -50,7 +50,7 @@ Using OMXPlayer
          -v / --version                 print version info
          -k / --keys                    print key bindings
          -n / --aidx  index             audio stream index    : e.g. 1
-         -o / --adev  device            audio out device      : e.g. hdmi/local
+         -o / --adev  device            audio out device      : e.g. hdmi/local/both
          -i / --info                    dump stream format and exit
          -s / --stats                   pts and buffer stats
          -p / --passthrough             audio passthrough
@@ -65,7 +65,7 @@ Using OMXPlayer
          -g / --genlog                  generate log file
          -l / --pos n                   start position (in seconds)
          -b / --blank                   set background to black
-              --boost-on-downmix        boost volume when downmixing
+              --no-boost-on-downmix     don't boost volume when downmixing
               --vol n                   Set initial volume in millibels (default 0)
               --no-osd                  do not display status information on screen
               --subtitles path          external subtitles in UTF-8 srt format
@@ -84,6 +84,9 @@ Using OMXPlayer
               --audio_queue n           Size of audio input queue in MB
               --video_queue n           Size of video input queue in MB
               --threshold   n           Amount of buffered data required to come out of buffering in seconds
+              --orientation n           Set orientation of video (0, 90, 180 or 270)
+              --live                    Set for live tv or vod type stream
+              --layout                  Set output speaker layout (e.g. 5.1)
               --key-config <file>       Uses key bindings specified in <file> instead of the default
 
 For example:

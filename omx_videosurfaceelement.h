@@ -31,7 +31,7 @@
 #include <QOpenGLContext>
 #include <QTimer>
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 #include "omx_mediaprocessorelement.h"
 #include "omx_textureprovider.h"
 

@@ -35,8 +35,9 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <assert.h>
+#include <memory>
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 #include "omx_globals.h"
 
 /*------------------------------------------------------------------------------
@@ -51,46 +52,21 @@ class QQuickItem;
 class OMX_TextureData
 {
 public:
-    OMX_TextureData() :
-        m_textureId(0),
-        m_textureData(NULL),
-        m_eglImage(NULL),
-        m_textureSize(QSize(0, 0)) {
-        // Do nothing.
-    }
+   OMX_TextureData();
+   OMX_TextureData(const OMX_TextureData& textureData);
 
-    OMX_TextureData(const OMX_TextureData& textureData) :
-        m_textureId(textureData.m_textureId),
-        m_textureData(textureData.m_textureData),
-        m_eglImage(textureData.m_eglImage),
-        m_textureSize(textureData.m_textureSize) {
-        // Do nothing.
-    }
+   ~OMX_TextureData();
 
-    ~OMX_TextureData() {
-        // Do not free.
-    }
+   void freeData();
 
-    void freeData() {
-        EGLDisplay eglDisplay = get_egl_display();
-
-        // Destroy texture, EGL image and free the buffer.
-        if (eglDestroyImageKHR(eglDisplay, m_eglImage) == EGL_SUCCESS) {
-            EGLint err = eglGetError();
-            LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %d.", err);
-        }
-        glDeleteTextures(1, &m_textureId);
-        delete m_textureData;
-    }
-
-    GLuint      m_textureId;
-    GLubyte*    m_textureData;
-    EGLImageKHR m_eglImage;
-    QSize       m_textureSize;
+   GLuint      m_textureId;
+   GLubyte*    m_textureData;
+   EGLImageKHR m_eglImage;
+   QSize       m_textureSize;
 };
 
 /*------------------------------------------------------------------------------
-|    OMX_VideoProcessorThread class
+|    OMX_TextureProvider class
 +-----------------------------------------------------------------------------*/
 /**
  * @brief The OMX_TextureProviderQQuickItem class can be instantiate by
@@ -100,10 +76,11 @@ public:
 class OMX_TextureProvider
 {
 public:
-    virtual ~OMX_TextureProvider() {}
-    virtual OMX_TextureData* instantiateTexture(QSize size) = 0;
-    virtual void freeTexture(OMX_TextureData* textureData) = 0;
+   virtual ~OMX_TextureProvider() {}
+   virtual OMX_TextureData* instantiateTexture(QSize size) = 0;
+   virtual void freeTexture(OMX_TextureData* textureData) = 0;
 };
+typedef std::shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
 
 /*------------------------------------------------------------------------------
 |    OMX_TextureProviderQQuickItem class
@@ -111,17 +88,14 @@ public:
 class OMX_TextureProviderQQuickItem : public OMX_TextureProvider
 {
 public:
-    OMX_TextureProviderQQuickItem(QQuickItem* item) :
-        OMX_TextureProvider(),
-        m_item(item) {
-        // Do nothing.
-    }
+   OMX_TextureProviderQQuickItem() : OMX_TextureProvider() {
+      // Do nothing.
+   }
 
-    OMX_TextureData* instantiateTexture(QSize size);
-    void freeTexture(OMX_TextureData* textureData);
+   virtual ~OMX_TextureProviderQQuickItem() {}
 
-private:
-    QQuickItem* m_item;
+   OMX_TextureData* instantiateTexture(QSize size);
+   void freeTexture(OMX_TextureData* textureData);
 };
 
 #endif // OMX_TEXTUREPROVIDERQQUICKITEM_H

@@ -40,7 +40,7 @@ extern "C" {
 
 #include "omx_audioprocessor.h"
 #include "OMX_Core.h"
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 using namespace std;
 

@@ -75,8 +75,8 @@ protected:
     QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*);
 
 private:
-    OMX_MediaProcessor* m_mediaProc;
-    OMX_TextureProvider* m_texProvider;
+    OMX_MediaProcessor*   m_mediaProc;
+    OMX_TextureProviderSh m_texProvider;
 
     QString m_source;
     volatile bool m_pendingOpen;

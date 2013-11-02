@@ -14,7 +14,7 @@
 
 #include "interface/vcos/vcos.h"
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 #define TIMEOUT_MS 10000
 
