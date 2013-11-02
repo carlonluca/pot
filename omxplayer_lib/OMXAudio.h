@@ -35,6 +35,7 @@
 #include "OMXStreamInfo.h"
 #include "BitstreamConverter.h"
 #include "utils/PCMRemap.h"
+#include "utils/SingleLock.h"
 
 class COMXAudio
 {
@@ -53,13 +54,11 @@ public:
   float GetCacheTime();
   float GetCacheTotal();
   unsigned int GetAudioRenderingLatency();
+  float GetMaxLevel(double &pts);
   COMXAudio();
-  bool Initialize(const CStdString& device, enum PCMChannels *channelMap,
-                           COMXStreamInfo &hints, OMXClock *clock, EEncoded bPassthrough, bool bUseHWDecode,
-                           bool boostOnDownmix, long initialVolume, float fifo_size);
-  bool Initialize(const CStdString& device, int iChannels, enum PCMChannels *channelMap,
-                           unsigned int downmixChannels, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool boostOnDownmix,
-                           OMXClock *clock, EEncoded bPassthrough = ENCODED_NONE, long initialVolume = 0, float fifo_size = 0);
+  bool Initialize(const CStdString& device, int iChannels, uint64_t channelMap,
+                           COMXStreamInfo &hints, enum PCMLayout layout, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool boostOnDownmix,
+                           OMXClock *clock, bool bUsePassthrough = false, bool bUseHWDecode = false, bool is_live = false, float fifo_size = 0);
   ~COMXAudio();
   bool PortSettingsChanged();
 
@@ -68,9 +67,11 @@ public:
   unsigned int GetSpace();
   bool Deinitialize();
 
-  long GetCurrentVolume() const;
-  void Mute(bool bMute);
-  bool SetCurrentVolume(long nVolume);
+  void SetVolume(float nVolume);
+  float GetVolume();
+  void SetMute(bool bOnOff);
+  void SetDynamicRangeCompression(long drc);
+  bool ApplyVolume();
   void SubmitEOS();
   bool IsEOS();
 
@@ -89,48 +90,73 @@ public:
   void PrintDTS(OMX_AUDIO_PARAM_DTSTYPE *dtsparam);
   unsigned int SyncDTS(BYTE* pData, unsigned int iSize);
   unsigned int SyncAC3(BYTE* pData, unsigned int iSize);
+  void UpdateAttenuation();
+  void BuildChannelMap(enum PCMChannels *channelMap, uint64_t layout);
+  int BuildChannelMapCEA(enum PCMChannels *channelMap, uint64_t layout);
+  void BuildChannelMapOMX(enum OMX_AUDIO_CHANNELTYPE *channelMap, uint64_t layout);
+  uint64_t GetChannelLayout(enum PCMLayout layout);
 
 private:
   bool          m_Initialized;
-  bool          m_Pause;
-  bool          m_CanPause;
-  long          m_CurrentVolume;
+  float         m_CurrentVolume;
+  bool          m_Mute;
+  long          m_drc;
   bool          m_Passthrough;
   bool          m_HWDecode;
   bool          m_normalize_downmix;
-  std::string   m_deviceuse;
   unsigned int  m_BytesPerSec;
   unsigned int  m_BufferLen;
   unsigned int  m_ChunkLen;
   unsigned int  m_InputChannels;
   unsigned int  m_OutputChannels;
-  unsigned int  m_downmix_channels;
   unsigned int  m_BitsPerSample;
+  float		m_maxLevel;
+  float         m_amplification;
+  float         m_attenuation;
+  float         m_submitted;
   COMXCoreComponent *m_omx_clock;
-  OMXClock       *m_av_clock;
+  OMXClock      *m_av_clock;
+  bool          m_settings_changed;
   bool          m_setStartTime;
-  int           m_SampleSize;
   bool          m_LostSync;
   int           m_SampleRate;
   OMX_AUDIO_CODINGTYPE m_eEncoding;
   uint8_t       *m_extradata;
   int           m_extrasize;
+  std::string   m_deviceuse;
+  double        m_last_pts;
+  bool          m_submitted_eos;
+  bool          m_failed_eos;
   float         m_fifo_size;
+  bool          m_live;
+
+  OMX_AUDIO_CHANNELTYPE m_input_channels[OMX_AUDIO_MAXCHANNELS];
+  OMX_AUDIO_CHANNELTYPE m_output_channels[OMX_AUDIO_MAXCHANNELS];
   OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_output;
   OMX_AUDIO_PARAM_PCMMODETYPE m_pcm_input;
   OMX_AUDIO_PARAM_DTSTYPE     m_dtsParam;
   WAVEFORMATEXTENSIBLE        m_wave_header;
+  typedef struct {
+    double pts;
+    float level;
+  } amplitudes_t;
+  std::deque<amplitudes_t> m_ampqueue;
+  float m_downmix_matrix[OMX_AUDIO_MAXCHANNELS*OMX_AUDIO_MAXCHANNELS];
 
 protected:
-  COMXCoreComponent m_omx_render;
+  COMXCoreComponent m_omx_render_analog;
+  COMXCoreComponent m_omx_render_hdmi;
+  COMXCoreComponent m_omx_splitter;
   COMXCoreComponent m_omx_mixer;
   COMXCoreComponent m_omx_decoder;
-  COMXCoreTunel     m_omx_tunnel_clock;
+  COMXCoreTunel     m_omx_tunnel_clock_analog;
+  COMXCoreTunel     m_omx_tunnel_clock_hdmi;
   COMXCoreTunel     m_omx_tunnel_mixer;
   COMXCoreTunel     m_omx_tunnel_decoder;
+  COMXCoreTunel     m_omx_tunnel_splitter_analog;
+  COMXCoreTunel     m_omx_tunnel_splitter_hdmi;
   DllAvUtil         m_dllAvUtil;
-  bool              m_settings_changed;
-  CPCMRemap         m_remap;
+  CCriticalSection m_critSection;
 
   // lcarlon: I need this to use externally.
   friend class OMX_PlayerAudio;

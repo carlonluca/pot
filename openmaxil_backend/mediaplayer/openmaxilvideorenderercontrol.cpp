@@ -29,7 +29,7 @@
 #include "QtCore/qtimer.h"
 #include "QtCore/qmutex.h"
 #include "openmaxilvideorenderercontrol.h"
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 static QMutex m_mutex;
 

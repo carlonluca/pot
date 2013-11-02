@@ -40,7 +40,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 #include "omx_videosurfaceelement.h"
 #include "omx_textureprovider.h"
 
@@ -68,6 +68,7 @@
 
 #define MAX_TEXT_LENGTH 1024
 
+// lcarlon: needed callback for OMX componenent.
 OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer)
 {
     (void)pAppData;
@@ -77,12 +78,7 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
     return OMX_FillThisBuffer(handle, pBuffer);
 }
 
-/**
- * @brief COMXVideo::COMXVideo Creates a video element. Does not take responsability
- * for the texture provider.
- * @param provider
- */
-COMXVideo::COMXVideo(OMX_TextureProvider* provider)
+COMXVideo::COMXVideo(OMX_TextureProviderSh provider) : m_video_codec_name("")
 {
   m_is_open           = false;
   m_extradata         = NULL;
@@ -96,12 +92,14 @@ COMXVideo::COMXVideo(OMX_TextureProvider* provider)
   m_omx_clock         = NULL;
   m_av_clock          = NULL;
   m_submitted_eos     = false;
+  m_failed_eos        = false;
   m_settings_changed  = false;
   m_setStartTime      = false;
   m_setStartTimeText  = true;
   m_transform         = OMX_DISPLAY_ROT0;
   m_first_text        = true;
   m_pixel_aspect      = 1.0f;
+  // lcarlon: keep these inits.
   m_provider          = provider;
   m_textureData       = NULL;
 }
@@ -113,6 +111,7 @@ COMXVideo::~COMXVideo()
 
 bool COMXVideo::SendDecoderConfig()
 {
+  CSingleLock lock (m_critSection);
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
 
   /* send decoder config */
@@ -165,6 +164,7 @@ bool COMXVideo::NaluFormatStartCodes(enum AVCodecID codec, uint8_t *in_extradata
 
 bool COMXVideo::PortSettingsChanged()
 {
+  CSingleLock lock (m_critSection);
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
 
   if (m_settings_changed)
@@ -224,7 +224,7 @@ bool COMXVideo::PortSettingsChanged()
       port_image.format.video.nFrameWidth, port_image.format.video.nFrameHeight,
       port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace);
 
-  printf("%s::%s - %dx%d@%.2f interlace:%d deinterlace:%d", CLASSNAME, __func__,
+  printf("V:PortSettingsChanged: %dx%d@%.2f interlace:%d deinterlace:%d\n",
       port_image.format.video.nFrameWidth, port_image.format.video.nFrameHeight,
       port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace);
 
@@ -238,6 +238,7 @@ bool COMXVideo::PortSettingsChanged()
   }
 
 #if 0
+  // lcarlon: this is not valid for egl_render.
   OMX_CONFIG_DISPLAYREGIONTYPE configDisplay;
   OMX_INIT_STRUCTURE(configDisplay);
   configDisplay.nPortIndex = m_omx_render.GetInputPort();
@@ -250,7 +251,7 @@ bool COMXVideo::PortSettingsChanged()
     CLog::Log(LOGWARNING, "%s::%s - could not set transform : %d", CLASSNAME, __func__, m_transform);
     return false;
   }
-#endif // 0
+#endif
 
   SetVideoEGL();
 
@@ -363,6 +364,7 @@ bool COMXVideo::PortSettingsChanged()
 
 bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspect, EDEINTERLACEMODE deinterlace, bool hdmi_clock_sync, float fifo_size, OMX_TextureData* textureData)
 {
+  CSingleLock lock (m_critSection);
   bool vflip = false;
   Close();
   OMX_ERRORTYPE omx_err   = OMX_ErrorNone;
@@ -378,13 +380,13 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
 
   m_hdmi_clock_sync = hdmi_clock_sync;
   m_submitted_eos = false;
+  m_failed_eos    = false;
 
-  m_hints       = hints;
   m_textureData = textureData; // Used in case not NULL.
 
   // lcarlon: it is important that the generation of the texture is done in the rendering
   // thread. Beware that BlockingQueuedConnection hardlocks when on the same thread.
-  LOG_VERBOSE(LOG_TAG, "Generating texture of size (%d, %d).", m_hints.width, m_hints.height);
+  LOG_VERBOSE(LOG_TAG, "Generating texture of size (%d, %d).", hints.width, hints.height);
 #if 0
   QMetaObject::invokeMethod(
            m_provider,
@@ -396,7 +398,7 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   // lcarlon: there are cases in which I don't want to generate a new texture, but I want to
   // re-use an existing one. For instance seek and restart may want to simply close and reopen
   // the video player without generating a new texture.
-  QSize videoSize(m_hints.width, m_hints.height);
+  QSize videoSize(hints.width, hints.height);
   if (!m_textureData) {
      m_textureData = m_provider->instantiateTexture(videoSize);
      LOG_VERBOSE(LOG_TAG, "Texture generated!");
@@ -698,7 +700,7 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   if(!m_omx_text.Initialize("OMX.broadcom.text_scheduler", OMX_IndexParamOtherInit))
     return false;
 
-  m_omx_tunnel_text.Initialize(m_omx_clock, m_omx_clock->GetInputPort() + 2, &m_omx_text, m_omx_text.GetInputPort() + 2);
+  m_omx_tunnel_text.Initialize(m_omx_clock, m_omx_clock->GetInputPort() + 3, &m_omx_text, m_omx_text.GetInputPort() + 2);
 
   OMX_INIT_STRUCTURE(portParam);
   portParam.nPortIndex = m_omx_text.GetInputPort();
@@ -788,7 +790,7 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   m_setStartTime      = true;
   m_setStartTimeText  = true;
 
-  switch(0)
+  switch(hints.orientation)
   {
     case 90:
       m_transform = OMX_DISPLAY_ROT90;
@@ -824,13 +826,7 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
 
 void COMXVideo::Close()
 {
-  m_omx_tunnel_decoder.Flush();
-  if(m_deinterlace)
-    m_omx_tunnel_image_fx.Flush();
-  m_omx_tunnel_clock.Flush();
-  m_omx_tunnel_sched.Flush();
-  m_omx_tunnel_text.Flush();
-
+  CSingleLock lock (m_critSection);
   m_omx_tunnel_clock.Deestablish();
   m_omx_tunnel_decoder.Deestablish();
   if(m_deinterlace)
@@ -845,7 +841,7 @@ void COMXVideo::Close()
   if(m_deinterlace)
     m_omx_image_fx.Deinitialize(true);
   m_omx_render.Deinitialize(true);
-  m_omx_text.Deinitialize();
+  m_omx_tunnel_text.Deestablish(true);
 
   m_is_open       = false;
 
@@ -866,19 +862,22 @@ void COMXVideo::SetDropState(bool bDrop)
 
 unsigned int COMXVideo::GetFreeSpace()
 {
+  CSingleLock lock (m_critSection);
   return m_omx_decoder.GetInputBufferSpace();
 }
 
 unsigned int COMXVideo::GetSize()
 {
+  CSingleLock lock (m_critSection);
   return m_omx_decoder.GetInputBufferSize();
 }
 
 int COMXVideo::Decode(uint8_t *pData, int iSize, double pts)
 {
+  CSingleLock lock (m_critSection);
   OMX_ERRORTYPE omx_err;
 
-  if( m_drop_state )
+  if( m_drop_state || !m_is_open )
     return true;
 
     unsigned int demuxer_bytes = (unsigned int)iSize;
@@ -967,25 +966,26 @@ int COMXVideo::Decode(uint8_t *pData, int iSize, double pts)
 
 void COMXVideo::Reset(void)
 {
+  CSingleLock lock (m_critSection);
   if(!m_is_open)
     return;
 
-  //m_setStartTime      = true;
-  //m_setStartTimeText  = true;
-
+  m_setStartTime      = true;
+  m_setStartTimeText  = true;
   m_omx_text.FlushAll();
-  m_omx_tunnel_text.Flush();
   m_omx_decoder.FlushInput();
-  m_omx_tunnel_decoder.Flush();
+  if(m_deinterlace)
+    m_omx_image_fx.FlushInput();
 }
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 void COMXVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect)
 {
+  CSingleLock lock (m_critSection);
   if(!m_is_open)
     return;
 
-  if ( !m_settings_changed || !((DestRect.x2 > DestRect.x1 && DestRect.y2 > DestRect.y1) || m_pixel_aspect != 0.0f) )
+  if ( !((DestRect.x2 > DestRect.x1 && DestRect.y2 > DestRect.y1) || m_pixel_aspect != 0.0f) )
     return;
 
   OMX_ERRORTYPE omx_err;
@@ -1070,22 +1070,26 @@ bool COMXVideo::SetVideoEGLOutputPort()
 
 int COMXVideo::GetInputBufferSize()
 {
+  CSingleLock lock (m_critSection);
   return m_omx_decoder.GetInputBufferSize();
 }
 
 void COMXVideo::SubmitEOS()
 {
+  CSingleLock lock (m_critSection);
   if(!m_is_open)
     return;
 
   m_submitted_eos = true;
+  m_failed_eos = false;
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
-  OMX_BUFFERHEADERTYPE *omx_buffer = m_omx_decoder.GetInputBuffer();
+  OMX_BUFFERHEADERTYPE *omx_buffer = m_omx_decoder.GetInputBuffer(1000);
   
   if(omx_buffer == NULL)
   {
     CLog::Log(LOGERROR, "%s::%s - buffer error 0x%08x", CLASSNAME, __func__, omx_err);
+    m_failed_eos = true;
     return;
   }
   
@@ -1106,9 +1110,10 @@ void COMXVideo::SubmitEOS()
 
 bool COMXVideo::IsEOS()
 {
+  CSingleLock lock (m_critSection);
   if(!m_is_open)
     return true;
-  if (!m_omx_render.IsEOS())
+  if (!m_failed_eos && !m_omx_render.IsEOS())
     return false;
   if (m_submitted_eos)
   {
@@ -1120,7 +1125,8 @@ bool COMXVideo::IsEOS()
 
 OMXPacket *COMXVideo::GetText()
 {
-  OMX_BUFFERHEADERTYPE *omx_buffer = m_omx_text.GetOutputBuffer();
+  CSingleLock lock (m_critSection);
+  OMX_BUFFERHEADERTYPE *omx_buffer = m_omx_text.GetOutputBuffer(0);
   OMXPacket *pkt = NULL;
 
   if(omx_buffer)
@@ -1147,6 +1153,7 @@ OMXPacket *COMXVideo::GetText()
 
 int COMXVideo::DecodeText(uint8_t *pData, int iSize, double dts, double pts)
 {
+  CSingleLock lock (m_critSection);
   OMX_ERRORTYPE omx_err;
 
   if (pData || iSize > 0)

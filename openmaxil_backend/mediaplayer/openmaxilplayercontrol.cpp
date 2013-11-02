@@ -45,6 +45,8 @@
 #include <omx_mediaprocessor.h>
 #include <omx_textureprovider.h>
 
+#include "lc_logging.h"
+
 /*------------------------------------------------------------------------------
 |    definitions
 +-----------------------------------------------------------------------------*/
@@ -57,7 +59,7 @@
 #define LOG_DEBUG(...) {(void)0}
 #endif // LOG_DEBUG
 #else
-#include <lgl_logging.h>
+#include <lc_logging.h>
 #endif // DEBUG_PLAYER_CONTROL
 
 
@@ -71,7 +73,7 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    , m_ownStream(false)
    , m_seekToStartPending(false)
    , m_pendingSeekPosition(-1)
-   , m_mediaProcessor(new OMX_MediaProcessor(this))
+   , m_mediaProcessor(new OMX_MediaProcessor(OMX_TextureProviderSh(new OMX_TextureProviderQQuickItem())))
    , m_textureData(NULL)
    , m_sceneGraphInitialized(false)
    , m_quickItem(NULL)
@@ -282,7 +284,7 @@ void OpenMAXILPlayerControl::processCommands()
          LOG_VERBOSE(LOG_TAG, "Processing post freeTexture()...");
          PlayerCommandFreeTextureData* freeTextureCommand =
                dynamic_cast<PlayerCommandFreeTextureData*>(command);
-         this->freeTextureInt(freeTextureCommand->m_textureData);
+         m_texProvider->freeTexture(freeTextureCommand->m_textureData);
       }
    }
 
@@ -291,66 +293,15 @@ void OpenMAXILPlayerControl::processCommands()
 }
 
 /*------------------------------------------------------------------------------
-|    OpenMAXILPlayerControl::instantiateTexture
-+-----------------------------------------------------------------------------*/
-/**
- * @brief OpenMAXILPlayerControl::instantiateTexture is invoked by the OMX_MediaProcessor
- * when a texture is requested. The thread the code is run on is the same as the thread
- * running the setFilename method: in this case the renderer thread. This makes it possible
- * to make it work correctly.
- * @param size The size of the texture to instantiate.
- * @return The OMX_TextureData containing the data.
- */
-OMX_TextureData* OpenMAXILPlayerControl::instantiateTexture(QSize size)
-{
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
-
-   OMX_TextureProviderQQuickItem provider(NULL);
-   m_textureData = provider.instantiateTexture(size);
-   return m_textureData;
-}
-
-/*------------------------------------------------------------------------------
-|    OpenMAXILPlayerControl::freeTexture
-+-----------------------------------------------------------------------------*/
-/**
- * @brief OpenMAXILPlayerControl::freeTexture must free textureData content. To do this
- * it is necessary to be in the renderer thread.
- * @param textureData
- */
-void OpenMAXILPlayerControl::freeTexture(OMX_TextureData* textureData)
-{
-   LOG_DEBUG("%s", Q_FUNC_INFO);
-
-#if 0
-   PlayerCommandFreeTextureData* command = new PlayerCommandFreeTextureData;
-   command->m_playerCommandType = PLAYER_COMMAND_TYPE_FREE_TEXTURE_DATA;
-   command->m_textureData       = textureData;
-   appendCommand(command);
-#endif
-
-   // Guaranteed to be invoked in the renderer thread. No need to queue a message.
-   OMX_TextureProviderQQuickItem provider(NULL);
-   provider.freeTexture(m_textureData);
-}
-
-/*------------------------------------------------------------------------------
-|    OpenMAXILPlayerControl::freeTextureInt
-+-----------------------------------------------------------------------------*/
-void OpenMAXILPlayerControl::freeTextureInt(OMX_TextureData* textureData)
-{
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
-
-   OMX_TextureProviderQQuickItem provider(NULL);
-   provider.freeTexture(textureData);
-}
-
-/*------------------------------------------------------------------------------
 |    OpenMAXILPlayerControl::setMedia
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setMedia(const QMediaContent& content, QIODevice* stream)
 {
    Q_UNUSED(stream);
+
+   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   LOG_DEBUG(LOG_TAG, "Media: %s.", qPrintable(content.canonicalUrl().path()));
+   LOG_DEBUG(LOG_TAG, "setMedia thread is: 0x%x.", ((unsigned int)QThread::currentThread()));
 
    LOG_VERBOSE(LOG_TAG, "Deferring setMedia()...");
    QUrl url = content.canonicalUrl();
@@ -522,9 +473,9 @@ void OpenMAXILPlayerControl::setPlaybackRate(qreal rate)
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setPosition(qint64 position)
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   LOG_DEBUG(LOG_TAG, "%s, %lld", Q_FUNC_INFO, position);
 
-   m_mediaProcessor->seek(position);
+  m_mediaProcessor->seek(position);
 }
 
 /*------------------------------------------------------------------------------
@@ -564,9 +515,7 @@ int OpenMAXILPlayerControl::volume() const
 +-----------------------------------------------------------------------------*/
 qint64 OpenMAXILPlayerControl::position() const
 {
-#if 0
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
-#endif
+   //LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
    return m_mediaProcessor->streamPosition();
 }

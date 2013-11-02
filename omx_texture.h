@@ -37,7 +37,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 
 /*------------------------------------------------------------------------------

@@ -31,7 +31,7 @@
 
 #include <cstring>
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 #include "omx_mediaprocessor.h"
 #include "omx_textureprovider.h"
 #include "omx_playeraudio.h"
@@ -82,7 +82,7 @@ static int get_mem_gpu(void)
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::OMX_MediaProcessor
 +-----------------------------------------------------------------------------*/
-OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
+OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProviderSh provider) :
    m_textureData(NULL),
    m_state(STATE_INACTIVE),
 #ifdef ENABLE_SUBTITLES
@@ -133,6 +133,8 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProvider* provider) :
    m_player_subtitles = new OMXPlayerSubtitles;
 #endif
 
+   connect(m_player_video, SIGNAL(textureDataReady(const OMX_TextureData*)),
+           this, SLOT(onTextureReady(const OMX_TextureData*)), Qt::DirectConnection);
    connect(m_player_video, SIGNAL(textureDataReady(const OMX_TextureData*)),
            this, SIGNAL(textureReady(const OMX_TextureData*)), Qt::DirectConnection);
 
@@ -260,11 +262,15 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 #endif
 
    LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
-   if (!m_av_clock->OMXInitialize(m_has_video, m_has_audio))
+   if (!m_av_clock->OMXInitialize())
       return false;
 
    if (ENABLE_HDMI_CLOCK_SYNC && !m_av_clock->HDMIClockSync())
       return false;
+
+   m_av_clock->OMXStateIdle();
+   m_av_clock->OMXStop();
+   m_av_clock->OMXPause();
 
    m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
    m_omx_reader->GetHints(OMXSTREAM_VIDEO, *m_hints_video);
@@ -296,7 +302,6 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
              m_video_queue_size, m_video_fifo_size
              ))
          return false;
-      m_textureData = textureData;
    }
 
 #ifdef ENABLE_SUBTITLES
@@ -333,20 +338,24 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 
 
    LOG_VERBOSE(LOG_TAG, "Opening audio using OMX...");
-   if (m_has_audio)
+   if (m_has_audio) {
       if (!m_player_audio->Open(
              *m_hints_audio,
              m_av_clock,
              m_omx_reader,
              "omx:hdmi",         /* TODO: implement way to change */
              false,              /* TODO: passthrough */
-             0,                  /* TODO: initial_volume */
              false,              /* TODO: hw decode */
              false,              /* TODO: downmix boost */
              true,               /* threaded */
+             false,              /* is_live */
+             PCM_LAYOUT_2_0,
              m_audio_queue_size, m_audio_fifo_size
              ))
          return false;
+      if (m_has_audio)
+          m_player_audio->SetVolume(pow(10, 0 / 2000.0));
+   }
 
    setState(STATE_STOPPED);
    return true;
@@ -374,16 +383,20 @@ bool OMX_MediaProcessor::play()
    case STATE_STOPPED: {
       setState(STATE_PLAYING);
 
+#if 1
       if (!m_omx_reader->SeekTime(0, true, &startpts)) {
          LOG_WARNING(LOG_TAG, "Failed to seek to the beginning.");
          return false;
       }
 
       flushStreams(startpts);
+#endif
 
-      m_av_clock->OMXStart(0.0);
+      //m_av_clock->OMXStart(0.0);
+      m_av_clock->OMXPause();
       m_av_clock->OMXStateExecute();
-      m_av_clock->OMXMediaTime(0.0D);
+      m_av_clock->OMXResume();
+      //m_av_clock->OMXMediaTime(0.0D);
 
       LOG_VERBOSE(LOG_TAG, "Starting thread.");
       return QMetaObject::invokeMethod(this, "mediaDecoding");
@@ -495,7 +508,7 @@ bool OMX_MediaProcessor::pause()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::seek(qint64 position)
 {
-   log_verbose("Seek %lldms.", position);
+   LOG_VERBOSE(LOG_TAG, "Seek %lldms.", position);
 
    // Get current position in ms.
    qint64 current  = m_av_clock->OMXMediaTime(false)*1E-3;
@@ -510,6 +523,15 @@ bool OMX_MediaProcessor::seek(qint64 position)
    m_incr = increment;
 
    return true;
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::onTextureReady
++-----------------------------------------------------------------------------*/
+void OMX_MediaProcessor::onTextureReady(const OMX_TextureData* textureData)
+{
+   // It should be safe to const_cast here.
+   m_textureData = const_cast<OMX_TextureData*>(textureData);
 }
 
 /*------------------------------------------------------------------------------
@@ -553,7 +575,7 @@ void OMX_MediaProcessor::mediaDecoding()
 {
    // See description in the qmakefile.
 //#define ENABLE_PROFILE_MAIN_LOOP
-//#define ENABLE_PAUSE_FOR_BUFFERING
+#define ENABLE_PAUSE_FOR_BUFFERING
 
    LOG_VERBOSE(LOG_TAG, "Decoding thread started.");
    emit playbackStarted();
@@ -568,10 +590,12 @@ void OMX_MediaProcessor::mediaDecoding()
    float video_fifo = 0;
    float threshold = 0;
    bool audio_fifo_low = false, video_fifo_low = false, audio_fifo_high = false, video_fifo_high = false;
-   float m_threshold = 0.1f; //std::min(0.1f, audio_fifo_size * 0.1f);
+   float m_threshold = 1.0f; //std::min(0.1f, audio_fifo_size * 0.1f);
 #endif // ENABLE_PAUSE_FOR_BUFFERING
+   bool sentStarted = false;
 
    bool sendEos = false;
+   double m_last_check_time = 0.0;
 
    while (!m_pendingStop) {
 #ifdef ENABLE_PROFILE_MAIN_LOOP
@@ -591,6 +615,13 @@ void OMX_MediaProcessor::mediaDecoding()
          LOG_VERBOSE(LOG_TAG, "Average: %f.", (double)tot/totNum);
       }
 #endif
+
+      double now = m_av_clock->GetAbsoluteClock();
+      bool update = false;
+      if (m_last_check_time == 0.0 || m_last_check_time + DVD_MSEC_TO_TIME(20) <= now) {
+         update = true;
+         m_last_check_time = now;
+      }
 
       // If a request is pending then consider done here.
       m_mutexPending.lock();
@@ -620,6 +651,7 @@ void OMX_MediaProcessor::mediaDecoding()
          if (m_incr < 0.0f) {
 #endif
             m_player_video->Close();
+            sentStarted = false;
             if (m_has_video && !m_player_video->Open(
                    *m_hints_video,
                    m_av_clock,
@@ -639,6 +671,10 @@ void OMX_MediaProcessor::mediaDecoding()
 
          m_incr = 0;
 
+#ifdef ENABLE_PAUSE_FOR_BUFFERING
+         m_av_clock->OMXPause();
+#endif
+
 #ifdef ENABLE_SUBTITLES
          if (m_has_subtitle)
             m_player_subtitles.Resume();
@@ -652,14 +688,13 @@ void OMX_MediaProcessor::mediaDecoding()
       else if (m_packetAfterSeek && TRICKPLAY(m_av_clock->OMXPlaySpeed())) {
          double seek_pos     = 0;
          double pts          = 0;
-         //static int faket    = 20*60*1e6;
 
          pts      = m_av_clock->OMXMediaTime();
          seek_pos = (pts/DVD_TIME_BASE);
 
          seek_pos *= 1000.0;
 
-#if 0
+#if 1
          if (m_omx_reader->SeekTime((int)seek_pos, m_av_clock->OMXPlaySpeed() < 0, &startpts))
             ; //FlushStreams(DVD_NOPTS_VALUE);
 #endif // 0
@@ -678,100 +713,107 @@ void OMX_MediaProcessor::mediaDecoding()
          break;
       }
 
+      if (update) {
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
-      /* when the video/audio fifos are low, we pause clock, when high we resume */
-      stamp     = m_av_clock->OMXMediaTime();
-      audio_pts = m_player_audio->GetCurrentPTS();
-      video_pts = m_player_video->GetCurrentPTS();
+         /* when the video/audio fifos are low, we pause clock, when high we resume */
+         stamp     = m_av_clock->OMXMediaTime();
+         audio_pts = m_player_audio->GetCurrentPTS();
+         video_pts = m_player_video->GetCurrentPTS();
 
-      if (0 && m_av_clock->OMXIsPaused()) {
-         double old_stamp = stamp;
-         if (audio_pts != DVD_NOPTS_VALUE && (stamp == 0 || audio_pts < stamp))
-            stamp = audio_pts;
-         if (video_pts != DVD_NOPTS_VALUE && (stamp == 0 || video_pts < stamp))
-            stamp = video_pts;
-         if (old_stamp != stamp)
-         {
-            m_av_clock->OMXMediaTime(stamp);
-            stamp = m_av_clock->OMXMediaTime();
+         if (0 && m_av_clock->OMXIsPaused()) {
+            double old_stamp = stamp;
+            if (audio_pts != DVD_NOPTS_VALUE && (stamp == 0 || audio_pts < stamp))
+               stamp = audio_pts;
+            if (video_pts != DVD_NOPTS_VALUE && (stamp == 0 || video_pts < stamp))
+               stamp = video_pts;
+            if (old_stamp != stamp)
+            {
+               m_av_clock->OMXMediaTime(stamp);
+               stamp = m_av_clock->OMXMediaTime();
+            }
          }
-      }
 
-      audio_fifo = audio_pts == DVD_NOPTS_VALUE ? 0.0f : audio_pts / DVD_TIME_BASE - stamp * 1e-6;
-      video_fifo = video_pts == DVD_NOPTS_VALUE ? 0.0f : video_pts / DVD_TIME_BASE - stamp * 1e-6;
-      threshold  = min(0.1f, (float)m_player_audio->GetCacheTotal()*0.1f);
+         audio_fifo = audio_pts == DVD_NOPTS_VALUE ? 0.0f : audio_pts / DVD_TIME_BASE - stamp * 1e-6;
+         video_fifo = video_pts == DVD_NOPTS_VALUE ? 0.0f : video_pts / DVD_TIME_BASE - stamp * 1e-6;
+         threshold  = min(0.1f, (float)m_player_audio->GetCacheTotal()*0.1f);
 #endif // ENABLE_PAUSE_FOR_BUFFERING
 
 #if 0
-      static int count;
-      if ((count++ & 15) == 0) {
-         LOG_VERBOSE(LOG_TAG, "M: %8.02f V : %8.02f %8d %8d A : %8.02f %8.02f/%8.02f Cv : %8d Ca : %8d \r", stamp,
-                     audio_fifo, m_player_video->GetDecoderBufferSize(), m_player_video->GetDecoderFreeSpace(),
-                     video_fifo, m_player_audio->GetDelay(), m_player_audio->GetCacheTotal(),
-                     m_player_video->GetCached(), m_player_audio->GetCached());
-      }
-#endif
-
-#if 0
-      if(m_tv_show_info) {
-         static unsigned count;
+         static int count;
          if ((count++ & 15) == 0) {
-            char response[80];
-            if (m_player_video.GetDecoderBufferSize() && m_player_audio.GetCacheTotal())
-               vc_gencmd(response, sizeof response, "render_bar 4 video_fifo %d %d %d %d",
-                         (int)(100.0*m_player_video.GetDecoderBufferSize()-m_player_video.GetDecoderFreeSpace())/m_player_video.GetDecoderBufferSize(),
-                         (int)(100.0*video_fifo/m_player_audio.GetCacheTotal()),
-                         0, 100);
-            if (m_player_audio.GetCacheTotal())
-               vc_gencmd(response, sizeof response, "render_bar 5 audio_fifo %d %d %d %d",
-                         (int)(100.0*audio_fifo/m_player_audio.GetCacheTotal()),
-                         (int)(100.0*m_player_audio.GetDelay()/m_player_audio.GetCacheTotal()),
-                         0, 100);
-            vc_gencmd(response, sizeof response, "render_bar 6 video_queue %d %d %d %d",
-                      m_player_video.GetLevel(), 0, 0, 100);
-            vc_gencmd(response, sizeof response, "render_bar 7 audio_queue %d %d %d %d",
-                      m_player_audio.GetLevel(), 0, 0, 100);
+            LOG_VERBOSE(LOG_TAG, "M: %8.02f V : %8.02f %8d %8d A : %8.02f %8.02f/%8.02f Cv : %8d Ca : %8d \r", stamp,
+                        audio_fifo, m_player_video->GetDecoderBufferSize(), m_player_video->GetDecoderFreeSpace(),
+                        video_fifo, m_player_audio->GetDelay(), m_player_audio->GetCacheTotal(),
+                        m_player_video->GetCached(), m_player_audio->GetCached());
          }
-      }
-#endif
-
-#ifdef ENABLE_PAUSE_FOR_BUFFERING
-      if (audio_pts != DVD_NOPTS_VALUE) {
-         audio_fifo_low  = m_has_audio && audio_fifo < threshold;
-         audio_fifo_high = !m_has_audio || (audio_pts != DVD_NOPTS_VALUE && audio_fifo > 2.0f * m_threshold);
-      }
-
-      if (video_pts != DVD_NOPTS_VALUE) {
-         video_fifo_low  = m_has_video && video_fifo < threshold;
-         video_fifo_high = !m_has_video || (video_pts != DVD_NOPTS_VALUE && video_fifo > 2.0f * m_threshold);
-      }
 #endif
 
 #if 0
-      CLog::Log(LOGDEBUG, "Normal M:%.0f (A:%.0f V:%.0f) P:%d A:%.2f V:%.2f/T:%.2f (%d,%d,%d,%d) A:%d%% V:%d%% (%.2f,%.2f)\n", stamp, audio_pts, video_pts, m_av_clock->OMXIsPaused(),
-                audio_pts == DVD_NOPTS_VALUE ? 0.0:audio_fifo, video_pts == DVD_NOPTS_VALUE ? 0.0:video_fifo, 2.0f * m_threshold, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high,
-                m_player_audio.GetLevel(), m_player_video.GetLevel(), m_player_audio.GetDelay(), (float)m_player_audio.GetCacheTotal());
+         if(m_tv_show_info) {
+            static unsigned count;
+            if ((count++ & 15) == 0) {
+               char response[80];
+               if (m_player_video.GetDecoderBufferSize() && m_player_audio.GetCacheTotal())
+                  vc_gencmd(response, sizeof response, "render_bar 4 video_fifo %d %d %d %d",
+                            (int)(100.0*m_player_video.GetDecoderBufferSize()-m_player_video.GetDecoderFreeSpace())/m_player_video.GetDecoderBufferSize(),
+                            (int)(100.0*video_fifo/m_player_audio.GetCacheTotal()),
+                            0, 100);
+               if (m_player_audio.GetCacheTotal())
+                  vc_gencmd(response, sizeof response, "render_bar 5 audio_fifo %d %d %d %d",
+                            (int)(100.0*audio_fifo/m_player_audio.GetCacheTotal()),
+                            (int)(100.0*m_player_audio.GetDelay()/m_player_audio.GetCacheTotal()),
+                            0, 100);
+               vc_gencmd(response, sizeof response, "render_bar 6 video_queue %d %d %d %d",
+                         m_player_video.GetLevel(), 0, 0, 100);
+               vc_gencmd(response, sizeof response, "render_bar 7 audio_queue %d %d %d %d",
+                         m_player_audio.GetLevel(), 0, 0, 100);
+            }
+         }
 #endif
 
-      // Enable this to enable pause for buffering.
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
-      if (!m_Pause && (m_omx_reader.IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high)))
-      {
-         if (m_av_clock->OMXIsPaused())
-         {
-            CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader.IsEof(), m_omx_pkt);
-            m_av_clock->OMXResume();
+         if (audio_pts != DVD_NOPTS_VALUE) {
+            audio_fifo_low  = m_has_audio && audio_fifo < threshold;
+            audio_fifo_high = !m_has_audio || (audio_pts != DVD_NOPTS_VALUE && audio_fifo > m_threshold);
          }
-      }
-      else if (m_Pause || audio_fifo_low || video_fifo_low)
-      {
-         if (!m_av_clock->OMXIsPaused())
-         {
-            CLog::Log(LOGDEBUG, "Pause %.2f,%.2f (%d,%d,%d,%d) %.2f\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_threshold);
-            m_av_clock->OMXPause();
+
+         if (video_pts != DVD_NOPTS_VALUE) {
+            video_fifo_low  = m_has_video && video_fifo < threshold;
+            video_fifo_high = !m_has_video || (video_pts != DVD_NOPTS_VALUE && video_fifo > m_threshold);
          }
-      }
+
+         // Enable this to enable pause for buffering.
+         if (m_state != STATE_PAUSED && (m_omx_reader->IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high)))
+         {
+            if (m_av_clock->OMXIsPaused())
+            {
+               CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader->IsEof(), m_omx_pkt);
+               log_verbose("Pausing for buffering...");
+               m_av_clock->OMXStateExecute();
+               m_av_clock->OMXResume();
+            }
+         }
+         else if (m_state == STATE_PAUSED || audio_fifo_low || video_fifo_low)
+         {
+            if (!m_av_clock->OMXIsPaused())
+            {
+               if (m_state != STATE_PAUSED)
+                 m_threshold = std::min(2.0f*m_threshold, 16.0f);
+               CLog::Log(LOGDEBUG, "Pause %.2f,%.2f (%d,%d,%d,%d) %.2f\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_threshold);
+               log_verbose("Buffering completed. Resuming...");
+               m_av_clock->OMXPause();
+            }
+         }
 #endif
+      }
+
+      if (!sentStarted)
+      {
+         CLog::Log(LOGDEBUG, "COMXPlayer::HandleMessages - player started RESET");
+         m_av_clock->OMXReset(m_has_video, m_has_audio);
+         m_av_clock->OMXStateExecute();
+         sentStarted = true;
+      }
 
       if (!m_omx_pkt)
          m_omx_pkt = m_omx_reader->Read();
@@ -804,67 +846,98 @@ void OMX_MediaProcessor::mediaDecoding()
       if (!m_omx_pkt)
          m_omx_pkt = m_omx_reader->Read();
 
-      if (m_has_video && m_omx_pkt && m_omx_reader->IsActive(OMXSTREAM_VIDEO, m_omx_pkt->stream_index)) {
-         if (TRICKPLAY(m_av_clock->OMXPlaySpeed()))
-            m_packetAfterSeek = true;
-         if (m_player_video->AddPacket(m_omx_pkt))
-            m_omx_pkt = NULL;
-         else
-            OMXClock::OMXSleep(10);
+      if(m_omx_pkt)
+        sendEos = false;
+
+      if(m_omx_reader->IsEof() && !m_omx_pkt) {
+        // demuxer EOF, but may have not played out data yet
+        if ( (m_has_video && m_player_video->GetCached()) ||
+             (m_has_audio && m_player_audio->GetCached()) )
+        {
+          OMXClock::OMXSleep(10);
+          continue;
+        }
+        if (!sendEos && m_has_video)
+          m_player_video->SubmitEOS();
+        if (!sendEos && m_has_audio)
+          m_player_audio->SubmitEOS();
+        sendEos = true;
+        if ( (m_has_video && !m_player_video->IsEOS()) ||
+             (m_has_audio && !m_player_audio->IsEOS()) )
+        {
+          OMXClock::OMXSleep(10);
+          continue;
+        }
+        break;
       }
-      else if(m_has_audio && m_omx_pkt && !TRICKPLAY(m_av_clock->OMXPlaySpeed()) && m_omx_pkt->codec_type == AVMEDIA_TYPE_AUDIO) {
-         if (m_player_audio->AddPacket(m_omx_pkt))
-            m_omx_pkt = NULL;
-         else
-            OMXClock::OMXSleep(10);
+
+      if(m_has_video && m_omx_pkt && m_omx_reader->IsActive(OMXSTREAM_VIDEO, m_omx_pkt->stream_index))
+      {
+        if (TRICKPLAY(m_av_clock->OMXPlaySpeed()))
+        {
+           m_packetAfterSeek = true;
+        }
+        if(m_player_video->AddPacket(m_omx_pkt))
+          m_omx_pkt = NULL;
+        else
+          OMXClock::OMXSleep(10);
+      }
+      else if(m_has_audio && m_omx_pkt && !TRICKPLAY(m_av_clock->OMXPlaySpeed()) && m_omx_pkt->codec_type == AVMEDIA_TYPE_AUDIO)
+      {
+        if(m_player_audio->AddPacket(m_omx_pkt))
+          m_omx_pkt = NULL;
+        else
+          OMXClock::OMXSleep(10);
       }
 #ifdef ENABLE_SUBTITLES
       else if(m_has_subtitle && m_omx_pkt && !TRICKPLAY(m_av_clock->OMXPlaySpeed()) &&
-              m_omx_pkt->codec_type == AVMEDIA_TYPE_SUBTITLE) {
-         if (m_omx_pkt->size && ENABLE_SUBTITLES &&
-             (m_omx_pkt->hints.codec == CODEC_ID_TEXT ||
-              m_omx_pkt->hints.codec == CODEC_ID_SSA)) {
-            if(m_player_subtitles->AddPacket(m_omx_pkt))
-               m_omx_pkt = NULL;
-            else
-               OMXClock::OMXSleep(10);
-         }
-         else {
-            m_omx_reader.FreePacket(m_omx_pkt);
-            m_omx_pkt = NULL;
-         }
+              m_omx_pkt->codec_type == AVMEDIA_TYPE_SUBTITLE)
+      {
+        auto result = m_player_subtitles.AddPacket(m_omx_pkt,
+                        m_omx_reader.GetRelativeIndex(m_omx_pkt->stream_index));
+        if (result)
+          m_omx_pkt = NULL;
+        else
+          OMXClock::OMXSleep(10);
       }
 #endif
-      else if (m_omx_pkt) {
-         m_omx_reader->FreePacket(m_omx_pkt);
-         m_omx_pkt = NULL;
+      else
+      {
+        if(m_omx_pkt)
+        {
+          m_omx_reader->FreePacket(m_omx_pkt);
+          m_omx_pkt = NULL;
+        }
+        else
+          OMXClock::OMXSleep(10);
       }
    }
 
    LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
-   m_av_clock->OMXResume();
+   //m_av_clock->OMXResume();
    m_av_clock->OMXStop();
    m_av_clock->OMXStateIdle();
-   m_av_clock->OMXStateExecute();
+   //m_av_clock->OMXStateExecute();
+   //m_av_clock->OMXReset(m_has_video, m_has_audio);
 
-   // Restart if EOF.
-   if (m_omx_reader->IsEof()) {
-      m_player_video->Close();
-      if (m_has_video)
-         if (!m_player_video->Open(
-                *m_hints_video,
-                m_av_clock,
-                m_textureData,
-                VS_DEINTERLACEMODE_OFF, /* deinterlace */
-                ENABLE_HDMI_CLOCK_SYNC,
-                true,                   /* threaded */
-                1.0,                    /* display aspect, unused */
-                m_video_queue_size, m_video_fifo_size
-                )) {
-            LOG_ERROR(LOG_TAG, "Failed to reopen media.");
-         }
-         // TODO: Handle failure.
-   }
+   // Restart video player. It seems it is necessary to close
+   // and open again. omxplayer does this also when seeking so
+   // maybe there is no other way to restart it.
+   m_player_video->Close();
+   if (m_has_video)
+      if (!m_player_video->Open(
+             *m_hints_video,
+             m_av_clock,
+             m_textureData,
+             VS_DEINTERLACEMODE_OFF, /* deinterlace */
+             ENABLE_HDMI_CLOCK_SYNC,
+             true,                   /* threaded */
+             1.0,                    /* display aspect, unused */
+             m_video_queue_size, m_video_fifo_size
+             )) {
+         LOG_ERROR(LOG_TAG, "Failed to reopen media.");
+      }
+   // TODO: Handle failure.
 
    setState(STATE_STOPPED);
    emit playbackCompleted();
@@ -901,11 +974,17 @@ void OMX_MediaProcessor::setSpeed(int iSpeed)
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::flushStreams(double pts)
 {
+   m_av_clock->OMXStop();
+   m_av_clock->OMXPause();
+
    if (m_has_video)
       m_player_video->Flush();
 
    if (m_has_audio)
       m_player_audio->Flush();
+
+   if (pts != DVD_NOPTS_VALUE)
+       m_av_clock->OMXMediaTime(0.0);
 
 #ifdef ENABLE_SUBTITLES
    if (m_has_subtitle)

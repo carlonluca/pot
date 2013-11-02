@@ -34,7 +34,7 @@
 
 #include "omx_imageelement.h"
 #include "omx_texture.h"
-#include "lgl_logging.h"
+#include "lc_logging.h"
 #include "openmaxiltextureloader.h"
 
 

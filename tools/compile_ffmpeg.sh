@@ -25,7 +25,7 @@ fi
 
 cd 3rdparty/ffmpeg
 git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src
-cd ffmpeg_src; git checkout n2.0
+cd ffmpeg_src; git checkout n2.1
 
 echo "Configuring..."
 FLOAT=hard

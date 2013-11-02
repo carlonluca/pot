@@ -38,7 +38,7 @@
 
 #include "omx_videosurfaceelement.h"
 #include "omx_texture.h"
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 
 /*------------------------------------------------------------------------------

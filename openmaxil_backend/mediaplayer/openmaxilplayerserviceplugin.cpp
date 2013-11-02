@@ -32,7 +32,7 @@
 #include "openmaxilplayerserviceplugin.h"
 #include "openmaxilplayerservice.h"
 
-#include "lgl_logging.h"
+#include "lc_logging.h"
 
 /*------------------------------------------------------------------------------
 |    OMX_PlayerServicePlugin::create
