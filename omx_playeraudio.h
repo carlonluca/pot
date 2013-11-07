@@ -41,6 +41,9 @@ public:
 
    void SetCurrentVolume(long volume, bool linear);
    long GetCurrentVolume(bool linear);
+
+   void SetMuted(bool mute);
+   bool GetMuted();
 };
 
 #endif // OMX_AUDIO_H
