@@ -422,8 +422,7 @@ bool OpenMAXILPlayerControl::isMuted() const
 {
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
-   // TODO: Implement mute.
-   return false;
+   return m_mediaProcessor->muted();
 }
 
 /*------------------------------------------------------------------------------
@@ -527,7 +526,7 @@ void OpenMAXILPlayerControl::setMuted(bool muted)
 {
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
-   // TODO: Implement.
+   m_mediaProcessor->setMute(muted);
 }
 
 QT_END_NAMESPACE
