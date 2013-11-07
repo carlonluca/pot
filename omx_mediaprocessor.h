@@ -117,6 +117,9 @@ public:
     void setVolume(long volume, bool linear);
     long volume(bool linear);
 
+    void setMute(bool muted);
+    bool muted();
+
     QVariantMap getMetaData();
 
 public slots:
