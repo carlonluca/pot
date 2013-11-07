@@ -50,6 +50,19 @@ OMX_PlayerAudio::~OMX_PlayerAudio()
    // Do nothing.
 }
 
+void OMX_PlayerAudio::SetMuted(bool mute)
+{
+       m_mute = mute;
+
+       if (m_decoder)
+	       m_decoder->SetMute(m_mute);
+}
+
+bool OMX_PlayerAudio::GetMuted()
+{
+       return m_mute;
+}
+
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
