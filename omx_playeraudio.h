@@ -37,7 +37,7 @@ class OMX_PlayerAudio : public OMXPlayerAudio
 {
 public:
    OMX_PlayerAudio();
-   ~OMX_PlayerAudio();
+   virtual ~OMX_PlayerAudio();
 
    void SetCurrentVolume(long volume, bool linear);
    long GetCurrentVolume(bool linear);

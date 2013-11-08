@@ -576,6 +576,9 @@ void OMX_MediaProcessor::setMute(bool muted)
        m_player_audio->SetMuted(muted);
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::muted
++-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::muted()
 {
        return m_player_audio->GetMuted();
