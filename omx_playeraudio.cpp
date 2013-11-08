@@ -35,7 +35,7 @@ using namespace std;
 
 
 /*------------------------------------------------------------------------------
-|    includes
+|    OMX_PlayerAudio::OMX_PlayerAudio
 +-----------------------------------------------------------------------------*/
 OMX_PlayerAudio::OMX_PlayerAudio() : OMXPlayerAudio()
 {
@@ -43,13 +43,16 @@ OMX_PlayerAudio::OMX_PlayerAudio() : OMXPlayerAudio()
 }
 
 /*------------------------------------------------------------------------------
-|    includes
+|    OMX_PlayerAudio::~OMX_PlayerAudio
 +-----------------------------------------------------------------------------*/
 OMX_PlayerAudio::~OMX_PlayerAudio()
 {
    // Do nothing.
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_PlayerAudio::SetMuted
++-----------------------------------------------------------------------------*/
 void OMX_PlayerAudio::SetMuted(bool mute)
 {
        m_mute = mute;
@@ -58,13 +61,16 @@ void OMX_PlayerAudio::SetMuted(bool mute)
 	       m_decoder->SetMute(m_mute);
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_PlayerAudio::GetMuted
++-----------------------------------------------------------------------------*/
 bool OMX_PlayerAudio::GetMuted()
 {
        return m_mute;
 }
 
 /*------------------------------------------------------------------------------
-|    includes
+|    OMX_PlayerAudio::SetCurrentVolume
 +-----------------------------------------------------------------------------*/
 /**
  * @brief OMX_PlayerAudio::SetCurrentVolume
@@ -110,6 +116,9 @@ void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
    OMXPlayerAudio::SetVolume(mbVolume*1000);
 }
 
+/*------------------------------------------------------------------------------
+|    OMX_PlayerAudio::GetCurrentVolume
++-----------------------------------------------------------------------------*/
 long OMX_PlayerAudio::GetCurrentVolume(bool linear)
 {
    return 0;
