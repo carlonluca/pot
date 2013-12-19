@@ -80,6 +80,18 @@ void OMX_MediaProcessorElement::setSource(QString source)
     update();
 }
 
+bool OMX_MediaProcessorElement::autoPlay()
+{
+    return m_autoPlay;
+}
+
+void OMX_MediaProcessorElement::setAutoPlay(bool autoPlay)
+{
+    LOG_VERBOSE(LOG_TAG, "Setting autoPlay.");
+
+    m_autoPlay = autoPlay;
+}
+
 QSGNode* OMX_MediaProcessorElement::updatePaintNode(QSGNode*, UpdatePaintNodeData*)
 {
 #if 0
@@ -170,8 +182,12 @@ bool OMX_MediaProcessorElement::openMedia(QString filepath)
     }
     if (!m_mediaProc->setFilename(filepath, m_textureData))
         return false;
-    if (!play())
-        return false;
+
+    // Check to see if we should be auto-playing the media
+    if (m_autoPlay) {
+		if (!play())
+			return false;
+    }
 
     return true;
 }
