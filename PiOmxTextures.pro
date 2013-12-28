@@ -296,6 +296,7 @@ HEADERS += \
 OTHER_FILES += \
     main.qml \
     changelog.txt \
+    main_v4l2.cpp \
     tools/compile_ffmpeg.sh \
     tools/extract_aac_stream.sh \
     tools/extract_h264_stream.sh \
