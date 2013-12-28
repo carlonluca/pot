@@ -45,6 +45,7 @@
 #include <cstdarg>
 #include <cstring>
 #include <iostream>
+#include <cstdlib>
 #if !defined(_WIN32) && !defined(_WIN32_WCE) && !defined(__ANDROID__)
 #include <unistd.h>
 #include <execinfo.h>
@@ -1897,9 +1898,7 @@ inline std::string lc_current_time()
    time_t t;
    time(&t);
 
-   tm r;
-   memset(&r, 0, sizeof(tm));
-   strftime(buffer, sizeof(buffer), "%X", localtime_r(&t, &r));
+   strftime(buffer, sizeof(buffer), "%T", localtime(&t));
 
    struct timeval tv;
    gettimeofday(&tv, 0);
