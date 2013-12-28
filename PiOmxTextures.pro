@@ -33,7 +33,11 @@ error("Either add CONFIG_APP or CONFIG_LIB to DEFINES.")
 
 QT += core core-private gui gui-private opengl quick quick-private
 
-TARGET   = PiOmxTextures
+contains(DEFINES, CONFIG_QMLSCENEOMX) {
+TARGET = qmlsceneomx
+}else {
+TARGET = PiOmxTextures
+}
 contains(DEFINES, CONFIG_LIB) {
 TEMPLATE = lib
 
@@ -166,12 +170,17 @@ QMAKE_CXXFLAGS += -std=c++11 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS     
 # [1]: part of implementation without omxplayer.
 
 contains(DEFINES, CONFIG_APP) {
+contains(DEFINES, CONFIG_QMLSCENEOMX) {
+SOURCES += \
+   qmlsceneomx.cpp
+} else {
 SOURCES += \
    main.cpp \
 #  main_ffmpeg.cpp \
 #  main_v4l2.cpp \
 #  main_demux.cpp \
 #  main_omxplayer.cpp
+}
 }
 
 SOURCES += \
@@ -306,5 +315,8 @@ OTHER_FILES += \
     omxplayer_lib/OMXPLAYER_VERSION
 
 contains(DEFINES, CONFIG_APP) {
+contains(DEFINES, CONFIG_QMLSCENEOMX) {
+} else {
 RESOURCES += resources.qrc
+}
 }
