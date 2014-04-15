@@ -40,8 +40,8 @@ COMXAudioCodecOMX::COMXAudioCodecOMX()
   m_iSampleFormat = AV_SAMPLE_FMT_NONE;
   // lcarlon: it seems that for some reason AV_SAMPLE_FMT_NONE is
   // not perfect on some videos, so I keep the old one.
-  //m_desiredSampleFormat = AV_SAMPLE_FMT_NONE;
-  m_desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
+  m_desiredSampleFormat = AV_SAMPLE_FMT_NONE;
+  //m_desiredSampleFormat = AV_SAMPLE_FMT_FLTP;
 }
 
 COMXAudioCodecOMX::~COMXAudioCodecOMX()

@@ -1,5 +1,5 @@
 diff --git a/src/imports/multimedia/qdeclarativeaudio.cpp b/src/imports/multimedia/qdeclarativeaudio.cpp
-index 37509b1..2ce032d 100644
+index 1bd992d..44555aa 100644
 --- a/src/imports/multimedia/qdeclarativeaudio.cpp
 +++ b/src/imports/multimedia/qdeclarativeaudio.cpp
 @@ -39,6 +39,8 @@
@@ -22,7 +22,7 @@ index 37509b1..2ce032d 100644
      , m_autoPlay(false)
      , m_autoLoad(true)
      , m_loaded(false)
-@@ -759,6 +761,13 @@ void QDeclarativeAudio::_q_statusChanged()
+@@ -738,6 +740,13 @@ void QDeclarativeAudio::_q_statusChanged()
      }
  }
  
@@ -34,10 +34,10 @@ index 37509b1..2ce032d 100644
 +}
 +
  /*!
-     \qmlproperty string QtMultimedia::Audio::errorString
+     \qmlproperty string QtMultimedia5::Audio::errorString
  
 diff --git a/src/imports/multimedia/qdeclarativeaudio_p.h b/src/imports/multimedia/qdeclarativeaudio_p.h
-index 1c67bc3..656a123 100644
+index b8a75c6..7087f29 100644
 --- a/src/imports/multimedia/qdeclarativeaudio_p.h
 +++ b/src/imports/multimedia/qdeclarativeaudio_p.h
 @@ -56,6 +56,7 @@
@@ -101,18 +101,18 @@ index aed5183..73b45f6 100644
  
      virtual QMediaPlayer::MediaStatus mediaStatus() const = 0;
 diff --git a/src/multimedia/multimedia.pro b/src/multimedia/multimedia.pro
-index 23cca25..f5abf3f 100644
+index 96b9e79..454219a 100644
 --- a/src/multimedia/multimedia.pro
 +++ b/src/multimedia/multimedia.pro
 @@ -1,5 +1,5 @@
  TARGET = QtMultimedia
--QT = core-private network gui-private
-+QT = core-private network gui-private quick
+-QT = core-private network gui
++QT = core-private network gui quick
  
- MODULE_PLUGIN_TYPES = \
-     mediaservice \
+ QMAKE_DOCS = $$PWD/doc/qtmultimedia.qdocconf
+ 
 diff --git a/src/multimedia/playback/qmediaplayer.cpp b/src/multimedia/playback/qmediaplayer.cpp
-index bf6294a..ca8f630 100644
+index eaac828..4392cb1 100644
 --- a/src/multimedia/playback/qmediaplayer.cpp
 +++ b/src/multimedia/playback/qmediaplayer.cpp
 @@ -494,6 +494,9 @@ QMediaPlayer::QMediaPlayer(QObject *parent, QMediaPlayer::Flags flags):
@@ -125,7 +125,7 @@ index bf6294a..ca8f630 100644
          d->networkAccessControl = qobject_cast<QMediaNetworkAccessControl*>(d->service->requestControl(QMediaNetworkAccessControl_iid));
          if (d->control != 0) {
              connect(d->control, SIGNAL(mediaChanged(QMediaContent)), SIGNAL(currentMediaChanged(QMediaContent)));
-@@ -1017,6 +1020,13 @@ void QMediaPlayer::setVideoOutput(QAbstractVideoSurface *surface)
+@@ -1012,6 +1015,13 @@ void QMediaPlayer::setVideoOutput(QAbstractVideoSurface *surface)
      }
  }
  
@@ -140,7 +140,7 @@ index bf6294a..ca8f630 100644
  QMultimedia::AvailabilityStatus QMediaPlayer::availability() const
  {
 diff --git a/src/multimedia/playback/qmediaplayer.h b/src/multimedia/playback/qmediaplayer.h
-index 454b0f1..99712b9 100644
+index 3195ae0..de3b8f1 100644
 --- a/src/multimedia/playback/qmediaplayer.h
 +++ b/src/multimedia/playback/qmediaplayer.h
 @@ -48,6 +48,8 @@
@@ -180,20 +180,79 @@ index 454b0f1..99712b9 100644
  
  QT_END_NAMESPACE
 diff --git a/src/plugins/plugins.pro b/src/plugins/plugins.pro
-index 2677e26..a60ff5a 100644
+index 8234e7e..bf6a46e 100644
 --- a/src/plugins/plugins.pro
 +++ b/src/plugins/plugins.pro
-@@ -30,8 +30,11 @@ win32:!winrt {
+@@ -30,7 +30,11 @@ win32 {
  }
  
- unix:!mac:!android {
+ unix:!mac {
 -    config_gstreamer {
--       SUBDIRS += gstreamer
 +    # lcarlon: specify when qmaking.
 +    raspberry {
 +        SUBDIRS += openmaxil
-+    } else:config_gstreamer {
-+        SUBDIRS += gstreamer
++    }
++    else:config_gstreamer {
+        SUBDIRS += gstreamer
      } else {
          SUBDIRS += audiocapture
+diff --git a/src/qtmultimediaquicktools/qsgvideonode_p.cpp b/src/qtmultimediaquicktools/qsgvideonode_p.cpp
+index b958180..08e630d 100644
+--- a/src/qtmultimediaquicktools/qsgvideonode_p.cpp
++++ b/src/qtmultimediaquicktools/qsgvideonode_p.cpp
+@@ -85,37 +85,39 @@ void QSGVideoNode::setTexturedRectGeometry(const QRectF &rect, const QRectF &tex
+     qSetGeom(v + 3, rect.bottomRight());
+ 
+     // and then texture coordinates
++    // lcarlon: for some reason, the texture coming out from OpenMAX IL must be mapped
++    // differently.
+     switch (orientation) {
+         default:
+             // tl, bl, tr, br
+-            qSetTex(v + 0, textureRect.topLeft());
+-            qSetTex(v + 1, textureRect.bottomLeft());
+-            qSetTex(v + 2, textureRect.topRight());
+-            qSetTex(v + 3, textureRect.bottomRight());
++            qSetTex(v + 0, textureRect.bottomLeft());
++            qSetTex(v + 1, textureRect.topLeft());
++            qSetTex(v + 2, textureRect.bottomRight());
++            qSetTex(v + 3, textureRect.topRight());
+             break;
+ 
+         case 90:
+             // tr, tl, br, bl
+-            qSetTex(v + 0, textureRect.topRight());
+-            qSetTex(v + 1, textureRect.topLeft());
+-            qSetTex(v + 2, textureRect.bottomRight());
+-            qSetTex(v + 3, textureRect.bottomLeft());
++            qSetTex(v + 0, textureRect.bottomRight());
++            qSetTex(v + 1, textureRect.bottomLeft());
++            qSetTex(v + 2, textureRect.topRight());
++            qSetTex(v + 3, textureRect.topLeft());
+             break;
+ 
+         case 180:
+             // br, tr, bl, tl
+-            qSetTex(v + 0, textureRect.bottomRight());
+-            qSetTex(v + 1, textureRect.topRight());
+-            qSetTex(v + 2, textureRect.bottomLeft());
+-            qSetTex(v + 3, textureRect.topLeft());
++            qSetTex(v + 0, textureRect.topRight());
++            qSetTex(v + 1, textureRect.bottomRight());
++            qSetTex(v + 2, textureRect.topLeft());
++            qSetTex(v + 3, textureRect.bottomLeft());
+             break;
+ 
+         case 270:
+             // bl, br, tl, tr
+-            qSetTex(v + 0, textureRect.bottomLeft());
+-            qSetTex(v + 1, textureRect.bottomRight());
+-            qSetTex(v + 2, textureRect.topLeft());
+-            qSetTex(v + 3, textureRect.topRight());
++            qSetTex(v + 0, textureRect.topLeft());
++            qSetTex(v + 1, textureRect.topRight());
++            qSetTex(v + 2, textureRect.bottomLeft());
++            qSetTex(v + 3, textureRect.bottomRight());
+             break;
      }
+ 

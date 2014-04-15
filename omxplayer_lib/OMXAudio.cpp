@@ -140,7 +140,10 @@ bool COMXAudio::PortSettingsChanged()
     }
 
     memcpy(m_pcm_output.eChannelMapping, m_output_channels, sizeof(m_output_channels));
-    m_pcm_output.nChannels = m_OutputChannels;
+    // round up to power of 2
+    m_pcm_output.nChannels = m_OutputChannels > 4 ? 8 : m_OutputChannels > 2 ? 4 : m_OutputChannels;
+    /* limit samplerate (through resampling) if requested */
+    m_pcm_output.nSamplingRate = std::min(std::max((int)m_pcm_output.nSamplingRate, 8000), 192000);
 
     m_pcm_output.nPortIndex = m_omx_mixer.GetOutputPort();
     omx_err = m_omx_mixer.SetParameter(OMX_IndexParamAudioPcm, &m_pcm_output);
@@ -948,8 +951,6 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
     if(m_setStartTime)
     {
       omx_buffer->nFlags = OMX_BUFFERFLAG_STARTTIME;
-      if(pts == DVD_NOPTS_VALUE)
-        omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_UNKNOWN;
 
       m_last_pts = pts;
 
@@ -968,7 +969,7 @@ unsigned int COMXAudio::AddPackets(const void* data, unsigned int len, double dt
         if(pts > m_last_pts)
           m_last_pts = pts;
         else
-          omx_buffer->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;;
+          omx_buffer->nFlags = OMX_BUFFERFLAG_TIME_UNKNOWN;
       }
       else if (m_last_pts == pts)
       {

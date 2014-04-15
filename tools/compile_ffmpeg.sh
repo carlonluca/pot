@@ -17,6 +17,8 @@ if [ $# -ne 1 ]; then
    exit
 fi
 
+${RPI_SYSROOT:?"Please, set the path to your sysroot in RPI_SYSROOT first."}
+
 echo "Downloading ffmpeg sources from git..."
 cd ..
 if [ ! -d "3rdparty/ffmpeg" ]; then
@@ -25,13 +27,14 @@ fi
 
 cd 3rdparty/ffmpeg
 git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src
-cd ffmpeg_src; git checkout n2.1
+cd ffmpeg_src; git checkout n2.2
 
 echo "Configuring..."
 FLOAT=hard
 export PATH=$PATH:/opt/rpi/gcc-linaro-arm-linux-gnueabihf-raspbian/bin/
 echo "Prefix to $PWD..."
 ./configure \
+--sysroot=$RPI_SYSROOT \
 --extra-cflags="-mfpu=vfp -mfloat-abi=$FLOAT -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog" \
 --enable-cross-compile \
 --enable-shared \
@@ -53,7 +56,9 @@ echo "Prefix to $PWD..."
 --disable-doc \
 --disable-postproc \
 --enable-gpl \
---enable-protocol=http \
+--enable-protocols \
+--enable-nonfree \
+--enable-openssl \
 --enable-pthreads \
 --enable-pic \
 --disable-armv5te \
