@@ -132,7 +132,7 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
     m_filename.replace(0, 8, "http://");
 
   if(m_filename.substr(0,6) == "mms://" || m_filename.substr(0,7) == "mmsh://" || m_filename.substr(0,7) == "mmst://" || m_filename.substr(0,7) == "mmsu://" ||
-      m_filename.substr(0,7) == "http://" || 
+      m_filename.substr(0,7) == "http://" || m_filename.substr(0,8) == "https://" ||
       m_filename.substr(0,7) == "rtmp://" || m_filename.substr(0,6) == "udp://" ||
       m_filename.substr(0,7) == "rtsp://" )
   {
@@ -648,9 +648,10 @@ void OMXReader::AddStream(int id)
     return;
 
   AVStream *pStream = m_pFormatContext->streams[id];
-  // discard PNG stream as we don't support it, and it stops mp3 files playing with album art
-  if (pStream->codec->codec_type == AVMEDIA_TYPE_VIDEO && 
-    (pStream->codec->codec_id == CODEC_ID_PNG))
+
+  // discard if it's a picture attachment (e.g. album art embedded in MP3 or AAC)
+  if(pStream->codec->codec_type == AVMEDIA_TYPE_VIDEO &&
+    (pStream->disposition & AV_DISPOSITION_ATTACHED_PIC))
     return;
 
   switch (pStream->codec->codec_type)

@@ -206,6 +206,10 @@ private:
     double startpts;
 
     QVariantMap m_metadata;
+
+    bool m_loop;
+    double m_loop_from;
+    float m_fps;
 };
 
 

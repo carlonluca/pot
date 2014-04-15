@@ -1,53 +1,104 @@
-#!/bin/sh
+#!/bin/bash
+#
+# OMXPlayer launcher script.
+#
 
-#mount -t nfs -o rsize=32768,wsize=32768,intr 192.168.10.1:/data/video /media
+OMXPLAYER_DIR=`dirname $0`
+OMXPLAYER_BIN="$OMXPLAYER_DIR/omxplayer.bin"
+OMXPLAYER_LIBS="/opt/vc/lib"
 
-OMXPLAYER="./omxplayer.bin"
-FBSET="/usr/sbin/fbset"
-FONT="fonts/FreeSans.ttf"
-
-if [ -e /usr/share/fonts/truetype/freefont/FreeSans.ttf ]; then
-  FONT="/usr/share/fonts/truetype/freefont/FreeSans.ttf"
+if [ -e "$OMXPLAYER_DIR/ffmpeg_compiled" ]; then
+    OMXPLAYER_LIBS="$OMXPLAYER_LIBS:$OMXPLAYER_DIR/ffmpeg_compiled"
 else
-  FONT="fonts/FreeSans.ttf"
+    OMXPLAYER_LIBS="$OMXPLAYER_LIBS:/usr/lib/omxplayer"
 fi
 
-if [ -e /usr/share/fonts/truetype/freefont/FreeSansOblique.ttf ]; then
-  ITALIC_FONT="/usr/share/fonts/truetype/freefont/FreeSansOblique.ttf"
-else
-  ITALIC_FONT="fonts/FreeSansOblique.ttf"
+refresh_regex='(|.* )(-r|--refresh)( .*|$)'
+audio_regex='.*\.(mp3|wav|wma|cda|ogg|ogm|aac|ac3|flac)( .*|$)'
+
+fbset_bin=`which fbset`
+xset_bin=`which xset`
+xrefresh_bin=`which xrefresh`
+
+if [ -z $NOREFRESH ] || [ "$NOREFRESH" == "0" ]; then
+    if [[ $@ =~ $refresh_regex ]] && [[ ! $@ =~ $audio_regex ]]; then
+        check_failed=0
+
+        if [ -z $fbset_bin ]; then
+            echo "WARNING: You are going to run omxplayer with -r/--refresh and you don't have fbset installed, this can cause black screen when it finishes playing."
+            check_failed=1
+        fi
+
+        if [ ! -z $DISPLAY ]; then
+            if [ -z $xset_bin ] || [ -z $xrefresh_bin ]; then
+                echo "WARNING: You are going to run omxplayer with -r/--refresh and you don't have xset and xrefresh installed (x11-xserver-utils package on Debian/Raspbian), this can cause black screen when it finishes playing."
+                check_failed=1
+            fi
+        fi
+
+        if [ "$check_failed" == "1" ]; then
+            read -sn 1 -p "Press any key to continue or Ctrl-C to quit."
+            echo
+        fi
+    fi
 fi
 
-if [ -e /usr/bin/omxplayer.bin ]; then
-  OMXPLAYER="/usr/bin/omxplayer.bin"
-else
-  OMXPLAYER="./omxplayer.bin"
+DBUS_CMD="dbus-daemon --fork --print-address 5 --print-pid 6 --session"
+OMXPLAYER_DBUS_ADDR="/tmp/omxplayerdbus"
+OMXPLAYER_DBUS_PID="/tmp/omxplayerdbus.pid"
+
+if [ ! -s "$OMXPLAYER_DBUS_PID" ] || ! pgrep -f "$DBUS_CMD" -F "$OMXPLAYER_DBUS_PID" >/dev/null; then
+	#echo "starting dbus for the first time" >&2
+	exec 5> "$OMXPLAYER_DBUS_ADDR"
+	exec 6> "$OMXPLAYER_DBUS_PID"
+	$DBUS_CMD
+	until [ -s "$OMXPLAYER_DBUS_ADDR" ]; do
+		echo "waiting for dbus address to appear" >&2
+		sleep .2
+	done
 fi
 
-if [ -e /usr/lib/omxplayer ]; then
-  export LD_LIBRARY_PATH=/opt/vc/lib:/usr/lib/omxplayer:$LD_LIBRARY_PATH
-else
-  export LD_LIBRARY_PATH=$PWD/ffmpeg_compiled/usr/local/lib:/opt/vc/lib:$LD_LIBRARY_PATH
+DBUS_SESSION_BUS_ADDRESS=`cat $OMXPLAYER_DBUS_ADDR`
+DBUS_SESSION_BUS_PID=`cat $OMXPLAYER_DBUS_PID`
+
+export DBUS_SESSION_BUS_ADDRESS
+export DBUS_SESSION_BUS_PID
+
+LD_LIBRARY_PATH="$OMXPLAYER_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" $OMXPLAYER_BIN "$@"; true
+
+if [ ! -z $NOREFRESH ] && [ "$NOREFRESH" == "1" ]; then
+    exit 0
 fi
 
-XRES=1920
-YRES=1080
-
-XRES=1600
-YRES=900
-
-if [ -e $FBSET ]; then
-  echo 0 > /sys/class/vtconsole/vtcon1/bind
-  fbset -xres 1 -yres 1
+if [[ $@ =~ $audio_regex ]]; then
+    exit 0
 fi
 
-if test -z "$DBUS_SESSION_BUS_ADDRESS"; then
-  eval $(dbus-launch --sh-syntax)
-fi
+if [[ $@ =~ $refresh_regex ]]; then
+    if [ ! -z $fbset_bin ]; then
+        DEPTH2=`$fbset_bin | head -3 | tail -1 | cut -d " " -f 10`
 
-$OMXPLAYER --font $FONT --italic-font $ITALIC_FONT "$@"
+        if [ "$DEPTH2" == "8" ]; then
+            DEPTH1=16
+        elif [ "$DEPTH2" == "16" ] || [ "$DEPTH2" == "32" ]; then
+            DEPTH1=8
+        else
+            DEPTH1=8
+            DEPTH2=16
+        fi
 
-if [ -e $FBSET ]; then
-  fbset -xres ${XRES} -yres ${YRES}
-  echo 1 > /sys/class/vtconsole/vtcon1/bind
+        $fbset_bin -depth $DEPTH1 > /dev/null 2>&1
+        $fbset_bin -depth $DEPTH2 > /dev/null 2>&1
+    fi
+
+    if [ ! -z $xset_bin ] && [ ! -z $xrefresh_bin ]; then
+        if [ -z $DISPLAY ]; then
+            DISPLAY=":0"
+        fi
+
+        $xset_bin -display $DISPLAY -q > /dev/null 2>&1
+        if [ "$?" == "0" ]; then
+            $xrefresh_bin -display $DISPLAY > /dev/null 2>&1
+        fi
+    fi
 fi

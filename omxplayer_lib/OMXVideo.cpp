@@ -89,6 +89,7 @@ COMXVideo::COMXVideo(OMX_TextureProviderSh provider) : m_video_codec_name("")
   m_drop_state        = false;
   m_decoded_width     = 0;
   m_decoded_height    = 0;
+  m_display_pixel_aspect = 0.0f;
   m_omx_clock         = NULL;
   m_av_clock          = NULL;
   m_submitted_eos     = false;
@@ -191,7 +192,10 @@ bool COMXVideo::PortSettingsChanged()
   }
 
   if (pixel_aspect.nX && pixel_aspect.nY)
-    m_pixel_aspect = (float)pixel_aspect.nX / (float)pixel_aspect.nY;
+  {
+    float fAspect = (float)pixel_aspect.nX / (float)pixel_aspect.nY;
+    m_pixel_aspect = fAspect / m_display_pixel_aspect;
+  }
 
   if (m_settings_changed)
   {
@@ -220,13 +224,13 @@ bool COMXVideo::PortSettingsChanged()
 
   m_omx_render.ResetEos();
 
-  CLog::Log(LOGDEBUG, "%s::%s - %dx%d@%.2f interlace:%d deinterlace:%d", CLASSNAME, __func__,
+  CLog::Log(LOGDEBUG, "%s::%s - %dx%d@%.2f interlace:%d deinterlace:%d par:%.2f", CLASSNAME, __func__,
       port_image.format.video.nFrameWidth, port_image.format.video.nFrameHeight,
-      port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace);
+      port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace, m_pixel_aspect);
 
-  printf("V:PortSettingsChanged: %dx%d@%.2f interlace:%d deinterlace:%d\n",
+  printf("V:PortSettingsChanged: %dx%d@%.2f interlace:%d deinterlace:%d par:%.2f\n",
       port_image.format.video.nFrameWidth, port_image.format.video.nFrameHeight,
-      port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace);
+      port_image.format.video.xFramerate / (float)(1<<16), interlace.eMode, m_deinterlace, m_pixel_aspect);
 
   if(!m_omx_sched.Initialize("OMX.broadcom.video_scheduler", OMX_IndexParamVideoInit))
     return false;
@@ -372,11 +376,18 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   m_settings_changed = false;
   m_setStartTime = true;
 
+  // lcarlon: unused when using egl_render.
+#if 0
+  m_src_rect.SetRect(0, 0, 0, 0);
+  m_dst_rect = DestRect;
+#endif
+
   m_video_codec_name      = "";
   m_codingType            = OMX_VIDEO_CodingUnused;
 
   m_decoded_width  = hints.width;
   m_decoded_height = hints.height;
+  m_display_pixel_aspect = display_aspect;
 
   m_hdmi_clock_sync = hdmi_clock_sync;
   m_submitted_eos = false;
@@ -818,8 +829,8 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
 
   m_first_text    = true;
 
-  float fAspect = (float)hints.aspect / (float)m_decoded_width * (float)m_decoded_height;
-  m_pixel_aspect = hints.aspect ? fAspect/display_aspect : 0.0f;
+  float fAspect = hints.aspect ? (float)hints.aspect / (float)m_decoded_width * (float)m_decoded_height : 1.0f;
+  m_pixel_aspect = fAspect / m_display_pixel_aspect;
 
   return true;
 }
@@ -905,7 +916,7 @@ int COMXVideo::Decode(uint8_t *pData, int iSize, double pts)
         CLog::Log(LOGDEBUG, "OMXVideo::Decode VDec : setStartTime %f\n", (pts == DVD_NOPTS_VALUE ? 0.0 : pts) / DVD_TIME_BASE);
         m_setStartTime = false;
       }
-      if(pts == DVD_NOPTS_VALUE)
+      else if(pts == DVD_NOPTS_VALUE)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_UNKNOWN;
 
       omx_buffer->nTimeStamp = ToOMXTime((uint64_t)(pts == DVD_NOPTS_VALUE) ? 0 : pts);

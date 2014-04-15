@@ -42,6 +42,7 @@
 #include "OMXOverlayCodecText.h"
 
 #include <string>
+#include <atomic>
 
 #include <QObject>
 
@@ -82,6 +83,7 @@ protected:
   bool                      m_bAbort;
   bool                      m_use_thread;
   bool                      m_flush;
+  std::atomic<bool>         m_flush_requested;
   unsigned int              m_cached_size;
   unsigned int              m_max_data_size;
   float                     m_fifo_size;

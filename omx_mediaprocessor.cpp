@@ -110,7 +110,10 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_TextureProviderSh provider) :
    m_playspeedCurrent(playspeed_normal),
    m_seekFlush(false),
    m_packetAfterSeek(false),
-   startpts(0)
+   startpts(0),
+   m_loop(false),
+   m_loop_from(0.0f),
+   m_fps(0.0f)
 {
    qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorError>("OMX_MediaProcessor::OMX_MediaProcessorError");
    qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorState>("OMX_MediaProcessor::OMX_MediaProcessorState");
@@ -260,6 +263,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 #ifdef ENABLE_SUBTITLES
    m_has_subtitle  = m_omx_reader->SubtitleStreamCount();
 #endif
+   m_loop          = m_loop && m_omx_reader->CanSeek();
 
    LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
    if (!m_av_clock->OMXInitialize())
@@ -274,6 +278,9 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 
    m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
    m_omx_reader->GetHints(OMXSTREAM_VIDEO, *m_hints_video);
+
+   if (m_fps > 0.0f)
+       m_hints_video->fpsrate = m_fps * DVD_TIME_BASE, m_hints_video->fpsscale = DVD_TIME_BASE;
 
    // Set audio stream to use.
    // TODO: Implement a way to change it runtime.
@@ -609,9 +616,14 @@ void OMX_MediaProcessor::mediaDecoding()
    float m_threshold = 1.0f; //std::min(0.1f, audio_fifo_size * 0.1f);
 #endif // ENABLE_PAUSE_FOR_BUFFERING
    bool sentStarted = false;
+   double last_seek_pos = 0;
 
    bool sendEos = false;
    double m_last_check_time = 0.0;
+
+   m_av_clock->OMXReset(m_has_video, m_has_audio);
+   m_av_clock->OMXStateExecute();
+   sentStarted = true;
 
    while (!m_pendingStop) {
 #ifdef ENABLE_PROFILE_MAIN_LOOP
@@ -656,7 +668,11 @@ void OMX_MediaProcessor::mediaDecoding()
       if (m_seekFlush || m_incr != 0) {
          double seek_pos = 0;
          double pts      = m_av_clock->OMXMediaTime();
-         seek_pos        = (pts / DVD_TIME_BASE) + m_incr;
+
+         //seek_pos        = (pts / DVD_TIME_BASE) + m_incr;
+         seek_pos = (pts ? pts / DVD_TIME_BASE : last_seek_pos) + m_incr;
+         last_seek_pos = seek_pos;
+
          seek_pos        *= 1000.0;
 
          if (m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
@@ -805,7 +821,7 @@ void OMX_MediaProcessor::mediaDecoding()
             {
                CLog::Log(LOGDEBUG, "Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n", audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader->IsEof(), m_omx_pkt);
                log_verbose("Pausing for buffering...");
-               m_av_clock->OMXStateExecute();
+               //m_av_clock->OMXStateExecute();
                m_av_clock->OMXResume();
             }
          }
@@ -842,6 +858,10 @@ void OMX_MediaProcessor::mediaDecoding()
          if ((m_has_video && m_player_video->GetCached()) ||
              (m_has_audio && m_player_audio->GetCached())) {
             OMXClock::OMXSleep(10);
+            continue;
+         }
+         if (m_loop) {
+            m_incr = m_loop_from - (m_av_clock->OMXMediaTime() ? m_av_clock->OMXMediaTime() / DVD_TIME_BASE : last_seek_pos);
             continue;
          }
 
