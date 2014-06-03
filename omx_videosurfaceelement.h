@@ -27,11 +27,12 @@
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
-#include <QtQuick/QQuickItem>
+#include <QQuickItem>
 #include <QOpenGLContext>
 #include <QTimer>
 
-#include "lc_logging.h"
+#include <lc_logging.h>
+
 #include "omx_mediaprocessorelement.h"
 #include "omx_textureprovider.h"
 

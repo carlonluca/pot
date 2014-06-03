@@ -35,13 +35,13 @@ extern "C" {
 #include "libavformat/avformat.h"
 }
 
-#include "lc_logging.h"
 #include "omx_imageelement.h"
 #include "omx_videosurfaceelement.h"
 #include "omx_camerasurfaceelement.h"
 #include "omx_mediaprocessorelement.h"
 #include "omx_audioprocessor.h"
 #include "omx_mediaprocessor.h"
+#include "lc_logging.h"
 
 #define ENABLE_QML_SAMPLE 1
 
@@ -124,6 +124,7 @@ int main(int argc, char *argv[])
 
     QQuickView view;
     view.setSource(QUrl("qrc:///main.qml"));
+    view.setResizeMode(view.SizeRootObjectToView);
     view.showFullScreen();
 #else
     OMX_AudioProcessor proc;

@@ -1062,8 +1062,21 @@ bool COMXVideo::SetVideoEGL()
 
 bool COMXVideo::SetVideoEGLOutputPort()
 {
+#define DISABLE_DISCARD_MODE
+#ifdef DISABLE_DISCARD_MODE
+   log_debug("Disabling discard mode.");
+   OMX_CONFIG_PORTBOOLEANTYPE booltype;
+   booltype.nSize = sizeof(OMX_CONFIG_PORTBOOLEANTYPE);
+   booltype.nVersion.nVersion = OMX_VERSION;
+   booltype.nPortIndex = 220;
+   booltype.bEnabled = OMX_FALSE;
+   OMX_ERRORTYPE omx_err = m_omx_render.SetParameter(OMX_IndexParamBrcmVideoEGLRenderDiscardMode, &booltype);
+   if (omx_err != OMX_ErrorNone)
+      log_warn("Failed to set OMX_IndexParamBrcmVideoEGLRenderDiscardMode.");
+#endif
+
    m_omx_render.EnablePort(m_omx_render.GetOutputPort(), true);
-   OMX_ERRORTYPE omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &m_eglBuffer, 221, NULL, m_textureData->m_eglImage);
+   omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &m_eglBuffer, 221, NULL, m_textureData->m_eglImage);
    if (omx_err != OMX_ErrorNone) {
       LOG_ERROR(LOG_TAG, "OpenMAXILTextureLoader::decode - OMX_UseEGLImage - failed with omxErr(0x%x)\n", omx_err);
       CLog::Log(LOGERROR, "OpenMAXILTextureLoader::decode - OMX_UseEGLImage - failed with omxErr(0x%x)\n", omx_err);

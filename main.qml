@@ -26,10 +26,10 @@ import com.luke.qml 1.0
 
 Rectangle {
     id: mainRectangle
-    property int indexVideo: 0
+    property int indexVideo: 3
     property int indexFlippable: 0
-    width: 1920
-    height: 1080
+    x: 0
+    y: 0
     color: "red"
     focus: true
 
@@ -47,7 +47,7 @@ Rectangle {
     }
 
     Timer {
-        interval: 5000; running: true; repeat: true
+        interval: 2000; running: true; repeat: true
         onTriggered: {
             indexVideo++;
             var theState = indexVideo%4;
@@ -56,9 +56,14 @@ Rectangle {
             else if (theState == 1)
                 mainRectangle.state = "NORMAL";
             else if (theState == 2)
-                myFlip.showBack();
+                //myFlip.showBack();
+                mainRectangle.state = "LARGE";
             else if (theState == 3)
-                myFlip.showFront();
+                //myFlip.showFront();
+                mainRectangle.state = "NORMAL";
+
+            crossImage1.next();
+            //crossImage2.next();
         }
     }
 
@@ -103,27 +108,11 @@ Rectangle {
 
         front: OMXVideoSurface {
             id: omxVideoSurface
-            width: 900
-            height: 600
-            x: 50
-            y: 50
+            width: 1280
+            height: 720
+            x: 0
+            y: 130
             source: mediaProcessor
-
-            SequentialAnimation {
-                id: theAnimation
-                PropertyAnimation {
-                    target: omxVideoSurface
-                    property: "opacity"
-                    to: 0.0
-                    duration: 1000
-                }
-                PropertyAnimation {
-                    target: omxVideoSurface
-                    property: "opacity"
-                    to: 1.0
-                    duration: 1000
-                }
-            }
         }
 
         back: Item {
@@ -142,41 +131,6 @@ Rectangle {
             }
         }
     }
-
-    /*ShaderEffect {
-            anchors.fill: parent
-
-            // Properties which will be passed into the shader as uniforms
-            property real amplitude: 0.02
-            property real frequency: 20
-            property real time: 0
-
-            NumberAnimation on time {
-                loops: Animation.Infinite
-                from: 0
-                to: Math.PI * 2
-                duration: 600
-            }
-
-            property variant source: ShaderEffectSource {
-                sourceItem: omxVideoSurface
-                hideSource: true
-            }
-
-            fragmentShader: "
-                uniform highp float amplitude;
-                uniform highp float frequency;
-                uniform highp float time;
-                uniform sampler2D source;
-                uniform lowp float qt_Opacity;
-                varying highp vec2 qt_TexCoord0;
-                void main() {
-                    highp vec2 p = sin(time + frequency * qt_TexCoord0);
-                    highp vec2 tc = qt_TexCoord0 + amplitude * vec2(p.y, -p.x);
-                    gl_FragColor = qt_Opacity * texture2D(source, tc);
-                }
-            "
-        }*/
 
     Image {
         id: imageLogo
@@ -204,17 +158,43 @@ Rectangle {
                 target: myMarquee
                 property: "x"
                 from: 0
-                to: 1920
+                to: mainRectangle.width
                 duration: 10000
             }
         }
+    }
+
+    OMX_CrossImage {
+        id: crossImage1
+
+        x: 1293
+        y: 130
+
+        width: 627
+        height: 372
+
+        source1: "qrc:/resources/1.jpg"
+        source2: "qrc:/resources/2.jpg"
+    }
+
+    OMX_CrossImage {
+        id: crossImage2
+
+        x: 1293
+        y: 502
+
+        width: 627
+        height: 372
+
+        source1: "qrc:/resources/3.jpg"
+        source2: "qrc:/resources/4.jpg"
     }
 
     states: [
         State {
             name: "NORMAL"
             PropertyChanges {
-                target: omxVideoSurface
+                target:omxVideoSurface
                 x: 50; y: 50; width: 900; height: 600;
             }
             PropertyChanges {
@@ -225,21 +205,32 @@ Rectangle {
         State {
             name: "LARGE"
             PropertyChanges {
-                target: omxVideoSurface;
-                x: 0; y: 0; width: 1920; height: 1080;
+                target:omxVideoSurface;
+                x: 0; y: 0; width: mainRectangle.width; height: mainRectangle.height;
             }
             PropertyChanges {
                 target: myFlip
-                x: 0; y: 0; width: 1920; height: 1080;
+                x: 0; y: 0; width: mainRectangle.width; height: mainRectangle.height;
             }
         }
     ]
 
     transitions: [
         Transition {
-            NumberAnimation {properties: "width,height"; duration: 800; easing.type: Easing.OutBounce}
-            NumberAnimation {properties: "x,y"; duration: 800}
+            from: "NORMAL"
+            to: "LARGE"
+            PropertyAnimation {property: "width"; duration: 800; easing.type: Easing.OutBounce}
+            PropertyAnimation {property: "height"; duration: 800; easing.type: Easing.OutBounce}
+            PropertyAnimation {property: "x"; duration: 800; easing.type: Easing.OutBounce}
+            PropertyAnimation {property: "y"; duration: 800; easing.type: Easing.OutBounce}
+        },
+        Transition {
+            from: "LARGE"
+            to: "NORMAL"
+            PropertyAnimation {property: "width"; duration: 800; easing.type: Easing.OutBounce}
+            PropertyAnimation {property: "height"; duration: 800; easing.type: Easing.OutBounce}
+            PropertyAnimation {property: "x"; duration: 800; easing.type: Easing.OutBounce}
+            PropertyAnimation {property: "y"; duration: 800; easing.type: Easing.OutBounce}
         }
-
     ]
 }

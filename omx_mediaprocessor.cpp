@@ -598,7 +598,7 @@ void OMX_MediaProcessor::mediaDecoding()
 {
    // See description in the qmakefile.
 //#define ENABLE_PROFILE_MAIN_LOOP
-#define ENABLE_PAUSE_FOR_BUFFERING
+//#define ENABLE_PAUSE_FOR_BUFFERING
 
    LOG_VERBOSE(LOG_TAG, "Decoding thread started.");
    emit playbackStarted();

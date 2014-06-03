@@ -37,8 +37,9 @@
 #include <stdexcept>
 #include <memory>
 
+#include <lc_logging.h>
+
 #include "omx_qthread.h"
-#include "lc_logging.h"
 
 using namespace std;
 
