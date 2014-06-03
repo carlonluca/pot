@@ -257,7 +257,8 @@ echo "Prefix to $PWD..."
 --disable-decoder=xbin \
 --disable-decoder=idf \
 --cross-prefix=arm-linux-gnueabihf- \
---prefix=$PWD/ffmpeg_compiled
+--prefix=$PWD/ffmpeg_compiled \
+--disable-symver
 
 echo "Building..."
 mkdir $PWD/ffmpeg_compiled

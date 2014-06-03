@@ -10,5 +10,13 @@
         <file>img/unknown.png</file>
         <file>img/video-x-generic.png</file>
         <file>img/audio-x-generic.png</file>
+        <file>img/1_1080p.jpg</file>
+        <file>img/2_1080p.jpg</file>
+        <file>img/3_1080p.jpg</file>
+        <file>img/4_1080p.jpg</file>
+        <file>img/1_720p.jpg</file>
+        <file>img/2_720p.jpg</file>
+        <file>img/3_720p.jpg</file>
+        <file>img/4_720p.jpg</file>
     </qresource>
 </RCC>

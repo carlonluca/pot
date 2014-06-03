@@ -147,10 +147,10 @@ QSGNode* OMX_VideoSurfaceElement::updatePaintNode(QSGNode* oldNode, UpdatePaintN
     // Create the vertices and map to texture.
     QRectF bounds = boundingRect();
     QSGGeometry::TexturedPoint2D* vertices = geometry->vertexDataAsTexturedPoint2D();
-    vertices[0].set(bounds.x(), bounds.y() + bounds.height(), 0.0f, 0.0f);
-    vertices[1].set(bounds.x() + bounds.width(), bounds.y() + bounds.height(), 1.0f, 0.0f);
-    vertices[2].set(bounds.x(), bounds.y(), 0.0f, 1.0f);
-    vertices[3].set(bounds.x() + bounds.width(), bounds.y(), 1.0f, 1.0f);
+    vertices[3].set(bounds.x(), bounds.y() + bounds.height(), 0.0f, 1.0f);
+    vertices[2].set(bounds.x() + bounds.width(), bounds.y() + bounds.height(), 1.0f, 1.0f);
+    vertices[1].set(bounds.x(), bounds.y(), 0.0f, 0.0f);
+    vertices[0].set(bounds.x() + bounds.width(), bounds.y(), 1.0f, 0.0f);
     return node;
 }
 

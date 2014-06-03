@@ -32,13 +32,12 @@ error("Either add CONFIG_APP or CONFIG_LIB to DEFINES.")
 }
 
 QT += core core-private gui gui-private opengl quick quick-private
+INCLUDEPATH += $$_PRO_FILE_PWD_/../LightLogger \
+   $$_PRO_FILE_PWD_/../LightSmartPtr
 
 TARGET   = PiOmxTextures
 contains(DEFINES, CONFIG_LIB) {
 TEMPLATE = lib
-
-INCLUDEPATH += $$_PRO_FILE_PWD_/../LightLogger \
-   $$_PRO_FILE_PWD_/../LightSmartPtr
 
 # Install headers.
 headers.files  = \
@@ -74,7 +73,8 @@ LIBS += $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libavformat.a \
    $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libavcodec.a \
    $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libavutil.a \
    $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libswscale.a \
-   $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libswresample.a
+   $$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib/libswresample.a \
+   -lz -lssl -lcrypto
 }
 else {
 LIBS += -L$$_PRO_FILE_PWD_/3rdparty/ffmpeg/lib \
@@ -306,7 +306,8 @@ OTHER_FILES += \
     omxplayer_lib/omxplayer.cpp \
     omxplayer_lib/Keyboard.h \
     omxplayer_lib/Keyboard.cpp \
-    omxplayer_lib/OMXPLAYER_VERSION
+    omxplayer_lib/OMXPLAYER_VERSION \
+    OMX_CrossImage.qml
 
 contains(DEFINES, CONFIG_APP) {
 RESOURCES += resources.qrc

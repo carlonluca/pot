@@ -33,6 +33,24 @@
 #include "poc_utils.h"
 #include "poc_qmlutils.h"
 
+/*------------------------------------------------------------------------------
+|    show_local_media
++-----------------------------------------------------------------------------*/
+bool show_local_media(QQuickView* view, QString fileAbsPath)
+{
+   QFile f(fileAbsPath);
+   if (!f.exists()) {
+      qWarning("File provided does not exist.");
+      return false;
+   }
+
+   QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
+   QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
+   QMetaObject::invokeMethod(mediaOutput, "showLocalMedia", Q_ARG(QVariant, fileAbsPath));
+
+   return true;
+}
+
 /*----------------------------------------------------------------------
 |    main
 +---------------------------------------------------------------------*/
@@ -58,17 +76,8 @@ int main(int argc, char* argv[])
     // If file path is provided from the command line, I start the player
     // immediately.
     QStringList args = app.arguments();
-    if (args.size() > 1) {
-       QFile f(args.at(1));
-       if (!f.exists())
-          qWarning("File provided does not exist.");
-       else {
-          QObject* rootObject  = dynamic_cast<QObject*>(view.rootObject());
-          QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
-          //mediaPlayer->setProperty("source", QUrl::fromLocalFile(args.at(1)));
-          QMetaObject::invokeMethod(mediaOutput, "showLocalMedia", Q_ARG(QVariant, args.at(1)));
-       }
-    }
+    if (args.size() > 1)
+       show_local_media(&view, args.at(1));
 
     return app.exec();
 }
