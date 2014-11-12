@@ -17,7 +17,15 @@ if [ $# -ne 1 ]; then
    exit
 fi
 
-${RPI_SYSROOT:?"Please, set the path to your sysroot in RPI_SYSROOT first."}
+if [ -z "$RPI_SYSROOT" ]; then
+   echo "Please set RPI_SYSROOT to the path of your sysroot."
+   exit 1
+fi
+
+if [ -z "$COMPILER_PATH" ]; then
+   echo "Please set COMPILER_PATH to the path of the cross-compiler."
+   exit 1
+fi
 
 echo "Downloading ffmpeg sources from git..."
 cd ..
@@ -26,7 +34,7 @@ if [ ! -d "3rdparty/ffmpeg" ]; then
 fi
 
 cd 3rdparty/ffmpeg
-git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src
+git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src --depth=1
 cd ffmpeg_src; git checkout n2.2
 
 echo "Configuring..."
