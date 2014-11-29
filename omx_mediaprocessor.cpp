@@ -728,7 +728,9 @@ void OMX_MediaProcessor::mediaDecoding()
 
 #if 1
          if (m_omx_reader->SeekTime((int)seek_pos, m_av_clock->OMXPlaySpeed() < 0, &startpts))
+         {
             ; //FlushStreams(DVD_NOPTS_VALUE);
+         }
 #endif // 0
 
          CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
