@@ -34,12 +34,12 @@ if [ ! -d "3rdparty/ffmpeg" ]; then
 fi
 
 cd 3rdparty/ffmpeg
-git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src --depth=1
-cd ffmpeg_src; git checkout n2.2
+git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -bn2.2 --depth=1
+cd ffmpeg_src;
 
 echo "Configuring..."
 FLOAT=hard
-export PATH=$PATH:/opt/rpi/gcc-linaro-arm-linux-gnueabihf-raspbian/bin/
+export PATH=$PATH:$COMPILER_PATH
 echo "Prefix to $PWD..."
 ./configure \
 --sysroot=$RPI_SYSROOT \
