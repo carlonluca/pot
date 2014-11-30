@@ -161,6 +161,8 @@ void OMX_MediaProcessorElement::instantiateMediaProcessor()
         connect(m_mediaProc, SIGNAL(textureInvalidated()), this, SIGNAL(textureInvalidated()));
         connect(m_mediaProc, SIGNAL(textureReady(const OMX_TextureData*)),
                 this, SLOT(onTextureDataReady(const OMX_TextureData*)), Qt::DirectConnection);
+        connect(m_mediaProc, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
+                this, SIGNAL(playbackStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
     }
 }
 
