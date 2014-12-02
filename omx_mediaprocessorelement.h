@@ -38,6 +38,7 @@
 class OMX_MediaProcessorElement : public QQuickItem
 {
     Q_OBJECT
+    Q_PROPERTY(int playbackState READ getPlaybackState)
     Q_PROPERTY(QString source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(bool autoPlay READ autoPlay WRITE setAutoPlay)
     Q_PROPERTY(long streamLength READ streamLength)
@@ -45,6 +46,8 @@ class OMX_MediaProcessorElement : public QQuickItem
 public:
     explicit OMX_MediaProcessorElement(QQuickItem* parent = 0);
     ~OMX_MediaProcessorElement();
+
+    int getPlaybackState() { return m_mediaProc->state(); }
 
     QString source();
     void setSource(QString source);
@@ -68,6 +71,7 @@ public slots:
     void onTextureDataReady(const OMX_TextureData* textureData);
 
 signals:
+    void playbackStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
     void textureReady(const OMX_TextureData* textureId);
     void textureInvalidated();
     void sourceChanged(QString filepath);
