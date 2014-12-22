@@ -18,23 +18,25 @@ function check_exists_dir {
    fi
 }
 
-function check_exists_env {
-   if [ -z $1 ]; then
-      echo "$1 was not set."
-      exit
-   fi
-}
-
 # Check the user provided the number of threads to use when building.
 if [ $# -ne 1 ]; then
    echo "Illegal arguments. Please provide just one parameter with the number of parallel threads to use when building."
    exit
 fi
 
-#${RPI_SYSROOT:?"Please, set the path to your sysroot in RPI_SYSROOT first."}
-#${COMPILER_PATH:?"Please, set the path to your cross-compiler to COMPILER_PATH first."}
-check_exists_env RPI_SYSROOT
-check_exists_env COMPILER_PATH
+# Check env.
+TEST="${RPI_SYSROOT:=false}"
+if [ "$TEST" == "false" ]; then
+   echo "Please set RPI_SYSROOT."
+   exit
+fi
+
+TEST="${COMPILER_PATH:=false}"
+if [ "$TEST" == "false" ]; then
+   echo "Please set COMPILER_PATH."
+   exit
+fi
+
 check_exists_dir "$RPI_SYSROOT"
 check_exists_dir "$COMPILER_PATH"
 
