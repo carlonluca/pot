@@ -6,5 +6,6 @@
         <file>resources/2.jpg</file>
         <file>resources/3.jpg</file>
         <file>resources/4.jpg</file>
+        <file>OMX_CrossImage.qml</file>
     </qresource>
 </RCC>

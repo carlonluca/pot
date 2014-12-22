@@ -39,6 +39,23 @@
 
 static bool g_abort = false;
 
+static int64_t timeout_start;
+static int64_t timeout_default_duration;
+static int64_t timeout_duration;
+
+static int64_t CurrentHostCounter(void)
+{
+  struct timespec now;
+  clock_gettime(CLOCK_MONOTONIC, &now);
+  return( ((int64_t)now.tv_sec * 1000000000LL) + now.tv_nsec );
+}
+
+#define RESET_TIMEOUT(x) do { \
+  timeout_start = CurrentHostCounter(); \
+  timeout_duration = (x) * timeout_default_duration; \
+} while (0)
+
+
 OMXReader::OMXReader()
 {
   m_open        = false;
@@ -80,13 +97,23 @@ void OMXReader::UnLock()
 
 static int interrupt_cb(void *unused)
 {
-  if(g_abort)
-    return 1;
-  return 0;
+  int ret = 0;
+  if (g_abort)
+  {
+    CLog::Log(LOGERROR, "COMXPlayer::interrupt_cb - Told to abort");
+    ret = 1;
+  }
+  else if (timeout_duration && CurrentHostCounter() - timeout_start > timeout_duration)
+  {
+    CLog::Log(LOGERROR, "COMXPlayer::interrupt_cb - Timed out");
+    ret = 1;
+  }
+  return ret;
 }
 
 static int dvd_file_read(void *h, uint8_t* buf, int size)
 {
+  RESET_TIMEOUT(1);
   if(interrupt_cb(NULL))
     return -1;
 
@@ -96,6 +123,7 @@ static int dvd_file_read(void *h, uint8_t* buf, int size)
 
 static offset_t dvd_file_seek(void *h, offset_t pos, int whence)
 {
+  RESET_TIMEOUT(1);
   if(interrupt_cb(NULL))
     return -1;
 
@@ -106,16 +134,18 @@ static offset_t dvd_file_seek(void *h, offset_t pos, int whence)
     return pFile->Seek(pos, whence & ~AVSEEK_FORCE);
 }
 
-bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false */)
+bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false */, float timeout /* = 0.0f */, std::string cookie /* = "" */, std::string user_agent /* = "" */)
 {
   if (!m_dllAvUtil.Load() || !m_dllAvCodec.Load() || !m_dllAvFormat.Load())
     return false;
-  
+
+  timeout_default_duration = (int64_t) (timeout * 1e9);
   m_iCurrentPts = DVD_NOPTS_VALUE;
   m_filename    = filename; 
   m_speed       = DVD_PLAYSPEED_NORMAL;
   m_program     = UINT_MAX;
   const AVIOInterruptCB int_cb = { interrupt_cb, NULL };
+  RESET_TIMEOUT(3);
 
   ClearStreams();
 
@@ -128,13 +158,23 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
   unsigned char *buffer   = NULL;
   unsigned int  flags     = READ_TRUNCATED | READ_BITRATE | READ_CHUNKED;
 
+  m_pFormatContext     = m_dllAvFormat.avformat_alloc_context();
+
+  // set the interrupt callback, appeared in libavformat 53.15.0
+  m_pFormatContext->interrupt_callback = int_cb;
+
+  // if format can be nonblocking, let's use that
+  m_pFormatContext->flags |= AVFMT_FLAG_NONBLOCK;
+
   if(m_filename.substr(0, 8) == "shout://" )
     m_filename.replace(0, 8, "http://");
 
   if(m_filename.substr(0,6) == "mms://" || m_filename.substr(0,7) == "mmsh://" || m_filename.substr(0,7) == "mmst://" || m_filename.substr(0,7) == "mmsu://" ||
       m_filename.substr(0,7) == "http://" || m_filename.substr(0,8) == "https://" ||
       m_filename.substr(0,7) == "rtmp://" || m_filename.substr(0,6) == "udp://" ||
-      m_filename.substr(0,7) == "rtsp://" )
+      m_filename.substr(0,7) == "rtsp://" || m_filename.substr(0,6) == "rtp://" ||
+      m_filename.substr(0,6) == "ftp://" || m_filename.substr(0,7) == "sftp://" ||
+      m_filename.substr(0,6) == "smb://")
   {
     // ffmpeg dislikes the useragent from AirPlay urls
     //int idx = m_filename.Find("|User-Agent=AppleCoreMedia");
@@ -143,10 +183,19 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
       m_filename = m_filename.substr(0, idx);
 
     AVDictionary *d = NULL;
-    // Enable seeking if http
-    if(m_filename.substr(0,7) == "http://")
+    // Enable seeking if http, ftp
+    if(!live && (m_filename.substr(0,7) == "http://" || m_filename.substr(0,6) == "ftp://" ||
+       m_filename.substr(0,7) == "sftp://" || m_filename.substr(0,6) == "smb://"))
     {
        av_dict_set(&d, "seekable", "1", 0);
+       if(!cookie.empty())
+       {
+          av_dict_set(&d, "cookies", cookie.c_str(), 0);
+       }
+       if(!user_agent.empty())
+       {
+          av_dict_set(&d, "user_agent", user_agent.c_str(), 0);
+       }
     }
     CLog::Log(LOGDEBUG, "COMXPlayer::OpenFile - avformat_open_input %s ", m_filename.c_str());
     result = m_dllAvFormat.avformat_open_input(&m_pFormatContext, m_filename.c_str(), iformat, &d);
@@ -193,7 +242,6 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
       return false;
     }
 
-    m_pFormatContext     = m_dllAvFormat.avformat_alloc_context();
     m_pFormatContext->pb = m_ioContext;
     result = m_dllAvFormat.avformat_open_input(&m_pFormatContext, m_filename.c_str(), iformat, NULL);
     if(result < 0)
@@ -203,14 +251,8 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
     }
   }
 
-  // set the interrupt callback, appeared in libavformat 53.15.0
-  m_pFormatContext->interrupt_callback = int_cb;
-
   m_bMatroska = strncmp(m_pFormatContext->iformat->name, "matroska", 8) == 0; // for "matroska.webm"
   m_bAVI = strcmp(m_pFormatContext->iformat->name, "avi") == 0;
-
-  // if format can be nonblocking, let's use that
-  m_pFormatContext->flags |= AVFMT_FLAG_NONBLOCK;
 
   // analyse very short to speed up mjpeg playback start
   if (iformat && (strcmp(iformat->name, "mjpeg") == 0) && m_ioContext->seekable == 0)
@@ -379,7 +421,7 @@ bool OMXReader::SeekTime(int time, bool backwords, double *startpts)
   if (m_pFormatContext->start_time != (int64_t)AV_NOPTS_VALUE)
     seek_pts += m_pFormatContext->start_time;
 
-
+  RESET_TIMEOUT(1);
   int ret = m_dllAvFormat.av_seek_frame(m_pFormatContext, -1, seek_pts, backwords ? AVSEEK_FLAG_BACKWARD : 0);
 
   if(ret >= 0)
@@ -391,7 +433,7 @@ bool OMXReader::SeekTime(int time, bool backwords, double *startpts)
 
   // demuxer will return failure, if you seek to eof
   m_eof = false;
-  if (m_pFile && m_pFile->IsEOF() && ret <= 0)
+  if (ret < 0)
   {
     m_eof = true;
     ret = 0;
@@ -418,7 +460,7 @@ OMXPacket *OMXReader::Read()
   OMXPacket *m_omx_pkt = NULL;
   int       result = -1;
 
-  if(!m_pFormatContext)
+  if(!m_pFormatContext || m_eof)
     return NULL;
 
   Lock();
@@ -432,6 +474,7 @@ OMXPacket *OMXReader::Read()
   pkt.data = NULL;
   pkt.stream_index = MAX_OMX_STREAMS;
 
+  RESET_TIMEOUT(1);
   result = m_dllAvFormat.av_read_frame(m_pFormatContext, &pkt);
   if (result < 0)
   {
@@ -441,7 +484,8 @@ OMXPacket *OMXReader::Read()
     UnLock();
     return NULL;
   }
-  else if (pkt.size < 0 || pkt.stream_index >= MAX_OMX_STREAMS)
+
+  if (pkt.size < 0 || pkt.stream_index >= MAX_OMX_STREAMS || interrupt_cb(NULL))
   {
     // XXX, in some cases ffmpeg returns a negative packet size
     if(m_pFormatContext->pb && !m_pFormatContext->pb->eof_reached)
@@ -855,6 +899,9 @@ bool OMXReader::GetHints(AVStream *stream, COMXStreamInfo *hints)
     AVDictionaryEntry *rtag = m_dllAvUtil.av_dict_get(stream->metadata, "rotate", NULL, 0);
     if (rtag)
       hints->orientation = atoi(rtag->value);
+    m_aspect = hints->aspect;
+    m_width = hints->width;
+    m_height = hints->height;
   }
 
   return true;

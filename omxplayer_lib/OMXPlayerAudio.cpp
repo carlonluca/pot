@@ -243,9 +243,10 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
 
   if(!m_passthrough && !m_hw_decode)
   {
+    double dts = pkt->dts, pts=pkt->pts;
     while(data_len > 0)
     {
-      int len = m_pAudioCodec->Decode((BYTE *)data_dec, data_len);
+      int len = m_pAudioCodec->Decode((BYTE *)data_dec, data_len, dts, pts);
       if( (len < 0) || (len >  data_len) )
       {
         m_pAudioCodec->Reset();
@@ -256,7 +257,7 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
       data_len -= len;
 
       uint8_t *decoded;
-      int decoded_size = m_pAudioCodec->GetData(&decoded);
+      int decoded_size = m_pAudioCodec->GetData(&decoded, dts, pts);
 
       if(decoded_size <=0)
         continue;
@@ -269,7 +270,7 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
 
       int ret = 0;
 
-      ret = m_decoder->AddPackets(decoded, decoded_size, pkt->dts, pkt->pts);
+      ret = m_decoder->AddPackets(decoded, decoded_size, dts, pts, m_pAudioCodec->GetFrameSize());
       if(ret != decoded_size)
       {
         printf("error ret %d decoded_size %d\n", ret, decoded_size);
@@ -284,7 +285,7 @@ bool OMXPlayerAudio::Decode(OMXPacket *pkt)
       if(m_flush_requested) return true;
     }
 
-    m_decoder->AddPackets(pkt->data, pkt->size, pkt->dts, pkt->pts);
+    m_decoder->AddPackets(pkt->data, pkt->size, pkt->dts, pkt->pts, 0);
   }
 
   return true;
@@ -343,6 +344,8 @@ void OMXPlayerAudio::Flush()
   m_flush_requested = true;
   Lock();
   LockDecoder();
+  if(m_pAudioCodec)
+    m_pAudioCodec->Reset();
   m_flush_requested = false;
   m_flush = true;
   while (!m_packets.empty())
@@ -386,7 +389,7 @@ bool OMXPlayerAudio::OpenAudioCodec()
 {
   m_pAudioCodec = new COMXAudioCodecOMX();
 
-  if(!m_pAudioCodec->Open(m_hints))
+  if(!m_pAudioCodec->Open(m_hints, m_layout))
   {
     delete m_pAudioCodec; m_pAudioCodec = NULL;
     return false;
@@ -440,7 +443,7 @@ bool OMXPlayerAudio::OpenDecoder()
   if(m_passthrough)
     m_hw_decode = false;
 
-  bAudioRenderOpen = m_decoder->Initialize(m_device, m_hints.channels, m_pAudioCodec->GetChannelMap(),
+  bAudioRenderOpen = m_decoder->Initialize(m_device, m_pAudioCodec->GetChannelMap(),
                            m_hints, m_layout, m_hints.samplerate, m_pAudioCodec->GetBitsPerSample(), m_boost_on_downmix,
                            m_av_clock, m_passthrough, m_hw_decode, m_live, m_fifo_size);
 

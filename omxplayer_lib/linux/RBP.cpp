@@ -21,7 +21,6 @@
 
 #include "RBP.h"
 #include "utils/log.h"
-#include "lc_logging.h"
 
 #define CLASSNAME "CRBP"
 

@@ -20,25 +20,34 @@ LDFLAGS		+= -L/opt/vc/lib -L/lib -L/usr/lib -lfreetype
 INCLUDES	+= -I/opt/vc/include/interface/vcos/pthreads \
 			-I/opt/vc/include \
 			-I/opt/vc/include/interface/vmcs_host \
+			-I/opt/vc/include/interface/vmcs_host/linux \
+			-I/usr/lib/arm-linux-gnueabihf/dbus-1.0/include \
 			-I/usr/include \
 			-I/usr/include/freetype2" > Makefile.include
 
 sed -i '/--enable-cross-compile \\/d;' Makefile.ffmpeg
 sed -i 's/			--cross-prefix=$(HOST)-//g;' Makefile.ffmpeg
-sed -i 's/			--disable-debug \\/			--disable-debug /g;' Makefile.ffmpeg
 
 sed -i 's/$(HOST)-//g;' Makefile.*
 sed -i 's/ -j9//g;' Makefile.*
 sed -i 's/#arm-unknown-linux-gnueabi-strip/arm-unknown-linux-gnueabi-strip/g;' Makefile
 sed -i 's/arm-unknown-linux-gnueabi-strip/strip/g;' Makefile
 
-echo "
-install: dist
-	cp omxplayer-dist/* / -r" >> Makefile
+cat <<EOF >>Makefile
+install:
+	cp -r \$(DIST)/* /
+
+uninstall:
+	rm -rf /usr/bin/omxplayer
+	rm -rf /usr/bin/omxplayer.bin
+	rm -rf /usr/lib/omxplayer
+	rm -rf /usr/share/doc/omxplayer
+	rm -rf /usr/share/man/man1/omxplayer.1
+EOF
 
 echo "Installing packages..."
 sudo apt-get update
-sudo apt-get -y install ca-certificates git-core subversion binutils libva1 libpcre3-dev libidn11-dev libboost1.50-dev libfreetype6-dev libusb-1.0-0-dev libdbus-1-dev
+sudo apt-get -y install ca-certificates git-core subversion binutils libva1 libpcre3-dev libidn11-dev libboost1.50-dev libfreetype6-dev libusb-1.0-0-dev libdbus-1-dev libssl-dev libssh-dev libsmbclient-dev
 sudo apt-get -y install gcc-4.7 g++-4.7
 
 

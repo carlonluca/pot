@@ -52,8 +52,9 @@ OMXControl::~OMXControl()
     dbus_disconnect();
 }
 
-void OMXControl::init(OMXClock *m_av_clock, OMXPlayerAudio *m_player_audio, OMXPlayerSubtitles *m_player_subtitles, OMXReader *m_omx_reader, std::string& dbus_name)
+int OMXControl::init(OMXClock *m_av_clock, OMXPlayerAudio *m_player_audio, OMXPlayerSubtitles *m_player_subtitles, OMXReader *m_omx_reader, std::string& dbus_name)
 {
+  int ret = 0;
   clock     = m_av_clock;
   audio     = m_player_audio;
   subtitles = m_player_subtitles;
@@ -71,6 +72,7 @@ void OMXControl::init(OMXClock *m_av_clock, OMXPlayerAudio *m_player_audio, OMXP
     {
       CLog::Log(LOGWARNING, "DBus connection failed, alternate failed, will continue without DBus");
       dbus_disconnect();
+      ret = -1;
     } else {
       CLog::Log(LOGDEBUG, "DBus connection succeeded");
       dbus_threads_init_default();
@@ -81,6 +83,7 @@ void OMXControl::init(OMXClock *m_av_clock, OMXPlayerAudio *m_player_audio, OMXP
     CLog::Log(LOGDEBUG, "DBus connection succeeded");
     dbus_threads_init_default();
   }
+  return ret;
 }
 
 void OMXControl::dispatch()
@@ -330,6 +333,34 @@ OMXControlResult OMXControl::getEvent()
     dbus_respond_int64(m, pos);
     return KeyConfig::ACTION_BLANK;
   }
+  else if (dbus_message_is_method_call(m, DBUS_INTERFACE_PROPERTIES, "Aspect"))
+  {
+    // Returns aspect ratio
+    double ratio = reader->GetAspectRatio();
+    dbus_respond_double(m, ratio);
+    return KeyConfig::ACTION_BLANK;
+  }
+  else if (dbus_message_is_method_call(m, DBUS_INTERFACE_PROPERTIES, "VideoStreamCount"))
+  {
+    // Returns number of video streams
+    int64_t vcount = reader->VideoStreamCount();
+    dbus_respond_int64(m, vcount);
+    return KeyConfig::ACTION_BLANK;
+  }
+  else if (dbus_message_is_method_call(m, DBUS_INTERFACE_PROPERTIES, "ResWidth"))
+  {
+    // Returns width of video
+    int64_t width = reader->GetWidth();
+    dbus_respond_int64(m, width);
+    return KeyConfig::ACTION_BLANK;
+  }
+  else if (dbus_message_is_method_call(m, DBUS_INTERFACE_PROPERTIES, "ResHeight"))
+  {
+    // Returns height of video
+    int64_t height = reader->GetHeight();
+    dbus_respond_int64(m, height);
+    return KeyConfig::ACTION_BLANK;
+  }
   else if (dbus_message_is_method_call(m, DBUS_INTERFACE_PROPERTIES, "Duration"))
   {
     // Returns the duration in microseconds
@@ -511,13 +542,13 @@ OMXControlResult OMXControl::getEvent()
   {
     subtitles->SetVisible(true);
     dbus_respond_ok(m);
-    return KeyConfig::ACTION_BLANK;
+    return KeyConfig::ACTION_SHOW_SUBTITLES;
   }
   else if (dbus_message_is_method_call(m, OMXPLAYER_DBUS_INTERFACE_PLAYER, "HideSubtitles"))
   {
     subtitles->SetVisible(false);
     dbus_respond_ok(m);
-    return KeyConfig::ACTION_BLANK;
+    return KeyConfig::ACTION_HIDE_SUBTITLES;
   }
   else if (dbus_message_is_method_call(m, OMXPLAYER_DBUS_INTERFACE_PLAYER, "Action"))
   {

@@ -1,0 +1,199 @@
+diff --git a/src/imports/multimedia/qdeclarativeaudio.cpp b/src/imports/multimedia/qdeclarativeaudio.cpp
+index 39e5be8..3067044 100644
+--- a/src/imports/multimedia/qdeclarativeaudio.cpp
++++ b/src/imports/multimedia/qdeclarativeaudio.cpp
+@@ -31,6 +31,8 @@
+ **
+ ****************************************************************************/
+ #include <QtQml/qqmlinfo.h>
++#include <QtQuick/qquickitem.h>
++#include <QtGui/qwindow.h>
+ 
+ #include "qdeclarativeaudio_p.h"
+ 
+@@ -97,8 +99,8 @@ void QDeclarativeAudio::_q_availabilityChanged(QMultimedia::AvailabilityStatus)
+     emit availabilityChanged(availability());
+ }
+ 
+-QDeclarativeAudio::QDeclarativeAudio(QObject *parent)
+-    : QObject(parent)
++QDeclarativeAudio::QDeclarativeAudio(QQuickItem *parent)
++    : QQuickItem(parent)
+     , m_autoPlay(false)
+     , m_autoLoad(true)
+     , m_loaded(false)
+@@ -757,6 +759,13 @@ void QDeclarativeAudio::_q_statusChanged()
+     }
+ }
+ 
++// lcarlon
++void QDeclarativeAudio::itemChange(ItemChange change, const ItemChangeData& value)
++{
++    printf("QDeclarativeAudio::itemChange\n");
++    m_player->onItemChanged(change, value);
++}
++
+ /*!
+     \qmlproperty string QtMultimedia::Audio::errorString
+ 
+diff --git a/src/imports/multimedia/qdeclarativeaudio_p.h b/src/imports/multimedia/qdeclarativeaudio_p.h
+index 7243d1d..3fbf1a5 100644
+--- a/src/imports/multimedia/qdeclarativeaudio_p.h
++++ b/src/imports/multimedia/qdeclarativeaudio_p.h
+@@ -48,6 +48,7 @@
+ #include <QtCore/qbasictimer.h>
+ #include <QtQml/qqmlparserstatus.h>
+ #include <QtQml/qqml.h>
++#include <QtQuick/qquickitem.h>
+ 
+ #include <qmediaplayer.h>
+ 
+@@ -62,7 +63,7 @@ class QDeclarativeMediaBaseAnimation;
+ class QDeclarativeMediaMetaData;
+ class QMediaAvailabilityControl;
+ 
+-class QDeclarativeAudio : public QObject, public QQmlParserStatus
++class QDeclarativeAudio : public QQuickItem
+ {
+     Q_OBJECT
+     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
+@@ -134,7 +135,7 @@ public:
+         ResourceMissing = QMultimedia::ResourceError
+     };
+ 
+-    QDeclarativeAudio(QObject *parent = 0);
++    QDeclarativeAudio(QQuickItem *parent = 0);
+     ~QDeclarativeAudio();
+ 
+     bool hasAudio() const;
+@@ -191,6 +192,9 @@ public Q_SLOTS:
+     void stop();
+     void seek(int position);
+ 
++    // lcarlon
++    void itemSceneChanged();
++
+ Q_SIGNALS:
+     void sourceChanged();
+     void autoLoadChanged();
+@@ -225,6 +229,9 @@ Q_SIGNALS:
+ 
+     void mediaObjectChanged();
+ 
++protected:
++    void itemChange(ItemChange change, const ItemChangeData& value);
++
+ private Q_SLOTS:
+     void _q_error(QMediaPlayer::Error);
+     void _q_availabilityChanged(QMultimedia::AvailabilityStatus);
+diff --git a/src/multimedia/controls/qmediaplayercontrol.h b/src/multimedia/controls/qmediaplayercontrol.h
+index d78ff63..707b2bb 100644
+--- a/src/multimedia/controls/qmediaplayercontrol.h
++++ b/src/multimedia/controls/qmediaplayercontrol.h
+@@ -52,6 +52,9 @@ class Q_MULTIMEDIA_EXPORT QMediaPlayerControl : public QMediaControl
+ public:
+     ~QMediaPlayerControl();
+ 
++    // lcarlon
++    virtual void setMediaPlayer(QMediaPlayer* mediaPlayer) {}
++
+     virtual QMediaPlayer::State state() const = 0;
+ 
+     virtual QMediaPlayer::MediaStatus mediaStatus() const = 0;
+diff --git a/src/multimedia/multimedia.pro b/src/multimedia/multimedia.pro
+index b3bdaa8..7ce74c8 100644
+--- a/src/multimedia/multimedia.pro
++++ b/src/multimedia/multimedia.pro
+@@ -1,5 +1,5 @@
+ TARGET = QtMultimedia
+-QT = core-private network gui-private
++QT = core-private network gui-private quick
+ 
+ MODULE_PLUGIN_TYPES = \
+     mediaservice \
+diff --git a/src/multimedia/playback/qmediaplayer.cpp b/src/multimedia/playback/qmediaplayer.cpp
+index 66aec7c..87a3e74 100644
+--- a/src/multimedia/playback/qmediaplayer.cpp
++++ b/src/multimedia/playback/qmediaplayer.cpp
+@@ -482,6 +482,9 @@ QMediaPlayer::QMediaPlayer(QObject *parent, QMediaPlayer::Flags flags):
+         d->error = ServiceMissingError;
+     } else {
+         d->control = qobject_cast<QMediaPlayerControl*>(d->service->requestControl(QMediaPlayerControl_iid));
++        //if (dynamic_cast<QQuickItem*>(parent))
++        //    printf("Parent is a QQuickItem.\n");
++        d->control->setMediaPlayer(this);
+         d->networkAccessControl = qobject_cast<QMediaNetworkAccessControl*>(d->service->requestControl(QMediaNetworkAccessControl_iid));
+         if (d->control != 0) {
+             connect(d->control, SIGNAL(mediaChanged(QMediaContent)), SIGNAL(currentMediaChanged(QMediaContent)));
+@@ -1005,6 +1008,13 @@ void QMediaPlayer::setVideoOutput(QAbstractVideoSurface *surface)
+     }
+ }
+ 
++// lcarlon
++void QMediaPlayer::onItemChanged(QQuickItem::ItemChange change, const QQuickItem::ItemChangeData& value)
++{
++    printf("QMediaPlayer::onItemChanged\n");
++    emit itemSceneChanged();
++}
++
+ /*! \reimp */
+ QMultimedia::AvailabilityStatus QMediaPlayer::availability() const
+ {
+diff --git a/src/multimedia/playback/qmediaplayer.h b/src/multimedia/playback/qmediaplayer.h
+index 4aa07c7..5385b1d 100644
+--- a/src/multimedia/playback/qmediaplayer.h
++++ b/src/multimedia/playback/qmediaplayer.h
+@@ -40,6 +40,8 @@
+ 
+ #include <QtNetwork/qnetworkconfiguration.h>
+ 
++#include <QtQuick/qquickitem.h>
++
+ QT_BEGIN_NAMESPACE
+ 
+ 
+@@ -168,6 +170,8 @@ public Q_SLOTS:
+     void setNetworkConfigurations(const QList<QNetworkConfiguration> &configurations);
+ 
+ Q_SIGNALS:
++    void itemSceneChanged();
++
+     void mediaChanged(const QMediaContent &media);
+     void currentMediaChanged(const QMediaContent &media);
+ 
+@@ -195,6 +199,8 @@ public:
+     virtual void unbind(QObject *);
+ 
+ private:
++    void onItemChanged(QQuickItem::ItemChange change, const QQuickItem::ItemChangeData& value);
++
+     Q_DISABLE_COPY(QMediaPlayer)
+     Q_DECLARE_PRIVATE(QMediaPlayer)
+     Q_PRIVATE_SLOT(d_func(), void _q_stateChanged(QMediaPlayer::State))
+@@ -204,6 +210,8 @@ private:
+     Q_PRIVATE_SLOT(d_func(), void _q_playlistDestroyed())
+     Q_PRIVATE_SLOT(d_func(), void _q_handlePlaylistLoaded())
+     Q_PRIVATE_SLOT(d_func(), void _q_handlePlaylistLoadFailed())
++
++    friend class QDeclarativeAudio;
+ };
+ 
+ QT_END_NAMESPACE
+diff --git a/src/plugins/plugins.pro b/src/plugins/plugins.pro
+index aa28bdd..8fdb8ae 100644
+--- a/src/plugins/plugins.pro
++++ b/src/plugins/plugins.pro
+@@ -34,8 +34,11 @@ winrt {
+ }
+ 
+ unix:!mac:!android {
+-    config_gstreamer {
+-       SUBDIRS += gstreamer
++    # lcarlon: specify when qmaking.
++    raspberry {
++        SUBDIRS += openmaxil
++    } else:config_gstreamer {
++        SUBDIRS += gstreamer
+     } else {
+         SUBDIRS += audiocapture
+     }

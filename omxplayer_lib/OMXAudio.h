@@ -30,12 +30,15 @@
 #include "linux/PlatformDefs.h"
 #include "DllAvCodec.h"
 #include "DllAvUtil.h"
+#include "utils/PCMRemap.h"
 #include "OMXCore.h"
 #include "OMXClock.h"
 #include "OMXStreamInfo.h"
 #include "BitstreamConverter.h"
 #include "utils/PCMRemap.h"
 #include "utils/SingleLock.h"
+
+#define AUDIO_BUFFER_SECONDS 3
 
 class COMXAudio
 {
@@ -56,14 +59,14 @@ public:
   unsigned int GetAudioRenderingLatency();
   float GetMaxLevel(double &pts);
   COMXAudio();
-  bool Initialize(const CStdString& device, int iChannels, uint64_t channelMap,
+  bool Initialize(const CStdString& device, uint64_t channelMap,
                            COMXStreamInfo &hints, enum PCMLayout layout, unsigned int uiSamplesPerSec, unsigned int uiBitsPerSample, bool boostOnDownmix,
                            OMXClock *clock, bool bUsePassthrough = false, bool bUseHWDecode = false, bool is_live = false, float fifo_size = 0);
   ~COMXAudio();
   bool PortSettingsChanged();
 
   unsigned int AddPackets(const void* data, unsigned int len);
-  unsigned int AddPackets(const void* data, unsigned int len, double dts, double pts);
+  unsigned int AddPackets(const void* data, unsigned int len, double dts, double pts, unsigned int frame_size);
   unsigned int GetSpace();
   bool Deinitialize();
 
@@ -86,10 +89,6 @@ public:
 
   void PrintChannels(OMX_AUDIO_CHANNELTYPE eChannelMapping[]);
   void PrintPCM(OMX_AUDIO_PARAM_PCMMODETYPE *pcm, std::string direction);
-  void PrintDDP(OMX_AUDIO_PARAM_DDPTYPE *ddparm);
-  void PrintDTS(OMX_AUDIO_PARAM_DTSTYPE *dtsparam);
-  unsigned int SyncDTS(BYTE* pData, unsigned int iSize);
-  unsigned int SyncAC3(BYTE* pData, unsigned int iSize);
   void UpdateAttenuation();
   void BuildChannelMap(enum PCMChannels *channelMap, uint64_t layout);
   int BuildChannelMapCEA(enum PCMChannels *channelMap, uint64_t layout);
@@ -105,6 +104,7 @@ private:
   bool          m_HWDecode;
   bool          m_normalize_downmix;
   unsigned int  m_BytesPerSec;
+  unsigned int  m_InputBytesPerSec;
   unsigned int  m_BufferLen;
   unsigned int  m_ChunkLen;
   unsigned int  m_InputChannels;
@@ -118,7 +118,6 @@ private:
   OMXClock      *m_av_clock;
   bool          m_settings_changed;
   bool          m_setStartTime;
-  bool          m_LostSync;
   int           m_SampleRate;
   OMX_AUDIO_CODINGTYPE m_eEncoding;
   uint8_t       *m_extradata;

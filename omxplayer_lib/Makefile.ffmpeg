@@ -4,15 +4,19 @@ CFLAGS=-D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DTARGET_POSIX -DTARGET_LI
 
 WORK=$(PWD)
 
+.PHONY : all
 all: checkout configure compile
 
+.PHONY : copy
 copy:
 	find ffmpeg -name '*.so*' -exec cp {} . \;
 	$(HOST)-strip *.so*
 
+.PHONY : compile
 compile: 
 	+$(MAKE) -C ffmpeg
 
+.PHONY : configure
 configure: 
 	cd ffmpeg; \
 	CFLAGS="$(CFLAGS) ${INCLUDES}" \
@@ -31,15 +35,17 @@ configure:
 			--disable-filters \
 			--disable-encoders \
 			--disable-devices \
-			--disable-ffprobe \
-			--disable-ffplay \
-			--disable-ffserver \
-			--disable-ffmpeg \
+			--disable-programs \
 			--enable-shared \
 			--disable-doc \
 			--disable-postproc \
 			--enable-gpl \
-			--enable-protocol=http \
+			--enable-version3 \
+			--enable-protocols \
+			--enable-libsmbclient \
+			--enable-libssh \
+			--enable-nonfree \
+			--enable-openssl \
 			--enable-pthreads \
 			--enable-pic \
 			--disable-armv5te \
@@ -237,15 +243,18 @@ configure:
 			--disable-decoder=bintext \
 			--disable-decoder=xbin \
 			--disable-decoder=idf \
+			--enable-decoder=opus \
 			--cross-prefix=$(HOST)-
 
+.PHONY : clean
 clean:
 	@rm -rf ffmpeg
 
-checkout: 
-	git clone git://source.ffmpeg.org/ffmpeg ffmpeg; \
-	cd ffmpeg; git checkout n2.1
+.PHONY : checkout
+checkout:
+	git clone git://source.ffmpeg.org/ffmpeg ffmpeg -b n2.4.3 --depth=1
 
+.PHONY : install
 install:
 	cd ffmpeg; make -j9 DESTDIR="$(WORK)/ffmpeg_compiled" install
 	$(HOST)-strip ffmpeg_compiled/usr/local/lib/*.so

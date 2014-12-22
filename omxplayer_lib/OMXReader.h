@@ -24,7 +24,6 @@
 
 #include "DllAvUtil.h"
 #include "DllAvFormat.h"
-#include "DllAvFilter.h"
 #include "DllAvCodec.h"
 #include "OMXStreamInfo.h"
 #include "OMXThread.h"
@@ -122,6 +121,9 @@ protected:
   int                       m_speed;
   unsigned int              m_program;
   pthread_mutex_t           m_lock;
+  double                    m_aspect;
+  int                       m_width;
+  int                       m_height;
   void Lock();
   void UnLock();
   bool SetActiveStreamInternal(OMXStreamType type, unsigned int index);
@@ -130,7 +132,7 @@ private:
 public:
   OMXReader();
   ~OMXReader();
-  bool Open(std::string filename, bool dump_format, bool live = false);
+  bool Open(std::string filename, bool dump_format, bool live = false, float timeout = 0.0f, std::string cookie = "", std::string user_agent = "");
   void ClearStreams();
   bool Close();
   //void FlushRead();
@@ -151,6 +153,9 @@ public:
   int  SubtitleStreamCount() { return m_subtitle_count; };
   bool SetActiveStream(OMXStreamType type, unsigned int index);
   int  GetChapterCount() { return m_chapter_count; };
+  double GetAspectRatio() { return m_aspect; };
+  int GetWidth() { return m_width; };
+  int GetHeight() { return m_height; };
   OMXChapter GetChapter(unsigned int chapter) { return m_chapters[(chapter > MAX_OMX_CHAPTERS) ? MAX_OMX_CHAPTERS : chapter]; };
   static void FreePacket(OMXPacket *pkt);
   static OMXPacket *AllocPacket(int size);

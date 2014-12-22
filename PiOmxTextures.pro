@@ -266,7 +266,6 @@ HEADERS  += \
     omx_wrapper/OMX_Core.h \
     omxplayer_lib/DllSwResample.h \
     omxplayer_lib/DllAvUtil.h \
-    omxplayer_lib/DllAvFilter.h \
     omxplayer_lib/DllAvCodec.h \
     omx_mediaprocessorelement.h \
     omx_textureprovider.h \

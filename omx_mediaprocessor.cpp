@@ -303,9 +303,12 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
              m_av_clock,
              textureData,
              VS_DEINTERLACEMODE_OFF, /* deinterlace */
+             OMX_ImageFilterAnaglyphNone,
              ENABLE_HDMI_CLOCK_SYNC,
              true,                   /* threaded */
              1.0,                    /* display aspect, unused */
+             0,                      /* display */
+             0,                      /* layer */
              m_video_queue_size, m_video_fifo_size
              ))
          return false;
@@ -675,31 +678,37 @@ void OMX_MediaProcessor::mediaDecoding()
 
          seek_pos        *= 1000.0;
 
-         if (m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
-            flushStreams(startpts);
+         if(m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
+         {
+            unsigned t = (unsigned)(startpts*1e-6);
+            auto dur = m_omx_reader->GetStreamLength() / 1000;
 
-//#define ENABLE_FAST_FORWARD_SEEK
-#ifdef ENABLE_FAST_FORWARD_SEEK
-         if (m_incr < 0.0f) {
-#endif
-            m_player_video->Close();
-            sentStarted = false;
-            if (m_has_video && !m_player_video->Open(
-                   *m_hints_video,
-                   m_av_clock,
-                   m_textureData,
-                   VS_DEINTERLACEMODE_OFF, /* deinterlace */
-                   ENABLE_HDMI_CLOCK_SYNC,
-                   true,                   /* threaded */
-                   1.0,                    /* display aspect, unused */
-                   m_video_queue_size, m_video_fifo_size
-                   )) {
-               m_incr = 0;
-               break;
-            }
-#ifdef ENABLE_FAST_FORWARD_SEEK
+            log_info("Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
+            flushStreams(startpts);
          }
-#endif
+
+         m_player_video->Close();
+         sentStarted = false;
+
+         if (m_omx_reader->IsEof())
+            break;
+
+         if (m_has_video && !m_player_video->Open(
+                *m_hints_video,
+                m_av_clock,
+                m_textureData,
+                VS_DEINTERLACEMODE_OFF, /* deinterlace */
+                OMX_ImageFilterAnaglyphNone,
+                ENABLE_HDMI_CLOCK_SYNC,
+                true,                   /* threaded */
+                1.0,                    /* display aspect, unused */
+                0,                      /* display */
+                0,                      /* layer */
+                m_video_queue_size, m_video_fifo_size
+                )) {
+            m_incr = 0;
+            break;
+         }
 
          m_incr = 0;
 
@@ -968,9 +977,12 @@ void OMX_MediaProcessor::mediaDecoding()
              m_av_clock,
              m_textureData,
              VS_DEINTERLACEMODE_OFF, /* deinterlace */
+             OMX_ImageFilterAnaglyphNone,
              ENABLE_HDMI_CLOCK_SYNC,
              true,                   /* threaded */
              1.0,                    /* display aspect, unused */
+             0,                      /* display, unused */
+             0,                      /* layer */
              m_video_queue_size, m_video_fifo_size
              )) {
          LOG_ERROR(LOG_TAG, "Failed to reopen media.");
@@ -1022,7 +1034,7 @@ void OMX_MediaProcessor::flushStreams(double pts)
       m_player_audio->Flush();
 
    if (pts != DVD_NOPTS_VALUE)
-       m_av_clock->OMXMediaTime(0.0);
+       m_av_clock->OMXMediaTime(pts);
 
 #ifdef ENABLE_SUBTITLES
    if (m_has_subtitle)
