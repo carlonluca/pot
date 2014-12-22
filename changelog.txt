@@ -1,5 +1,10 @@
 Changelog
 
+Version 4.3.0
+=============
+1. Updated for Qt 5.4.0.
+2. Fixed scripts + merged changes from omxplayer.
+
 Version 4.2.0
 =============
 1. Merged changes from omxplayer.
