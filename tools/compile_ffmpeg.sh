@@ -60,7 +60,7 @@ echo "Prefix to $PWD..."
 --extra-cflags="-mfpu=vfp -mfloat-abi=hard -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog" \
 --enable-cross-compile \
 --enable-shared \
---disable-static \
+--enable-static \
 --arch=arm \
 --cpu=arm1176jzf-s \
 --target-os=linux \

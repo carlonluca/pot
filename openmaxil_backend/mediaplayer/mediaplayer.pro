@@ -35,7 +35,9 @@ message($$_PRO_FILE_PWD_)
 INCLUDEPATH += $$PWD
 INCLUDEPATH += \
 #   $$_PRO_FILE_PWD_/../3rdparty/ffmpeg/include \
-   $$_PRO_FILE_PWD_/../3rdparty/PiOmxTextures/include
+   $$_PRO_FILE_PWD_/../3rdparty/PiOmxTextures/include \
+   $$_PRO_FILE_PWD_/../3rdparty/LightLogger
+
 LIBS += \
    -lEGL \
 #   -L$$_PRO_FILE_PWD_/../3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample \
