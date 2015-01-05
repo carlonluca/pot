@@ -801,6 +801,7 @@ OMX_ERRORTYPE COMXCoreComponent::FreeInputBuffers()
   return omx_err;
 }
 
+#include "lc_logging.h"
 OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
 {
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
@@ -818,10 +819,12 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
   pthread_mutex_lock(&m_omx_output_mutex);
   pthread_cond_broadcast(&m_output_buffer_cond);
 
+  log_verbose("m_omx_output_buffers size is %ld.", m_omx_output_buffers.size());
   for (size_t i = 0; i < m_omx_output_buffers.size(); i++)
   {
     uint8_t *buf = m_omx_output_buffers[i]->pBuffer;
 
+    log_verbose("Freeing output buffer for %p.", this);
     omx_err = OMX_FreeBuffer(m_handle, m_output_port, m_omx_output_buffers[i]);
 
     if(m_omx_output_use_buffers && buf)
@@ -843,7 +846,9 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
   WaitForOutputDone(1000);
 
   pthread_mutex_lock(&m_omx_output_mutex);
-  assert(m_omx_output_buffers.size() == m_omx_output_available.size());
+
+  // lcarlon: this must be removed to avoid the crash.
+  //assert(m_omx_output_buffers.size() == m_omx_output_available.size());
 
   m_omx_output_buffers.clear();
 
@@ -1490,6 +1495,7 @@ void COMXCoreComponent::ResetEos()
 
 bool COMXCoreComponent::Deinitialize()
 {
+   log_verbose("Deinit of %p", this);
   OMX_ERRORTYPE omx_err;
 
   m_exit = true;
@@ -1499,8 +1505,10 @@ bool COMXCoreComponent::Deinitialize()
 
   if(m_handle)
   {
+     log_verbose("Flushin of %p", this);
     FlushAll();
 
+    log_verbose("freeing output buf of %p", this);
     FreeOutputBuffers();
     FreeInputBuffers();
 

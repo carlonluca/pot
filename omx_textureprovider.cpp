@@ -58,7 +58,8 @@ OMX_TextureData::OMX_TextureData(const OMX_TextureData& textureData) :
    m_textureId(textureData.m_textureId),
    m_textureData(textureData.m_textureData),
    m_eglImage(textureData.m_eglImage),
-   m_textureSize(textureData.m_textureSize)
+   m_textureSize(textureData.m_textureSize),
+   m_omxBuffer(textureData.m_omxBuffer)
 {
    // Do nothing.
 }
@@ -68,7 +69,8 @@ OMX_TextureData::OMX_TextureData(const OMX_TextureData& textureData) :
 +-----------------------------------------------------------------------------*/
 OMX_TextureData::~OMX_TextureData()
 {
-   // Do not free.
+   if (m_textureData || m_textureId || m_eglImage)
+      log_warn("Loosing pointers to GPU data.");
 }
 
 /*------------------------------------------------------------------------------
@@ -82,21 +84,22 @@ void OMX_TextureData::freeData()
    EGLDisplay eglDisplay = get_egl_display();
 
    // Destroy texture, EGL image and free the buffer.
-   log_debug("Freeing KHR image...");
+   log_info("Freeing KHR image...");
    if (m_eglImage && eglDestroyImageKHR(eglDisplay, m_eglImage) == EGL_SUCCESS) {
       EGLint err = eglGetError();
       LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %d.", err);
    }
+
    m_eglImage = NULL;
 
    if (m_textureId) {
-      log_debug("Freeing texture...");
+      log_info("Freeing texture...");
       glDeleteTextures(1, &m_textureId);
       m_textureId = 0;
    }
 
    if (m_textureData) {
-      log_debug("Freeing texture data...");
+      log_info("Freeing texture data...");
       delete m_textureData;
       m_textureData = NULL;
    }
@@ -108,7 +111,12 @@ void OMX_TextureData::freeData()
 OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
 {
    EGLDisplay eglDisplay = get_egl_display();
+   if (!eglDisplay)
+      return (OMX_TextureData*)log_critical("Failed to get EGLDisplay.");
+
    EGLContext eglContext = get_egl_context();
+   if (!eglContext)
+      return (OMX_TextureData*)log_critical("Failed to get EGLContext.");
 
    EGLint attr[] = {EGL_GL_TEXTURE_LEVEL_KHR, 0, EGL_NONE};
 
@@ -124,6 +132,7 @@ OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
    GLubyte* pixel = new GLubyte[size.width()*size.height()*4];
    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width(), size.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
 
+   log_info("Creating EGLImageKHR...");
    EGLImageKHR eglImage = eglCreateImageKHR(
             eglDisplay,
             eglContext,
@@ -131,6 +140,7 @@ OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
             (EGLClientBuffer)textureId,
             attr
             );
+   log_verbose("EGL image %d created...", eglImage);
 
    EGLint eglErr = eglGetError();
    if (eglErr != EGL_SUCCESS) {
@@ -138,6 +148,7 @@ OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
       return 0;
    }
 
+   log_verbose("Creating OMX_TextureData...");
    OMX_TextureData* textureData = new OMX_TextureData;
    textureData->m_textureId   = textureId;
    textureData->m_textureData = pixel;

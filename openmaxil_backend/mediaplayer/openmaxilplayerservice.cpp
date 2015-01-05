@@ -21,6 +21,9 @@
  * along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
 #include <QtCore/qvariant.h>
 #include <QtCore/qdebug.h>
 
@@ -35,57 +38,41 @@
 #include "openmaxilvideorenderercontrol.h"
 #include "openmaxilstreamscontrol.h"
 
+#include "lc_logging.h"
+
 #include <private/qmediaplaylistnavigator_p.h>
 #include <qmediaplaylist.h>
 #include <private/qmediaresourceset_p.h>
 
 QT_BEGIN_NAMESPACE
 
-QGstreamerPlayerService::QGstreamerPlayerService(QObject *parent):
-     QMediaService(parent)
-     , m_videoOutput(0)
-     , m_videoRenderer(0)
-#if defined(HAVE_XVIDEO) && defined(HAVE_WIDGETS)
-     , m_videoWindow(0)
-     , m_videoWidget(0)
-#endif
-     , m_videoReferenceCount(0)
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerService::OpenMAXILPlayerService
++-----------------------------------------------------------------------------*/
+OpenMAXILPlayerService::OpenMAXILPlayerService(QObject *parent):
+   QMediaService(parent)
+ , m_videoOutput(0)
+ , m_videoRenderer(0)
+ , m_videoReferenceCount(0)
 {
-    qDebug("Instantiating QMediaService...");
+    log_verbose("Instantiating QMediaService...");
 
     m_control             = new OpenMAXILPlayerControl(this);
-    m_metaData            = new OMX_MetaDataProvider(m_control, this);
-    m_streamsControl      = new QGstreamerStreamsControl(this);
+    m_metaData            = new OpenMAXILMetaDataProvider(m_control, this);
+    m_streamsControl      = new OpenMAXILStreamsControl(this);
     m_availabilityControl = new OpenMAXILAvailabilityControl(this);
-
-#if defined(Q_WS_MAEMO_6) && defined(__arm__)
-    m_videoRenderer = new QGstreamerGLTextureRenderer(this);
-#else
-    //m_videoRenderer = new QGstreamerVideoRenderer(this);
-    m_videoRenderer = new OpenMAXILVideoRendererControl(this);
-
-    // Connect directly to avoid deadlock.
-    connect(m_control, SIGNAL(textureInvalidated()),
-            m_videoRenderer, SLOT(onTextureInvalidated()), Qt::DirectConnection);
-    connect(m_control, SIGNAL(textureReady(const OMX_TextureData*)),
-            m_videoRenderer, SLOT(onTextureReady(const OMX_TextureData*)), Qt::DirectConnection);
-#endif
-
-#if defined(HAVE_XVIDEO) && defined(HAVE_WIDGETS)
-#ifdef Q_WS_MAEMO_6
-    m_videoWindow = new QGstreamerVideoWindow(this, "omapxvsink");
-#else
-    m_videoWindow = new QGstreamerVideoOverlay(this);
-#endif
-    m_videoWidget = new QGstreamerVideoWidgetControl(this);
-#endif
+    m_videoRenderer       = new OpenMAXILVideoRendererControl(m_control->getMediaProcessor(), this);
 }
 
-QGstreamerPlayerService::~QGstreamerPlayerService()
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::~OpenMAXILPlayerControl
++-----------------------------------------------------------------------------*/
+OpenMAXILPlayerService::~OpenMAXILPlayerService()
 {
+   // Do nothing.
 }
 
-QMediaControl *QGstreamerPlayerService::requestControl(const char *name)
+QMediaControl *OpenMAXILPlayerService::requestControl(const char *name)
 {
     qDebug("Requesting control for %s...", name);
 
@@ -148,7 +135,7 @@ QMediaControl *QGstreamerPlayerService::requestControl(const char *name)
     return 0;
 }
 
-void QGstreamerPlayerService::releaseControl(QMediaControl *control)
+void OpenMAXILPlayerService::releaseControl(QMediaControl *control)
 {
 #if 0
     if (control == m_videoOutput) {

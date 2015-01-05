@@ -28,11 +28,14 @@
 #include "QtMultimedia/qvideosurfaceformat.h"
 #include "QtCore/qtimer.h"
 #include "QtCore/qmutex.h"
+
 #include "openmaxilvideorenderercontrol.h"
+
 #include "lc_logging.h"
 
 static QMutex m_mutex;
 
+#define FPS (30)
 
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoBuffer class
@@ -55,6 +58,10 @@ public:
       return QVariant::fromValue<unsigned int>(m_textureId);
    }
 
+   void setHandle(GLuint textureId) {
+      m_textureId = textureId;
+   }
+
    uchar* map(MapMode mode, int* numBytes, int* bytesPerLine) {
       return NULL;
    }
@@ -73,18 +80,30 @@ private:
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl
 +-----------------------------------------------------------------------------*/
-OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(QObject *parent) :
+OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OMX_MediaProcessor* p, QObject *parent) :
    QVideoRendererControl(parent),
+   m_mediaProcessor(p),
+   m_texData(NULL),
    m_surface(NULL),
    m_surfaceFormat(NULL),
    m_frame(NULL),
    m_buffer(NULL),
-   m_textureId(0),
    m_updateTimer(new QTimer(this))
 {
-   m_updateTimer->setInterval(40);
+   connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
+           this, SLOT(onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
+
+   OMX_EGLBufferProviderSh provider = m_mediaProcessor->m_provider;
+   connect(provider.get(), SIGNAL(texturesReady()),
+           this, SLOT(onTexturesReady()));
+   connect(provider.get(), SIGNAL(texturesFreed()),
+           this, SLOT(onTexturesFreed()));
+
+   m_updateTimer->setInterval(FPS);
    m_updateTimer->setSingleShot(false);
-   connect(m_updateTimer, SIGNAL(timeout()), this, SLOT(onUpdateTriggered()));
+   connect(m_updateTimer, SIGNAL(timeout()),
+           this, SLOT(onUpdateTriggered()));
+
    m_updateTimer->start();
 }
 
@@ -95,7 +114,23 @@ OpenMAXILVideoRendererControl::~OpenMAXILVideoRendererControl()
 {
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
+   QMutexLocker locker(&m_mutex);
+
+   // Stop the surface first.
+   if (m_surface)
+      m_surface->stop();
+
+   delete m_surfaceFormat;
    delete m_frame;
+#if 0
+   // NOTE: Do not free the buffer. It is already freed (I guess by
+   // deleting the frame somehow).
+   delete m_buffer;
+#endif
+
+   m_surfaceFormat = NULL;
+   m_frame         = NULL;
+   m_buffer        = NULL;
 }
 
 /*------------------------------------------------------------------------------
@@ -125,52 +160,63 @@ QAbstractVideoSurface* OpenMAXILVideoRendererControl::surface() const
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoRendererControl::onTextureReady
 +-----------------------------------------------------------------------------*/
-void OpenMAXILVideoRendererControl::onTextureReady(const OMX_TextureData* textureData)
+void OpenMAXILVideoRendererControl::onTexturesReady()
 {
-   QMutexLocker locker(&m_mutex);
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   onTexturesFreed();
 
+   QMutexLocker locker(&m_mutex);
+   OMX_EGLBufferProviderSh provider = m_mediaProcessor->m_provider;
+   if (!provider.get()) {
+      log_warn("Invalid provider.");
+      return;
+   }
+
+   QList<OMX_TextureData*> textures = provider->getBuffers();
+   if (textures.size() <= 0) {
+      log_warn("No textures in the provider.");
+      return;
+   }
+
+   OMX_TextureData* texture = textures.at(0);
+   if (!texture) {
+      log_warn("Couldn't get a valid texture.");
+      return;
+   }
+
+   // Just take one random texture to determine the size. Do not place
+   // any texture yet in the scene as I can't guarantee it is filled
+   // already with valid data.
    m_buffer = new OpenMAXILVideoBuffer(
             QAbstractVideoBuffer::GLTextureHandle,
-            textureData->m_textureId
+            0
             );
    m_frame = new QVideoFrame(
             m_buffer,
-            textureData->m_textureSize,
+            texture->m_textureSize,
             QVideoFrame::Format_RGB565
             );
    m_surfaceFormat = new QVideoSurfaceFormat(
-            textureData->m_textureSize,
+            texture->m_textureSize,
             QVideoFrame::Format_RGB565,
             QAbstractVideoBuffer::GLTextureHandle
             );
-   m_textureId = textureData->m_textureId;
 }
 
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoRendererControl::onTextureInvalidated
 +-----------------------------------------------------------------------------*/
-void OpenMAXILVideoRendererControl::onTextureInvalidated()
+void OpenMAXILVideoRendererControl::onTexturesFreed()
 {
    QMutexLocker locker(&m_mutex);
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   if (m_surfaceFormat) {
+      delete m_surfaceFormat;
+      m_surfaceFormat = NULL;
+   }
 
-   // Stop the surface first.
-   if (m_surface)
-      m_surface->stop();
-
-   delete m_surfaceFormat;
-   delete m_frame;
-#if 0
-   // NOTE: Do not free the buffer. It is already freed (I guess by
-   // deleting the frame somehow).
-   delete m_buffer;
-#endif
-   m_surfaceFormat = NULL;
-   m_frame         = NULL;
-   m_buffer        = NULL;
-
-   m_textureId = 0;
+   if (m_frame) {
+      delete m_frame;
+      m_frame = NULL;
+   }
 }
 
 /*------------------------------------------------------------------------------
@@ -178,15 +224,37 @@ void OpenMAXILVideoRendererControl::onTextureInvalidated()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILVideoRendererControl::onUpdateTriggered()
 {
-   QMutexLocker locker(&m_mutex);
-#ifdef UNACCEPTABLY_VERBOSE_LOGS
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
-#endif
+   // I don't like acquiring two locks at the same time...
+   QMutexLocker locker1(&m_mutex);
+   QMutexLocker locker2(&m_mutexData);
 
-   if (m_surface && m_frame && m_surfaceFormat) {
-      if (!m_surface->isActive() && !m_surface->start(*m_surfaceFormat)) {
-         LOG_WARNING(LOG_TAG, "Failed to start surface.");
-      }
+   if (!m_mediaProcessor || !m_mediaProcessor->m_provider.get())
+      return;
+
+   OMX_TextureData* data = m_mediaProcessor->m_provider->getNextFilledBuffer();
+   if (!data)
+      return;
+   if (m_texData)
+      m_mediaProcessor->m_provider->appendEmptyBuffer(m_texData);
+
+   m_texData = data;
+
+   if (m_surface && m_frame && m_surfaceFormat && m_texData) {
+      if (!m_surface->isActive() && !m_surface->start(*m_surfaceFormat))
+         log_warn("Failed to start surface.");
+
+      m_buffer->setHandle(m_texData->m_textureId);
       m_surface->present(*m_frame);
    }
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILVideoRendererControl::onMediaPlayerStateChanged
++-----------------------------------------------------------------------------*/
+void OpenMAXILVideoRendererControl::onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state)
+{
+   if (state == OMX_MediaProcessor::STATE_PLAYING)
+      m_updateTimer->start();
+   else
+      m_updateTimer->stop();
 }

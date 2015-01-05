@@ -40,6 +40,7 @@
 #include <lc_logging.h>
 
 #include "omx_qthread.h"
+#include "omx_textureprovider.h"
 
 using namespace std;
 
@@ -63,8 +64,6 @@ class AVPacket;
 class CRBP;
 class COMXCore;
 class COMXStreamInfo;
-
-typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
 
 
 /*------------------------------------------------------------------------------
@@ -91,7 +90,7 @@ public:
         ERROR_WRONG_THREAD
     };
 
-    OMX_MediaProcessor(OMX_TextureProviderSh provider);
+    OMX_MediaProcessor(OMX_EGLBufferProviderSh provider);
     ~OMX_MediaProcessor();
 
     bool setFilename(QString filename, OMX_TextureData*& textureData);
@@ -99,8 +98,6 @@ public:
     QStringList streams();
 
     qint64 streamPosition();
-
-    OMX_TextureData* textureData();
 
     bool hasAudio();
     bool hasVideo();
@@ -123,19 +120,18 @@ public:
 
     QVariantMap getMetaData();
 
+    OMX_EGLBufferProviderSh m_provider;
+
 public slots:
     bool play();
     bool stop();
     bool pause();
     bool seek(qint64 position);
-    void onTextureReady(const OMX_TextureData* textureData);
 
 signals:
     void metadataChanged(const QVariantMap metadata);
     void playbackStarted();
     void playbackCompleted();
-    void textureInvalidated();
-    void textureReady(const OMX_TextureData* textureData);
     void errorOccurred(OMX_MediaProcessor::OMX_MediaProcessorError error);
     void stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
 
@@ -153,7 +149,6 @@ private:
 
     OMX_QThread m_thread;
     QString m_filename;
-    OMX_TextureData* m_textureData;
 
     AVFormatContext* fmt_ctx;
     AVStream* streamVideo;
@@ -186,8 +181,6 @@ private:
 
     int m_subtitle_index;
     int m_audio_index;
-
-    OMX_TextureProviderSh m_provider;
 
     QMutex m_mutexPending;
     QWaitCondition m_waitPendingCommand;

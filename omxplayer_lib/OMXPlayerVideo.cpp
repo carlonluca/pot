@@ -39,7 +39,7 @@
 
 #define MAX_DATA_SIZE    10 * 1024 * 1024
 
-OMXPlayerVideo::OMXPlayerVideo(OMX_TextureProviderSh provider)
+OMXPlayerVideo::OMXPlayerVideo(OMX_EGLBufferProviderSh provider)
 {
   m_open          = false;
   m_stream_id     = -1;
@@ -103,7 +103,6 @@ void OMXPlayerVideo::UnLockDecoder()
 bool OMXPlayerVideo::Open(
         COMXStreamInfo &hints,
         OMXClock *av_clock,
-        OMX_TextureData*& textureData,
         EDEINTERLACEMODE deinterlace,
         OMX_IMAGEFILTERANAGLYPHTYPE anaglyph,
         bool hdmi_clock_sync,
@@ -144,7 +143,7 @@ bool OMXPlayerVideo::Open(
   if (fifo_size != 0.0)
     m_fifo_size = fifo_size;
 
-  if(!OpenDecoder(textureData))
+  if(!OpenDecoder())
   {
     Close();
     return false;
@@ -317,7 +316,7 @@ bool OMXPlayerVideo::AddPacket(OMXPacket *pkt)
   return ret;
 }
 
-bool OMXPlayerVideo::OpenDecoder(OMX_TextureData* textureData)
+bool OMXPlayerVideo::OpenDecoder()
 {
   if (m_hints.fpsrate && m_hints.fpsscale)
     m_fps = DVD_TIME_BASE / OMXReader::NormalizeFrameduration((double)DVD_TIME_BASE * m_hints.fpsscale / m_hints.fpsrate);
@@ -333,10 +332,8 @@ bool OMXPlayerVideo::OpenDecoder(OMX_TextureData* textureData)
   m_frametime = (double)DVD_TIME_BASE / m_fps;
 
   m_decoder = new COMXVideo(m_provider);
-  connect(m_decoder, SIGNAL(textureDataReady(const OMX_TextureData*)),
-          this, SIGNAL(textureDataReady(const OMX_TextureData*)), Qt::DirectConnection);
 
-  if(!m_decoder->Open(m_hints, m_av_clock, m_display_aspect, m_Deinterlace, m_anaglyph, m_hdmi_clock_sync, m_display, m_layer, m_fifo_size, textureData))
+  if(!m_decoder->Open(m_hints, m_av_clock, m_display_aspect, m_Deinterlace, m_anaglyph, m_hdmi_clock_sync, m_display, m_layer, m_fifo_size))
   {
     CloseDecoder();
     return false;

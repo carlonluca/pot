@@ -23,40 +23,40 @@
 
 #include "openmaxilstreamscontrol.h"
 
-QGstreamerStreamsControl::QGstreamerStreamsControl(QObject *parent)
+OpenMAXILStreamsControl::OpenMAXILStreamsControl(QObject *parent)
    :QMediaStreamsControl(parent)
 {
 }
 
-QGstreamerStreamsControl::~QGstreamerStreamsControl()
+OpenMAXILStreamsControl::~OpenMAXILStreamsControl()
 {
 }
 
-int QGstreamerStreamsControl::streamCount()
+int OpenMAXILStreamsControl::streamCount()
 {
    // TODO: Implement.
    return 0;
 }
 
-QMediaStreamsControl::StreamType QGstreamerStreamsControl::streamType(int streamNumber)
+QMediaStreamsControl::StreamType OpenMAXILStreamsControl::streamType(int streamNumber)
 {
    // TODO: Implement.
    return UnknownStream;
 }
 
-QVariant QGstreamerStreamsControl::metaData(int streamNumber, const QString &key)
+QVariant OpenMAXILStreamsControl::metaData(int streamNumber, const QString &key)
 {
    // TODO: Implement.
    return 0;
 }
 
-bool QGstreamerStreamsControl::isActive(int streamNumber)
+bool OpenMAXILStreamsControl::isActive(int streamNumber)
 {
    // TODO: Implement.
    return true;
 }
 
-void QGstreamerStreamsControl::setActive(int streamNumber, bool state)
+void OpenMAXILStreamsControl::setActive(int streamNumber, bool state)
 {
    // TODO: Implement.
 }

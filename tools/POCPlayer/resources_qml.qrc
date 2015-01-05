@@ -20,5 +20,6 @@
         <file>qml/POC_ImageOutputSurface.qml</file>
         <file>qml/main_animations.qml</file>
         <file>qml/POC_CrossImage.qml</file>
+        <file>qml/POC_VideoOutputSurface.qml</file>
     </qresource>
 </RCC>

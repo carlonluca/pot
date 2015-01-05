@@ -21,6 +21,9 @@
  * along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
 #include "openmaxilplayercontrol.h"
 
 #include <private/qmediaplaylistnavigator_p.h>
@@ -73,17 +76,13 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    , m_ownStream(false)
    , m_seekToStartPending(false)
    , m_pendingSeekPosition(-1)
-   , m_mediaProcessor(new OMX_MediaProcessor(OMX_TextureProviderSh(new OMX_TextureProviderQQuickItem())))
+   , m_mediaProcessor(new OMX_MediaProcessor(make_shared<OMX_EGLBufferProvider>()))
    , m_textureData(NULL)
    , m_sceneGraphInitialized(false)
    , m_quickItem(NULL)
 {
    LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
 
-   connect(m_mediaProcessor, SIGNAL(textureReady(const OMX_TextureData*)),
-           this, SIGNAL(textureReady(const OMX_TextureData*)));
-   connect(m_mediaProcessor, SIGNAL(textureInvalidated()),
-           this, SIGNAL(textureInvalidated()));
    connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
            this, SLOT(onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
    connect(m_mediaProcessor, SIGNAL(metadataChanged(QVariantMap)),

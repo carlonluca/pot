@@ -36,13 +36,13 @@
 #include "guilib/Geometry.h"
 #include "utils/SingleLock.h"
 
+#include "omx_textureprovider.h"
+
 using namespace std;
 
 class OMX_VideoSurfaceElement;
 class OMX_TextureProvider;
 class OMX_TextureData;
-
-typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
 
 
 #define VIDEO_BUFFERS 60
@@ -62,7 +62,7 @@ class COMXVideo : public QObject
 {
     Q_OBJECT
 public:
-  COMXVideo(OMX_TextureProviderSh provider);
+  COMXVideo(OMX_EGLBufferProviderSh provider);
   ~COMXVideo();
 
   // Required overrides
@@ -76,9 +76,7 @@ public:
           bool hdmi_clock_sync = false,
           int display = 0,
           int layer = 0,
-          float fifo_size = 0.0f,
-          OMX_TextureData* textureData = NULL
-          );
+          float fifo_size = 0.0f);
   bool PortSettingsChanged();
   void Close(void);
   unsigned int GetFreeSpace();
@@ -95,9 +93,6 @@ public:
   bool IsEOS();
   bool SubmittedEOS() { return m_submitted_eos; }
   bool BadState() { return m_omx_decoder.BadState(); };
-
-signals:
-  void textureDataReady(const OMX_TextureData* textureData);
 
 protected:
   // Video format
@@ -132,11 +127,11 @@ protected:
   EDEINTERLACEMODE  m_deinterlace_request;
   OMX_IMAGEFILTERANAGLYPHTYPE m_anaglyph;
   bool              m_hdmi_clock_sync;
+
   // lcarlon: modified members.
-  OMX_TextureProviderSh m_provider;
-  OMX_BUFFERHEADERTYPE* m_eglBuffer;
-  OMX_TextureData*  m_textureData; // Only used in case of re-use of the texture.
+  OMX_EGLBufferProviderSh m_provider;
   // ====
+
   float             m_pixel_aspect;
   bool              m_submitted_eos;
   bool              m_failed_eos;

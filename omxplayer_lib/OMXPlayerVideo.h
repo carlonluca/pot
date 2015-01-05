@@ -39,13 +39,12 @@
 #include <atomic>
 
 #include <QObject>
+#include "omx_textureprovider.h"
 
 using namespace std;
 
 class OMX_TextureProvider;
 class OMX_VideoSurfaceElement;
-
-typedef shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
 
 class OMXPlayerVideo : public QObject, public OMXThread
 {
@@ -80,7 +79,7 @@ protected:
   float                     m_fifo_size;
   bool                      m_hdmi_clock_sync;
   double                    m_iVideoDelay;
-  OMX_TextureProviderSh     m_provider;
+  OMX_EGLBufferProviderSh   m_provider;
   uint32_t                  m_history_valid_pts;
   int                       m_display;
   int                       m_layer;
@@ -91,15 +90,15 @@ protected:
   void UnLockDecoder();
 private:
 public:
-  OMXPlayerVideo(OMX_TextureProviderSh provider);
+  OMXPlayerVideo(OMX_EGLBufferProviderSh provider);
   ~OMXPlayerVideo();
-  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, OMX_TextureData*& textureId, EDEINTERLACEMODE deinterlace, OMX_IMAGEFILTERANAGLYPHTYPE anaglyph, bool hdmi_clock_sync, bool use_thread, float display_aspect, int display, int layer, float queue_size, float fifo_size);
+  bool Open(COMXStreamInfo &hints, OMXClock *av_clock, EDEINTERLACEMODE deinterlace, OMX_IMAGEFILTERANAGLYPHTYPE anaglyph, bool hdmi_clock_sync, bool use_thread, float display_aspect, int display, int layer, float queue_size, float fifo_size);
   bool Close();
   bool Decode(OMXPacket *pkt);
   void Process();
   void Flush();
   bool AddPacket(OMXPacket *pkt);
-  bool OpenDecoder(OMX_TextureData* textureData);
+  bool OpenDecoder();
   bool CloseDecoder();
   int  GetDecoderBufferSize();
   int  GetDecoderFreeSpace();
@@ -112,8 +111,5 @@ public:
   bool IsEOS();
   void SetDelay(double delay) { m_iVideoDelay = delay; }
   double GetDelay() { return m_iVideoDelay; }
-
-signals:
-  void textureDataReady(const OMX_TextureData* textureData);
 };
 #endif

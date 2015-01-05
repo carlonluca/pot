@@ -59,6 +59,10 @@ public:
         return m_mediaProc;
     }
 
+    // TODO: Make this private.
+    //OMX_TextureProviderSh m_texProvider;
+    OMX_EGLBufferProviderSh m_buffProvider;
+
 public slots:
     Q_INVOKABLE bool play();
     Q_INVOKABLE bool stop();
@@ -68,12 +72,8 @@ public slots:
     Q_INVOKABLE long streamLength();
     Q_INVOKABLE long streamPosition();
 
-    void onTextureDataReady(const OMX_TextureData* textureData);
-
 signals:
     void playbackStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
-    void textureReady(const OMX_TextureData* textureId);
-    void textureInvalidated();
     void sourceChanged(QString filepath);
 
     void playbackStarted();
@@ -83,8 +83,7 @@ protected:
     QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*);
 
 private:
-    OMX_MediaProcessor*   m_mediaProc;
-    OMX_TextureProviderSh m_texProvider;
+    OMX_MediaProcessor* m_mediaProc;
 
     QString m_source;
     bool m_autoPlay = true;

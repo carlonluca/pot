@@ -124,6 +124,10 @@ Rectangle {
             mediaOutput.goOnMedia();
         else if (event.key === Qt.Key_Left)
             mediaOutput.goBackMedia();
+        else if (event.key === Qt.Key_A)
+            mediaOutput.rotateClock();
+        else if (event.key === Qt.Key_D)
+            mediaOutput.rotateCounter();
         else if (event.key === Qt.Key_L)
             legend.toggleVisibility();
         else if (event.key === Qt.Key_T)

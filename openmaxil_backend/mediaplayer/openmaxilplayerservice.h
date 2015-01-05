@@ -37,28 +37,28 @@ class QMediaPlaylistNavigator;
 class QGstreamerMetaData;
 class OpenMAXILPlayerControl;
 class QGstreamerPlayerSession;
-class OMX_MetaDataProvider;
-class QGstreamerStreamsControl;
+class OpenMAXILMetaDataProvider;
+class OpenMAXILStreamsControl;
 class QGstreamerVideoRenderer;
 class QGstreamerVideoOverlay;
 class QGstreamerVideoWidgetControl;
 class OpenMAXILAvailabilityControl;
 class OpenMAXILVideoRendererControl;
 
-class QGstreamerPlayerService : public QMediaService
+class OpenMAXILPlayerService : public QMediaService
 {
     Q_OBJECT
 public:
-    QGstreamerPlayerService(QObject *parent = 0);
-    ~QGstreamerPlayerService();
+    OpenMAXILPlayerService(QObject *parent = 0);
+    ~OpenMAXILPlayerService();
 
     QMediaControl *requestControl(const char *name);
     void releaseControl(QMediaControl *control);
 
 private:
     OpenMAXILPlayerControl *m_control;
-    OMX_MetaDataProvider *m_metaData;
-    QGstreamerStreamsControl *m_streamsControl;
+    OpenMAXILMetaDataProvider *m_metaData;
+    OpenMAXILStreamsControl *m_streamsControl;
     OpenMAXILAvailabilityControl *m_availabilityControl;
 
     QMediaControl *m_videoOutput;

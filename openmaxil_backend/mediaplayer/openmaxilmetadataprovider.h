@@ -34,17 +34,15 @@
 
 QT_BEGIN_NAMESPACE
 
-class QGstreamerPlayerSession;
-
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider class
 +-----------------------------------------------------------------------------*/
-class OMX_MetaDataProvider : public QMetaDataReaderControl
+class OpenMAXILMetaDataProvider : public QMetaDataReaderControl
 {
     Q_OBJECT
 public:
-    OMX_MetaDataProvider(OpenMAXILPlayerControl* playerControl, QObject* parent);
-    virtual ~OMX_MetaDataProvider();
+    OpenMAXILMetaDataProvider(OpenMAXILPlayerControl* playerControl, QObject* parent);
+    virtual ~OpenMAXILMetaDataProvider();
 
     bool isMetaDataAvailable() const;
     bool isWritable() const;

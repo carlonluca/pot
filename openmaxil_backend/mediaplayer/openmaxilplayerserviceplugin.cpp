@@ -41,7 +41,7 @@ QMediaService* OMX_PlayerServicePlugin::create(const QString &key)
 {
    LOG_VERBOSE(LOG_TAG, "Instantiating player service...");
    if (key == QLatin1String(Q_MEDIASERVICE_MEDIAPLAYER))
-      return new QGstreamerPlayerService;
+      return new OpenMAXILPlayerService;
 
    LOG_WARNING(LOG_TAG, "OpenMAXIL service plugin: unsupported key: %s.", qPrintable(key));
    return NULL;

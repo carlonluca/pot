@@ -34,8 +34,8 @@ Item {
 
     // The video output component.
     POC_VideoOutput {
-        id:     videoOutput
-        source: mediaPlayer
+        id:        videoOutput
+        sourceUrl: mediaPlayer
 
         onControlBarDismissed: parent.controlBarDismissed()
     }
@@ -119,6 +119,20 @@ Item {
       */
     function goBackMedia() {
         currentOutput.goBackMedia();
+    }
+
+    /**
+      * Method to rotate the output surface.
+      */
+    function rotateClock() {
+        currentOutput.rotateClock();
+    }
+
+    /**
+      * Method to rotate the output surface.
+      */
+    function rotateCounter() {
+        currentOutput.rotateCounter();
     }
 
     onStateChanged: {
