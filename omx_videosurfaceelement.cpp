@@ -48,15 +48,13 @@ OMX_VideoSurfaceElement::OMX_VideoSurfaceElement(QQuickItem *parent)
    : QQuickItem(parent),
      m_source(NULL),
      m_sgtexture(new OMX_SGTexture(0, QSize(0, 0))),
-     m_textureSize(QSize(0, 0)),
-     m_texData(NULL)
+     m_textureSize(QSize(0, 0))
 {
    setFlag(ItemHasContents, true);
 
    // TODO: Avoid updating when not needed.
    m_timer = new QTimer(this);
    m_timer->setSingleShot(false);
-   connect(m_timer, SIGNAL(timeout()), this, SLOT(onTextureUpdate()));
    connect(m_timer, SIGNAL(timeout()), this, SLOT(update()));
    m_timer->start(30);
 }
@@ -101,9 +99,9 @@ QSGNode* OMX_VideoSurfaceElement::updatePaintNode(QSGNode* oldNode, UpdatePaintN
       geometry = node->geometry();
 
       // Texture has changed. Change the texture item for the scene graph.
-      QMutexLocker locker(&m_mutexTexture);
-      if (m_texData && (GLuint)m_sgtexture->textureId() != m_texData->m_textureId)
-         m_sgtexture->setTexture(m_texData->m_textureId, m_textureSize);
+      GLuint texture = m_source->m_buffProvider->getNextTexture();
+      if ((GLuint)m_sgtexture->textureId() != texture)
+         m_sgtexture->setTexture(texture, m_textureSize);
 
       // This is needed since Qt 5.1.1.
       node->markDirty(QSGNode::DirtyMaterial);
@@ -132,22 +130,4 @@ void OMX_VideoSurfaceElement::setSource(QObject* source)
    // OMX_VideoSurfaceElement of the texture I should use.
    m_source = (OMX_MediaProcessorElement*)source;
    emit sourceChanged(source);
-}
-
-/*------------------------------------------------------------------------------
-|    OMX_VideoSurfaceElement::onTextureUpdate
-+-----------------------------------------------------------------------------*/
-void OMX_VideoSurfaceElement::onTextureUpdate()
-{
-   if (!m_source || !m_source->m_buffProvider.get())
-      return;
-
-   OMX_TextureData* data = m_source->m_buffProvider->getNextFilledBuffer();
-   if (data) {
-      if (m_texData)
-         m_source->m_buffProvider->appendEmptyBuffer(m_texData);
-
-      QMutexLocker locker(&m_mutexTexture);
-      m_texData = data;
-   }
 }

@@ -79,14 +79,7 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
         return OMX_ErrorNone;
 
     assert(g_provider);
-
-    OMX_TextureData* done = g_provider->getCurrentData();
-    if (done->m_omxBuffer != pBuffer) {
-       g_provider->appendEmptyBuffer(done);
-       return OMX_ErrorNone; // This happens when closing.
-    }
-
-    g_provider->appendFilledBuffer(done);
+    g_provider->registerFilledBuffer(pBuffer);
 
     // Get next empty buffer.
     OMX_TextureData* empty = g_provider->getNextEmptyBuffer();
@@ -822,14 +815,7 @@ void COMXVideo::Close()
   if(m_deinterlace || m_anaglyph)
     m_omx_image_fx.Deinitialize();
 
-  // To free.
-  QList<OMX_TextureData*> buffers = m_provider->getBuffers();
-  foreach (OMX_TextureData* buffer, buffers) {
-     m_omx_render.m_omx_output_buffers.push_back(buffer->m_omxBuffer);
-     buffer->m_omxBuffer = NULL;
-  }
-
-  log_verbose("m_omx_render is %p frreing %d, %p", &m_omx_render, g_provider->getBufferCount(), g_provider->getCurrentData());
+  log_verbose("m_omx_render is %p freeing %d", &m_omx_render, g_provider->getBufferCount());
   m_omx_render.Deinitialize();
 
   m_is_open       = false;
@@ -1065,6 +1051,8 @@ bool COMXVideo::SetVideoEGLOutputPort()
       }
 
       log_info("Buffer created %p", data->m_omxBuffer);
+      m_omx_render.m_omx_output_available.push(data->m_omxBuffer);
+      m_omx_render.m_omx_output_buffers.push_back(data->m_omxBuffer);
    }
 
    LOG_VERBOSE(LOG_TAG, "Component renderer: %x.", (unsigned int)m_omx_render.GetComponent());

@@ -40,6 +40,8 @@ OMX_MediaProcessorElement::OMX_MediaProcessorElement(QQuickItem *parent) :
    m_buffProvider(NULL),
    m_mediaProc(NULL),
    m_pendingOpen(false),
+   m_pendingStop(false),
+   m_pendingPlay(false),
    m_textureData(NULL)
 {
    // I need to set this as a "has-content" item because I need the updatePaintNode
@@ -87,19 +89,33 @@ QSGNode* OMX_MediaProcessorElement::updatePaintNode(QSGNode*, UpdatePaintNodeDat
       m_pendingOpen = false;
    }
 
+   if (m_pendingStop) {
+      m_mediaProc->stop();
+      m_pendingStop = false;
+   }
+
+   if (m_pendingPlay) {
+      m_mediaProc->play();
+      m_pendingPlay = false;
+   }
+
    return NULL;
 }
 
 bool OMX_MediaProcessorElement::play()
 {
    CHECK_MEDIA_PROCESSOR;
-   return m_mediaProc->play();
+   //return m_mediaProc->play();
+   m_pendingPlay = true;
+   update();
 }
 
 bool OMX_MediaProcessorElement::stop()
 {
    CHECK_MEDIA_PROCESSOR;
-   return m_mediaProc->stop();
+   //return m_mediaProc->stop();
+   m_pendingStop = true;
+   update();
 }
 
 bool OMX_MediaProcessorElement::pause()

@@ -66,9 +66,6 @@ public:
         return (QSGTextureProvider*)m_sgtexture;
     }
 
-public slots:
-    void onTextureUpdate();
-
 signals:
     void sourceChanged(const QObject* source);
 
@@ -80,7 +77,6 @@ private:
 
     QMutex m_mutexTexture; // Use to access texture members.
     QSize  m_textureSize;
-    OMX_TextureData* m_texData;
     QTimer* m_timer;
 };
 

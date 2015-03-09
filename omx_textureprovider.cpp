@@ -78,19 +78,19 @@ OMX_TextureData::~OMX_TextureData()
 +-----------------------------------------------------------------------------*/
 void OMX_TextureData::freeData()
 {
-   if (!m_textureData || !m_textureId || !m_eglImage)
-      log_warn("Double free of OMX texture data requested.");
-
    EGLDisplay eglDisplay = get_egl_display();
+   assert(eglDisplay);
 
    // Destroy texture, EGL image and free the buffer.
-   log_info("Freeing KHR image...");
-   if (m_eglImage && eglDestroyImageKHR(eglDisplay, m_eglImage) == EGL_SUCCESS) {
-      EGLint err = eglGetError();
-      LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %d.", err);
-   }
+   if (m_eglImage) {
+      log_info("Freeing KHR image...");
+      if (eglDestroyImageKHR(eglDisplay, m_eglImage) != EGL_TRUE) {
+         EGLint err = eglGetError();
+         LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %d.", err);
+      }
 
-   m_eglImage = NULL;
+      m_eglImage = NULL;
+   }
 
    if (m_textureId) {
       log_info("Freeing texture...");
@@ -100,7 +100,7 @@ void OMX_TextureData::freeData()
 
    if (m_textureData) {
       log_info("Freeing texture data...");
-      delete m_textureData;
+      delete[] m_textureData;
       m_textureData = NULL;
    }
 }
@@ -130,6 +130,7 @@ OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
 
    // It seems that only 4byte pixels is supported here.
    GLubyte* pixel = new GLubyte[size.width()*size.height()*4];
+   memset(pixel, 0, size.width()*size.height()*4);
    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width(), size.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
 
    log_info("Creating EGLImageKHR...");

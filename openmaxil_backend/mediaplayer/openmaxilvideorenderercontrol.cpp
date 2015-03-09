@@ -51,7 +51,7 @@ public:
    }
 
    ~OpenMAXILVideoBuffer() {
-      LOG_VERBOSE(LOG_TAG, "VideoBuffer freed.");
+      log_verbose("VideoBuffer freed.");
    }
 
    QVariant handle() const {
@@ -83,15 +83,14 @@ private:
 OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OMX_MediaProcessor* p, QObject *parent) :
    QVideoRendererControl(parent),
    m_mediaProcessor(p),
-   m_texData(NULL),
    m_surface(NULL),
    m_surfaceFormat(NULL),
    m_frame(NULL),
    m_buffer(NULL),
    m_updateTimer(new QTimer(this))
 {
-   connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
-           this, SLOT(onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
+   //connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
+   //        this, SLOT(onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
 
    OMX_EGLBufferProviderSh provider = m_mediaProcessor->m_provider;
    connect(provider.get(), SIGNAL(texturesReady()),
@@ -112,7 +111,7 @@ OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OMX_MediaProcessor*
 +-----------------------------------------------------------------------------*/
 OpenMAXILVideoRendererControl::~OpenMAXILVideoRendererControl()
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    QMutexLocker locker(&m_mutex);
 
@@ -120,6 +119,7 @@ OpenMAXILVideoRendererControl::~OpenMAXILVideoRendererControl()
    if (m_surface)
       m_surface->stop();
 
+   log_warn("Freeing frame and format...");
    delete m_surfaceFormat;
    delete m_frame;
 #if 0
@@ -139,7 +139,7 @@ OpenMAXILVideoRendererControl::~OpenMAXILVideoRendererControl()
 void OpenMAXILVideoRendererControl::setSurface(QAbstractVideoSurface* surface)
 {
    QMutexLocker locker(&m_mutex);
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    if (m_surface && m_surface->isActive())
        m_surface->stop();
@@ -152,7 +152,7 @@ void OpenMAXILVideoRendererControl::setSurface(QAbstractVideoSurface* surface)
 QAbstractVideoSurface* OpenMAXILVideoRendererControl::surface() const
 {
    QMutexLocker locker(&m_mutex);
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    return m_surface;
 }
@@ -165,6 +165,8 @@ void OpenMAXILVideoRendererControl::onTexturesReady()
    onTexturesFreed();
 
    QMutexLocker locker(&m_mutex);
+
+   log_verbose("Setting up for new textures...");
    OMX_EGLBufferProviderSh provider = m_mediaProcessor->m_provider;
    if (!provider.get()) {
       log_warn("Invalid provider.");
@@ -208,11 +210,14 @@ void OpenMAXILVideoRendererControl::onTexturesReady()
 void OpenMAXILVideoRendererControl::onTexturesFreed()
 {
    QMutexLocker locker(&m_mutex);
+
+   log_verbose("Destroying QVideoSurfaceFormat.");
    if (m_surfaceFormat) {
       delete m_surfaceFormat;
       m_surfaceFormat = NULL;
    }
 
+   log_verbose("Destroying QVideoFrame.");
    if (m_frame) {
       delete m_frame;
       m_frame = NULL;
@@ -231,19 +236,14 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
    if (!m_mediaProcessor || !m_mediaProcessor->m_provider.get())
       return;
 
-   OMX_TextureData* data = m_mediaProcessor->m_provider->getNextFilledBuffer();
-   if (!data)
-      return;
-   if (m_texData)
-      m_mediaProcessor->m_provider->appendEmptyBuffer(m_texData);
-
-   m_texData = data;
-
-   if (m_surface && m_frame && m_surfaceFormat && m_texData) {
+   if (m_surface && m_frame && m_surfaceFormat) {
       if (!m_surface->isActive() && !m_surface->start(*m_surfaceFormat))
          log_warn("Failed to start surface.");
 
-      m_buffer->setHandle(m_texData->m_textureId);
+      GLuint t = m_mediaProcessor->m_provider->getNextTexture();
+
+      log_debug("Setting texture %u.", t);
+      m_buffer->setHandle(t);
       m_surface->present(*m_frame);
    }
 }

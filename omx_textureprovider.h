@@ -113,6 +113,7 @@ public:
    OMX_EGLBufferProvider() :
       m_texProvider(new OMX_TextureProviderQQuickItem)
     , m_current(NULL)
+    , m_currentRendered(NULL)
    {}
 
    ~OMX_EGLBufferProvider() {
@@ -132,13 +133,39 @@ public:
       return !(m_filledQueue.isEmpty() && m_emptyQueue.isEmpty() && !m_current);
    }
 
-   OMX_TextureData* getNextFilledBuffer();
    OMX_TextureData* getNextEmptyBuffer();
-   OMX_TextureData* getCurrentData() {
-      return m_current;
+   GLuint getNextTexture() {
+      QMutexLocker locker1(&m_filledMx);
+      QMutexLocker locker2(&m_emptyMx);
+
+      OMX_TextureData* data = getNextFilledBuffer();
+      if (!data)
+         return m_currentRendered ? m_currentRendered->m_textureId : 0;
+
+      if (m_currentRendered)
+         appendEmptyBuffer(m_currentRendered);
+      m_currentRendered = data;
+
+      return data->m_textureId;
    }
+
+   bool registerFilledBuffer(OMX_BUFFERHEADERTYPE* buffer) {
+      {
+         QMutexLocker locker1(&m_filledMx);
+         QMutexLocker locker2(&m_emptyMx);
+
+         if (!m_current)
+            return false;
+         m_current->m_omxBuffer = buffer;
+      }
+
+      appendFilledBuffer(m_current);
+      m_current = NULL;
+
+      return true;
+   }
+
    void appendFilledBuffer(OMX_TextureData* buffer);
-   void appendEmptyBuffer(OMX_TextureData* buffer);
 
    void cleanTextures() {
       QMutexLocker locker1(&m_filledMx);
@@ -170,13 +197,11 @@ public:
       QMutexLocker locker1(&m_filledMx);
       QMutexLocker locker2(&m_emptyMx);
 
-      if (m_current) {
-         m_current->freeData();
-         m_current = NULL;
-      }
-
       foreach (OMX_TextureData* data, m_available)
          data->freeData();
+
+      m_current = NULL;
+      m_currentRendered = NULL;
 
       m_filledQueue.clear();
       m_emptyQueue.clear();
@@ -190,11 +215,15 @@ signals:
    void texturesFreed();
 
 private:
+   OMX_TextureData* getNextFilledBuffer();
+   void appendEmptyBuffer(OMX_TextureData* buffer);
+
    OMX_TextureProviderSh m_texProvider;
    QQueue<OMX_TextureData*> m_filledQueue;
    QQueue<OMX_TextureData*> m_emptyQueue;
    QList<OMX_TextureData*> m_available;
    OMX_TextureData* m_current;
+   OMX_TextureData* m_currentRendered;
    QMutex m_filledMx;
    QMutex m_emptyMx;
 };
@@ -208,7 +237,7 @@ bool OMX_EGLBufferProvider::instantiateTextures(const QSize& s, int count)
 {
    QMutexLocker locker(&m_emptyMx);
    for (int i = 0; i < count; i++) {
-      log_verbose("Instantiating texture data...");
+      log_info("Instantiating texture data...");
       OMX_TextureData* tex = m_texProvider->instantiateTexture(s);
       m_emptyQueue.append(tex);
       m_available.append(tex);
@@ -225,11 +254,9 @@ bool OMX_EGLBufferProvider::instantiateTextures(const QSize& s, int count)
 inline
 OMX_TextureData* OMX_EGLBufferProvider::getNextFilledBuffer()
 {
-   QMutexLocker locker(&m_filledMx);
    if (!m_filledQueue.empty())
       return m_filledQueue.dequeue();
 
-   log_verbose("No buffer available.");
    return NULL;
 }
 
@@ -274,7 +301,6 @@ void OMX_EGLBufferProvider::appendFilledBuffer(OMX_TextureData* buffer)
 inline
 void OMX_EGLBufferProvider::appendEmptyBuffer(OMX_TextureData* buffer)
 {
-   QMutexLocker locker(&m_emptyMx);
    m_emptyQueue.enqueue(buffer);
 }
 

@@ -88,6 +88,8 @@ private:
     QString m_source;
     bool m_autoPlay = true;
     volatile bool m_pendingOpen;
+    volatile bool m_pendingStop;
+    volatile bool m_pendingPlay;
     OMX_TextureData* m_textureData;
 
 private slots:

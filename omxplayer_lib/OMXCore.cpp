@@ -37,6 +37,8 @@
 #include "XMemUtils.h"
 #endif
 
+#include "lc_logging.h"
+
 //#define OMX_DEBUG_EVENTS
 //#define OMX_DEBUG_EVENTHANDLER
 
@@ -801,7 +803,6 @@ OMX_ERRORTYPE COMXCoreComponent::FreeInputBuffers()
   return omx_err;
 }
 
-#include "lc_logging.h"
 OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
 {
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
@@ -848,7 +849,7 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
   pthread_mutex_lock(&m_omx_output_mutex);
 
   // lcarlon: this must be removed to avoid the crash.
-  //assert(m_omx_output_buffers.size() == m_omx_output_available.size());
+  assert(m_omx_output_buffers.size() == m_omx_output_available.size());
 
   m_omx_output_buffers.clear();
 
@@ -1584,7 +1585,10 @@ OMX_ERRORTYPE COMXCoreComponent::DecoderFillBufferDoneCallback(
  
   if(ctx->CustomDecoderFillBufferDoneHandler){
     OMX_ERRORTYPE omx_err = (*(ctx->CustomDecoderFillBufferDoneHandler))(hComponent, pAppData, pBuffer);
-    if(omx_err != OMX_ErrorNone)return omx_err;
+
+    // lcarlon: I don't want to call the internal callback if a custom one is provided.
+    //if(omx_err != OMX_ErrorNone)return omx_err;
+    return omx_err;
   }
 
   return ctx->DecoderFillBufferDone(hComponent, pBuffer);

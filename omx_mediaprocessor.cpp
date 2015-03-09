@@ -88,7 +88,7 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 #ifdef ENABLE_SUBTITLES
    m_has_subtitle(false),
 #endif
-   m_omx_reader(new OMX_Reader),
+   m_omx_reader(NULL),
    m_omx_pkt(NULL),
    m_RBP(new CRBP),
    m_OMX(new COMXCore),
@@ -127,14 +127,6 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
    m_RBP->Initialize();
    m_OMX->Initialize();
 
-   // Players.
-   m_av_clock         = new OMXClock;
-   m_player_video     = new OMXPlayerVideo(provider);
-   m_player_audio     = new OMX_PlayerAudio;
-#ifdef ENABLE_SUBTITLES
-   m_player_subtitles = new OMXPlayerSubtitles;
-#endif
-
    // Move to a new thread.
    moveToThread(&m_thread);
    m_thread.start();
@@ -160,8 +152,10 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
    delete m_player_video;
 
    LOG_VERBOSE(LOG_TAG, "Freeing clock...");
-   m_av_clock->OMXDeinitialize();
-   delete m_av_clock;
+   if (m_av_clock) {
+      m_av_clock->OMXDeinitialize();
+      delete m_av_clock;
+   }
 
    // TODO: This should really be done, but still it seems to sefault sometimes.
    LOG_VERBOSE(LOG_TAG, "Deinitializing hardware libs...");
@@ -220,6 +214,8 @@ bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& texture
 inline
 bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& textureData)
 {
+   log_verbose_func;
+
    switch (m_state) {
    case STATE_INACTIVE:
       break;
@@ -238,6 +234,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
    if (url.isLocalFile() && filename.startsWith("file://"))
       filename = url.path();
 
+   m_omx_reader = new OMX_Reader;
    if (!m_omx_reader->Open(filename.toStdString(), true)) {
       LOG_ERROR(LOG_TAG, "Failed to open source.");
       return false;
@@ -249,6 +246,14 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
    LOG_VERBOSE(LOG_TAG, "Copy metatada...");
    convertMetaData();
    emit metadataChanged(m_metadata);
+
+   // Players.
+   m_av_clock         = new OMXClock;
+   m_player_video     = new OMXPlayerVideo(m_provider);
+   m_player_audio     = new OMX_PlayerAudio;
+#ifdef ENABLE_SUBTITLES
+   m_player_subtitles = new OMXPlayerSubtitles;
+#endif
 
    m_filename = filename;
 
@@ -376,14 +381,22 @@ bool OMX_MediaProcessor::play()
    if (!checkCurrentThread())
       return false;
 
+   LOG_VERBOSE(LOG_TAG, "Cleaning textures...");
+   m_provider->cleanTextures();
+
    switch (m_state) {
    case STATE_INACTIVE:
-      return true;
+      return false;
    case STATE_PAUSED:
       break;
    case STATE_PLAYING:
       return true;
    case STATE_STOPPED: {
+      OMX_TextureData* d = NULL;
+      if (!m_av_clock)
+         if (!setFilenameInt(m_filename, d))
+            return false;
+
       setState(STATE_PLAYING);
 
 #if 1
@@ -460,6 +473,10 @@ bool OMX_MediaProcessor::stop()
       m_waitPendingCommand.wait(&m_mutexPending);
    }
    m_mutexPending.unlock();
+
+   m_provider->cleanTextures();
+   cleanup();
+
    LOG_INFORMATION(LOG_TAG, "Stop command issued.");
    return true;
 }
@@ -533,6 +550,8 @@ bool OMX_MediaProcessor::seek(qint64 position)
 +-----------------------------------------------------------------------------*/
 qint64 OMX_MediaProcessor::streamPosition()
 {
+   // FIXME: OMXMediaTime seems to lock.
+   return 0;
    if (!m_av_clock)
       return -1;
    return m_av_clock->OMXMediaTime(false)*1E-3;
@@ -865,34 +884,6 @@ void OMX_MediaProcessor::mediaDecoding()
          break;
       }
 
-      if (!m_omx_pkt)
-         m_omx_pkt = m_omx_reader->Read();
-
-      if(m_omx_pkt)
-        sendEos = false;
-
-      if(m_omx_reader->IsEof() && !m_omx_pkt) {
-        // demuxer EOF, but may have not played out data yet
-        if ( (m_has_video && m_player_video->GetCached()) ||
-             (m_has_audio && m_player_audio->GetCached()) )
-        {
-          OMXClock::OMXSleep(10);
-          continue;
-        }
-        if (!sendEos && m_has_video)
-          m_player_video->SubmitEOS();
-        if (!sendEos && m_has_audio)
-          m_player_audio->SubmitEOS();
-        sendEos = true;
-        if ( (m_has_video && !m_player_video->IsEOS()) ||
-             (m_has_audio && !m_player_audio->IsEOS()) )
-        {
-          OMXClock::OMXSleep(10);
-          continue;
-        }
-        break;
-      }
-
       if(m_has_video && m_omx_pkt && m_omx_reader->IsActive(OMXSTREAM_VIDEO, m_omx_pkt->stream_index))
       {
         if (TRICKPLAY(m_av_clock->OMXPlaySpeed()))
@@ -936,32 +927,10 @@ void OMX_MediaProcessor::mediaDecoding()
    }
 
    LOG_VERBOSE(LOG_TAG, "Stopping OMX clock...");
-   //m_av_clock->OMXResume();
    m_av_clock->OMXStop();
    m_av_clock->OMXStateIdle();
-   //m_av_clock->OMXStateExecute();
-   //m_av_clock->OMXReset(m_has_video, m_has_audio);
 
-   // Restart video player. It seems it is necessary to close
-   // and open again. omxplayer does this also when seeking so
-   // maybe there is no other way to restart it.
-   m_player_video->Close();
-   //if (m_has_video)
-   //   if (!m_player_video->Open(
-   //          *m_hints_video,
-   //          m_av_clock,
-   //          VS_DEINTERLACEMODE_OFF, /* deinterlace */
-   //          OMX_ImageFilterAnaglyphNone,
-   //          ENABLE_HDMI_CLOCK_SYNC,
-   //          true,                   /* threaded */
-   //          1.0,                    /* display aspect, unused */
-   //          0,                      /* display, unused */
-   //          0,                      /* layer */
-   //          m_video_queue_size, m_video_fifo_size
-   //          )) {
-   //      LOG_ERROR(LOG_TAG, "Failed to reopen media.");
-   //   }
-   // TODO: Handle failure.
+   cleanup();
 
    setState(STATE_STOPPED);
    emit playbackCompleted();
@@ -1077,21 +1046,40 @@ void OMX_MediaProcessor::cleanup()
 #endif
 
    LOG_VERBOSE(LOG_TAG, "Closing players...");
+   if (m_av_clock) {
+      m_av_clock->OMXStop();
+      m_av_clock->OMXStateIdle();
+   }
+
 #ifdef ENABLE_SUBTITLES
-   m_player_subtitles->Close();
+   if (m_player_subtitles)
+      m_player_subtitles->Close();
 #endif
-   m_player_video->Close();
-   m_player_audio->Close();
+
+   if (m_player_video)
+      m_player_video->Close();
+   if (m_player_audio)
+      m_player_audio->Close();
 
    if (m_omx_pkt) {
       m_omx_reader->FreePacket(m_omx_pkt);
       m_omx_pkt = NULL;
    }
 
-   LOG_VERBOSE(LOG_TAG, "Closing players...");
-   m_omx_reader->Close();
+   if (m_omx_reader) {
+      m_omx_reader->Close();
+      delete m_omx_reader;
+      m_omx_reader = NULL;
+   }
+
    m_metadata.clear();
    emit metadataChanged(m_metadata);
+
+   if (m_av_clock) {
+      m_av_clock->OMXDeinitialize();
+      delete m_av_clock;
+      m_av_clock = NULL;
+   }
 
    vc_tv_show_info(0);
 
@@ -1102,7 +1090,20 @@ void OMX_MediaProcessor::cleanup()
    // used wants to free the texture in his own thread, which would still
    // be blocked waiting for the stop command to finish.
    LOG_VERBOSE(LOG_TAG, "Freeing texture...");
-   m_provider->free();
+   //m_provider->free();
+
+#ifdef ENABLE_SUBTITLES
+   delete m_player_subtitles;
+   m_player_subtitles = NULL;
+#endif
+
+   delete m_player_audio;
+   delete m_player_video;
+   delete m_av_clock;
+
+   m_player_audio = NULL;
+   m_player_video = NULL;
+   m_av_clock = NULL;
 
    LOG_INFORMATION(LOG_TAG, "Cleanup done.");
 }

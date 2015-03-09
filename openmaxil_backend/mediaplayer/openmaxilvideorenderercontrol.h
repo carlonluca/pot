@@ -60,7 +60,6 @@ public slots:
 
 private:
    OMX_MediaProcessor* m_mediaProcessor;
-   OMX_TextureData* m_texData;
    QMutex m_mutexData;
 
    QAbstractVideoSurface* m_surface;
