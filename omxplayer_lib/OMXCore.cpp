@@ -825,7 +825,7 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
   {
     uint8_t *buf = m_omx_output_buffers[i]->pBuffer;
 
-    log_verbose("Freeing output buffer for %p.", this);
+    log_verbose("Freeing output buffer for %p in %s.", this, m_componentName.c_str());
     omx_err = OMX_FreeBuffer(m_handle, m_output_port, m_omx_output_buffers[i]);
 
     if(m_omx_output_use_buffers && buf)
@@ -848,7 +848,6 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
 
   pthread_mutex_lock(&m_omx_output_mutex);
 
-  // lcarlon: this must be removed to avoid the crash.
   assert(m_omx_output_buffers.size() == m_omx_output_available.size());
 
   m_omx_output_buffers.clear();

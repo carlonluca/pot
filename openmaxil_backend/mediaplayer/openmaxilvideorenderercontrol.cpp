@@ -242,7 +242,7 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
 
       GLuint t = m_mediaProcessor->m_provider->getNextTexture();
 
-      //log_debug("Setting texture %u.", t);
+      log_debug("Setting texture %u.", t);
       m_buffer->setHandle(t);
       m_surface->present(*m_frame);
    }

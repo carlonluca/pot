@@ -396,6 +396,8 @@ bool COMXVideo::PortSettingsChanged()
     return false;
   }
 
+  SetVideoEGLOutputPort();
+
   omx_err = m_omx_render.SetStateForComponent(OMX_StateExecuting);
   if(omx_err != OMX_ErrorNone)
   {
@@ -404,7 +406,15 @@ bool COMXVideo::PortSettingsChanged()
   }
 
   m_settings_changed = true;
-  return SetVideoEGLOutputPort();
+
+  OMX_TextureData* data = m_provider->getNextEmptyBuffer();
+  assert(data);
+
+  if ((omx_err = OMX_FillThisBuffer(m_omx_render.GetComponent(), data->m_omxBuffer)) != OMX_ErrorNone) {
+     LOG_ERROR(LOG_TAG, "Error: %x.", (unsigned int)omx_err);
+  }
+
+  return true;
 }
 
 bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspect, EDEINTERLACEMODE deinterlace, OMX_IMAGEFILTERANAGLYPHTYPE anaglyph, bool hdmi_clock_sync, int display, int layer, float fifo_size)
@@ -458,6 +468,8 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   QSize videoSize(hints.width, hints.height);
   //if (!m_textureData) {
      //m_textureData = m_provider->instantiateTexture(videoSize);
+  m_provider->free();
+
   if (m_provider->getBufferCount() <= 0) {
      m_provider->instantiateTextures(videoSize, 4);
      LOG_VERBOSE(LOG_TAG, "Texture generated!");
@@ -800,7 +812,7 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
 #include "lc_logging.h"
 void COMXVideo::Close()
 {
-   log_verbose("Closing video...");
+  log_verbose("Closing video...");
   CSingleLock lock (m_critSection);
   m_omx_tunnel_clock.Deestablish();
   m_omx_tunnel_decoder.Deestablish();
@@ -1038,7 +1050,22 @@ bool COMXVideo::SetVideoEGLOutputPort()
    if (omx_err != OMX_ErrorNone)
       log_warn("Failed to set OMX_IndexParamBrcmVideoEGLRenderDiscardMode.");
 
-   m_omx_render.EnablePort(m_omx_render.GetOutputPort(), true);
+   OMX_PARAM_PORTDEFINITIONTYPE portFormat;
+   OMX_INIT_STRUCTURE(portFormat);
+   portFormat.nPortIndex = m_omx_render.GetOutputPort();
+   omx_err = m_omx_render.GetParameter(OMX_IndexParamPortDefinition, &portFormat);
+   if(omx_err != OMX_ErrorNone)
+     return omx_err;
+
+   m_omx_render.m_output_alignment     = portFormat.nBufferAlignment;
+   m_omx_render.m_output_buffer_count  = portFormat.nBufferCountActual;
+   m_omx_render.m_output_buffer_size   = portFormat.nBufferSize;
+
+   log_debug("Trying to enable to output port...");
+   m_omx_render.EnablePort(m_omx_render.GetOutputPort(), false);
+
+   // Buffers are freed using another technique.
+   m_omx_render.m_omx_output_use_buffers = false;
 
    // Get buffers for images.
    QList<OMX_TextureData*> datas = m_provider->getBuffers();
@@ -1058,12 +1085,8 @@ bool COMXVideo::SetVideoEGLOutputPort()
    LOG_VERBOSE(LOG_TAG, "Component renderer: %x.", (unsigned int)m_omx_render.GetComponent());
    m_omx_render.SetCustomDecoderFillBufferDoneHandler(&fill_buffer_done_callback);
 
-   OMX_TextureData* data = m_provider->getNextEmptyBuffer();
-   assert(data);
-
-   if ((omx_err = OMX_FillThisBuffer(m_omx_render.GetComponent(), data->m_omxBuffer)) != OMX_ErrorNone) {
-      LOG_ERROR(LOG_TAG, "Error: %x.", (unsigned int)omx_err);
-   }
+   // Taken from OMXCore.
+   m_omx_render.m_flush_output = false;
 
    return true;
 }

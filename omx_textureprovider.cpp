@@ -36,8 +36,44 @@
 #include <IL/OMX_Broadcom.h>
 
 #include "lc_logging.h"
+
 #include "omx_textureprovider.h"
 #include "omx_globals.h"
+
+/*------------------------------------------------------------------------------
+|    check_gl_error
++-----------------------------------------------------------------------------*/
+void check_gl_error() {
+   GLenum err = glGetError();
+
+   while (err != GL_NO_ERROR) {
+      const char* error;
+
+      switch (err) {
+      case GL_INVALID_OPERATION:
+         error = "INVALID_OPERATION";
+         break;
+      case GL_INVALID_ENUM:
+         error = "INVALID_ENUM";
+         break;
+      case GL_INVALID_VALUE:
+         error = "INVALID_VALUE";
+         break;
+      case GL_OUT_OF_MEMORY:
+         error = "OUT_OF_MEMORY";
+         break;
+      case GL_INVALID_FRAMEBUFFER_OPERATION:
+         error = "INVALID_FRAMEBUFFER_OPERATION";
+         break;
+      default:
+         return;
+      }
+
+      log_err("GL error: %s.", err);
+
+      err = glGetError();
+   }
+}
 
 /*------------------------------------------------------------------------------
 |    OMX_TextureData::OMX_TextureData
@@ -95,6 +131,9 @@ void OMX_TextureData::freeData()
    if (m_textureId) {
       log_info("Freeing texture...");
       glDeleteTextures(1, &m_textureId);
+
+      check_gl_error();
+
       m_textureId = 0;
    }
 
@@ -123,15 +162,17 @@ OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
    GLuint textureId;
    glGenTextures(1, &textureId);
    glBindTexture(GL_TEXTURE_2D, textureId);
+
+   // It seems that only 4byte pixels is supported here.
+   //GLubyte* pixel = new GLubyte[size.width()*size.height()*2];
+   //memset(pixel, 0, size.width()*size.height()*2);
+   GLubyte* pixel = NULL;
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width(), size.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-   // It seems that only 4byte pixels is supported here.
-   GLubyte* pixel = new GLubyte[size.width()*size.height()*4];
-   memset(pixel, 0, size.width()*size.height()*4);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, size.width(), size.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, pixel);
 
    log_info("Creating EGLImageKHR...");
    EGLImageKHR eglImage = eglCreateImageKHR(
