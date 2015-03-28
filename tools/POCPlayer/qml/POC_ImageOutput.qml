@@ -121,4 +121,12 @@ Item {
         nextSurface.opacity    = 1.0;
         currentSurface = nextSurface;
     }
+
+    function rotateClock() {
+        currentSurface.rotateClock();
+    }
+
+    function rotateCounter() {
+        currentSurface.rotateCounter();
+    }
 }

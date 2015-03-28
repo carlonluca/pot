@@ -69,24 +69,14 @@ public:
 signals:
     void sourceChanged(const QObject* source);
 
-public slots:
-    void onTextureChanged(const OMX_TextureData* textureData);
-    void onTextureInvalidated();
-
 private:
     void setTexture();
 
     OMX_MediaProcessorElement* m_source;
-#ifdef ENABLE_VIDEO_PROCESSOR
-    OMX_VideoProcessor* m_videoProc;
-#else
-    OMX_MediaProcessor* m_mediaProc;
-#endif
     OMX_SGTexture* m_sgtexture;
 
     QMutex m_mutexTexture; // Use to access texture members.
     QSize  m_textureSize;
-    GLuint m_textureId;
     QTimer* m_timer;
 };
 

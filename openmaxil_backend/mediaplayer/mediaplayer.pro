@@ -31,6 +31,8 @@ QT += quick
 
 include(../common.pri)
 
+DEFINES += BUILD_LOG_LEVEL_DEBUG
+
 message($$_PRO_FILE_PWD_)
 INCLUDEPATH += $$PWD
 INCLUDEPATH += \

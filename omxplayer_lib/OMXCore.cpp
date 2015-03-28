@@ -37,6 +37,8 @@
 #include "XMemUtils.h"
 #endif
 
+#include "lc_logging.h"
+
 //#define OMX_DEBUG_EVENTS
 //#define OMX_DEBUG_EVENTHANDLER
 
@@ -818,10 +820,12 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
   pthread_mutex_lock(&m_omx_output_mutex);
   pthread_cond_broadcast(&m_output_buffer_cond);
 
+  log_verbose("m_omx_output_buffers size is %ld.", m_omx_output_buffers.size());
   for (size_t i = 0; i < m_omx_output_buffers.size(); i++)
   {
     uint8_t *buf = m_omx_output_buffers[i]->pBuffer;
 
+    log_verbose("Freeing output buffer for %p in %s.", this, m_componentName.c_str());
     omx_err = OMX_FreeBuffer(m_handle, m_output_port, m_omx_output_buffers[i]);
 
     if(m_omx_output_use_buffers && buf)
@@ -843,6 +847,7 @@ OMX_ERRORTYPE COMXCoreComponent::FreeOutputBuffers()
   WaitForOutputDone(1000);
 
   pthread_mutex_lock(&m_omx_output_mutex);
+
   assert(m_omx_output_buffers.size() == m_omx_output_available.size());
 
   m_omx_output_buffers.clear();
@@ -1490,6 +1495,7 @@ void COMXCoreComponent::ResetEos()
 
 bool COMXCoreComponent::Deinitialize()
 {
+   log_verbose("Deinit of %p", this);
   OMX_ERRORTYPE omx_err;
 
   m_exit = true;
@@ -1499,8 +1505,10 @@ bool COMXCoreComponent::Deinitialize()
 
   if(m_handle)
   {
+     log_verbose("Flushin of %p", this);
     FlushAll();
 
+    log_verbose("freeing output buf of %p", this);
     FreeOutputBuffers();
     FreeInputBuffers();
 
@@ -1576,7 +1584,10 @@ OMX_ERRORTYPE COMXCoreComponent::DecoderFillBufferDoneCallback(
  
   if(ctx->CustomDecoderFillBufferDoneHandler){
     OMX_ERRORTYPE omx_err = (*(ctx->CustomDecoderFillBufferDoneHandler))(hComponent, pAppData, pBuffer);
-    if(omx_err != OMX_ErrorNone)return omx_err;
+
+    // lcarlon: I don't want to call the internal callback if a custom one is provided.
+    //if(omx_err != OMX_ErrorNone)return omx_err;
+    return omx_err;
   }
 
   return ctx->DecoderFillBufferDone(hComponent, pBuffer);

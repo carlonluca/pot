@@ -30,12 +30,12 @@ QT_BEGIN_NAMESPACE
 
 class QGstreamerPlayerSession;
 
-class QGstreamerStreamsControl : public QMediaStreamsControl
+class OpenMAXILStreamsControl : public QMediaStreamsControl
 {
     Q_OBJECT
 public:
-    QGstreamerStreamsControl(QObject* parent);
-    virtual ~QGstreamerStreamsControl();
+    OpenMAXILStreamsControl(QObject* parent);
+    virtual ~OpenMAXILStreamsControl();
 
     virtual int streamCount();
     virtual StreamType streamType(int streamNumber);

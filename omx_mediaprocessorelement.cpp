@@ -29,167 +29,137 @@
 
 using namespace std;
 
-#define CHECK_MEDIA_PROCESSOR                                             \
-    if (!m_mediaProc) {                                                   \
-       LOG_WARNING(LOG_TAG, "The media processor is not available yet."); \
-       return false;                                                      \
-    }
+#define CHECK_MEDIA_PROCESSOR                                            \
+   if (!m_mediaProc) {                                                   \
+      LOG_WARNING(LOG_TAG, "The media processor is not available yet."); \
+      return false;                                                      \
+   }
 
 OMX_MediaProcessorElement::OMX_MediaProcessorElement(QQuickItem *parent) :
-    QQuickItem(parent),
-    m_mediaProc(NULL),
-    m_texProvider(NULL),
-    m_pendingOpen(false),
-    m_textureData(NULL)
+   QQuickItem(parent),
+   m_buffProvider(NULL),
+   m_mediaProc(NULL),
+   m_pendingOpen(false),
+   m_pendingStop(false),
+   m_pendingPlay(false),
+   m_textureData(NULL)
 {
-    // I need to set this as a "has-conent" item because I need the updatePaintNode
-    // to be invoked.
-    setFlag(QQuickItem::ItemHasContents, true);
+   // I need to set this as a "has-content" item because I need the updatePaintNode
+   // to be invoked.
+   setFlag(QQuickItem::ItemHasContents, true);
 }
 
 OMX_MediaProcessorElement::~OMX_MediaProcessorElement()
 {
-    delete m_mediaProc;
-    delete m_textureData;
+   delete m_mediaProc;
+   delete m_textureData;
 }
 
 QString OMX_MediaProcessorElement::source()
 {
-    return m_source;
+   return m_source;
 }
 
 void OMX_MediaProcessorElement::setSource(QString source)
 {
-    LOG_VERBOSE(LOG_TAG, "Setting source.");
+   LOG_VERBOSE(LOG_TAG, "Setting source.");
 
-    // TODO: Handle errors.
-    m_source = source;
-#if 0
-    if (m_mediaProc) {
-        if (openMedia(source))
-            m_mediaProc->play();
-        else {
-            LOG_WARNING(LOG_TAG, "Failed to open media.");
-        }
-    }
-    else {
-        LOG_VERBOSE(LOG_TAG, "Play delayed.");
-    }
-#endif
-    m_pendingOpen = true;
-    update();
+   // TODO: Handle errors.
+   m_source = source;
+   m_pendingOpen = true;
+   update();
 }
 
 bool OMX_MediaProcessorElement::autoPlay()
 {
-    return m_autoPlay;
+   return m_autoPlay;
 }
 
 void OMX_MediaProcessorElement::setAutoPlay(bool autoPlay)
 {
-    LOG_VERBOSE(LOG_TAG, "Setting autoPlay.");
+   LOG_VERBOSE(LOG_TAG, "Setting autoPlay.");
 
-    m_autoPlay = autoPlay;
+   m_autoPlay = autoPlay;
 }
 
 QSGNode* OMX_MediaProcessorElement::updatePaintNode(QSGNode*, UpdatePaintNodeData*)
 {
-#if 0
-    // The item paints nothing on the screen, but still I need this to instantiate
-    // all the structures needed to provide the video.
-    //if (!m_texProvider) {
-    //LOG_VERBOSE(LOG_TAG, "Instantiating texture provider.");
+   if (m_pendingOpen) {
+      openMedia(m_source);
+      m_pendingOpen = false;
+   }
 
-    // Open if filepath is set.
-    // TODO: Handle errors.
-    LOG_DEBUG(LOG_TAG, "Thread of rendering: %ld.", QThread::currentThreadId());
-    if (!m_source.isNull()) {
-        QMetaObject::invokeMethod(
-                    this,
-                    "openMedia",
-                    Qt::QueuedConnection,
-                    Q_ARG(QString, m_source)
-                    );
-        QMetaObject::invokeMethod(
-                    this,
-                    "play",
-                    Qt::QueuedConnection
-                    );
-    }
-    //}
-#endif
-    if (m_pendingOpen) {
-        openMedia(m_source);
-        m_pendingOpen = false;
-    }
+   if (m_pendingStop) {
+      m_mediaProc->stop();
+      m_pendingStop = false;
+   }
 
-    return NULL;
+   if (m_pendingPlay) {
+      m_mediaProc->play();
+      m_pendingPlay = false;
+   }
+
+   return NULL;
 }
 
 bool OMX_MediaProcessorElement::play()
 {
-    CHECK_MEDIA_PROCESSOR;
-    return m_mediaProc->play();
+   CHECK_MEDIA_PROCESSOR;
+   //return m_mediaProc->play();
+   m_pendingPlay = true;
+   update();
 }
 
 bool OMX_MediaProcessorElement::stop()
 {
-    CHECK_MEDIA_PROCESSOR;
-    return m_mediaProc->stop();
+   CHECK_MEDIA_PROCESSOR;
+   //return m_mediaProc->stop();
+   m_pendingStop = true;
+   update();
 }
 
 bool OMX_MediaProcessorElement::pause()
 {
-    CHECK_MEDIA_PROCESSOR;
-    return m_mediaProc->pause();
+   CHECK_MEDIA_PROCESSOR;
+   return m_mediaProc->pause();
 }
 
 bool OMX_MediaProcessorElement::seek(long millis)
 {
-    CHECK_MEDIA_PROCESSOR;
-    return m_mediaProc->seek(millis);
+   CHECK_MEDIA_PROCESSOR;
+   return m_mediaProc->seek(millis);
 }
 
 void OMX_MediaProcessorElement::instantiateMediaProcessor()
 {
-    if (!m_texProvider)
-        m_texProvider = make_shared<OMX_TextureProviderQQuickItem>();
-    if (!m_mediaProc) {
-        m_mediaProc = new OMX_MediaProcessor(m_texProvider);
-        connect(m_mediaProc, SIGNAL(playbackCompleted()), this, SIGNAL(playbackCompleted()));
-        connect(m_mediaProc, SIGNAL(playbackStarted()), this, SIGNAL(playbackStarted()));
-        connect(m_mediaProc, SIGNAL(textureInvalidated()), this, SIGNAL(textureInvalidated()));
-        connect(m_mediaProc, SIGNAL(textureReady(const OMX_TextureData*)),
-                this, SLOT(onTextureDataReady(const OMX_TextureData*)), Qt::DirectConnection);
-        connect(m_mediaProc, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
-                this, SIGNAL(playbackStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
-    }
-}
-
-void OMX_MediaProcessorElement::onTextureDataReady(const OMX_TextureData *textureData)
-{
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
-
-   emit textureReady(textureData);
+   if (!m_buffProvider)
+      m_buffProvider = make_shared<OMX_EGLBufferProvider>();
+   if (!m_mediaProc) {
+      m_mediaProc = new OMX_MediaProcessor(m_buffProvider);
+      connect(m_mediaProc, SIGNAL(playbackCompleted()), this, SIGNAL(playbackCompleted()));
+      connect(m_mediaProc, SIGNAL(playbackStarted()), this, SIGNAL(playbackStarted()));
+      connect(m_mediaProc, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
+              this, SIGNAL(playbackStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
+   }
 }
 
 bool OMX_MediaProcessorElement::openMedia(QString filepath)
 {
-    instantiateMediaProcessor();
+   instantiateMediaProcessor();
 
-    // I need to do this in the rendering thread.
-    if (m_textureData) {
-        m_textureData->freeData();
-        m_textureData = NULL;
-    }
-    if (!m_mediaProc->setFilename(filepath, m_textureData))
-        return false;
+   // I need to do this in the rendering thread.
+   if (m_textureData) {
+      m_textureData->freeData();
+      m_textureData = NULL;
+   }
+   if (!m_mediaProc->setFilename(filepath, m_textureData))
+      return false;
 
-    // Check to see if we should be auto-playing the media
-    if (m_autoPlay) {
-		if (!play())
-			return false;
-    }
+   // Check to see if we should be auto-playing the media
+   if (m_autoPlay) {
+      if (!play())
+         return false;
+   }
 
-    return true;
+   return true;
 }

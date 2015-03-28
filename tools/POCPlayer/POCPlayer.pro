@@ -22,13 +22,21 @@
 #
 
 QT          += quick multimedia
+
+INCLUDEPATH += $$_PRO_FILE_PWD_/../../../LightLogger
+
 SOURCES     += main.cpp \
     poc_qmlutils.cpp \
     poc_utils.cpp
-HEADERS     += poc_qmlutils.h \
+
+HEADERS     += \
+    $$_PRO_FILE_PWD_/../../../LightLogger/lc_logging.h \
+    poc_qmlutils.h \
     poc_utils.h
+
 RESOURCES   += resources_qml.qrc \
     resources_imgs.qrc
+
 OTHER_FILES += qml/main.qml \
     qml/POC_ControlBar.qml \
     qml/POC_StringUtils.js \
@@ -48,4 +56,7 @@ OTHER_FILES += qml/main.qml \
     qml/POC_ControlBarImage.qml \
     qml/POC_ImageOutputSurface.qml \
     qml/main_animations.qml \
-    qml/POC_CrossImage.qml
+    qml/POC_CrossImage.qml \
+    qml/main_loop.qml \
+    qml/POC_CrossImage.qml \
+    qml/POC_VideoOutputSurface.qml

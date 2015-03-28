@@ -49,8 +49,8 @@ static const OMX_MetaDataKeyLookup omx_metaDataKeys[] = {
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider::OMX_MetaDataProvider
 +-----------------------------------------------------------------------------*/
-OMX_MetaDataProvider::OMX_MetaDataProvider(OpenMAXILPlayerControl* playerControl, QObject* parent)
-   :QMetaDataReaderControl(parent)
+OpenMAXILMetaDataProvider::OpenMAXILMetaDataProvider(OpenMAXILPlayerControl* playerControl, QObject* parent)
+   : QMetaDataReaderControl(parent)
 {
 #if 0
    // Store in a map.
@@ -69,14 +69,14 @@ OMX_MetaDataProvider::OMX_MetaDataProvider(OpenMAXILPlayerControl* playerControl
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider::~OMX_MetaDataProvider
 +-----------------------------------------------------------------------------*/
-OMX_MetaDataProvider::~OMX_MetaDataProvider()
+OpenMAXILMetaDataProvider::~OpenMAXILMetaDataProvider()
 {
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider::isMetaDataAvailable
 +-----------------------------------------------------------------------------*/
-bool OMX_MetaDataProvider::isMetaDataAvailable() const
+bool OpenMAXILMetaDataProvider::isMetaDataAvailable() const
 {
    return true;
 }
@@ -84,14 +84,14 @@ bool OMX_MetaDataProvider::isMetaDataAvailable() const
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider::isWritable
 +-----------------------------------------------------------------------------*/
-bool OMX_MetaDataProvider::isWritable() const
+bool OpenMAXILMetaDataProvider::isWritable() const
 {
    return false;
 }
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider::metaData
 +-----------------------------------------------------------------------------*/
-QVariant OMX_MetaDataProvider::metaData(const QString& key) const
+QVariant OpenMAXILMetaDataProvider::metaData(const QString& key) const
 {
    LOG_DEBUG(LOG_TAG, "MetaData request for key: %s.", qPrintable(key));
    return m_tags.value(key);
@@ -100,7 +100,7 @@ QVariant OMX_MetaDataProvider::metaData(const QString& key) const
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider::availableMetaData
 +-----------------------------------------------------------------------------*/
-QStringList OMX_MetaDataProvider::availableMetaData() const
+QStringList OpenMAXILMetaDataProvider::availableMetaData() const
 {
    LOG_DEBUG(LOG_TAG, "Available metadata requested...");
    return m_tags.keys();
@@ -109,7 +109,7 @@ QStringList OMX_MetaDataProvider::availableMetaData() const
 /*------------------------------------------------------------------------------
 |    OMX_MetaDataProvider::onUpdateRequested
 +-----------------------------------------------------------------------------*/
-void OMX_MetaDataProvider::onUpdateRequested(const QVariantMap metaData)
+void OpenMAXILMetaDataProvider::onUpdateRequested(const QVariantMap metaData)
 {
    Q_UNUSED(metaData);
 

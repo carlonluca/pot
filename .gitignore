@@ -1,2 +1,5 @@
+tools/build*
+*.pro.user*
+3rdparty
 3rdparty/*
 openmaxil_backend/3rdparty/*

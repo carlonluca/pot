@@ -68,17 +68,27 @@
 
 #define MAX_TEXT_LENGTH 1024
 
+static OMX_EGLBufferProvider* g_provider;
+
 // lcarlon: needed callback for OMX componenent.
 OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer)
 {
     (void)pAppData;
-    assert(pBuffer);
+
     if (pBuffer->nFlags & OMX_BUFFERFLAG_EOS)
         return OMX_ErrorNone;
-    return OMX_FillThisBuffer(handle, pBuffer);
+
+    assert(g_provider);
+    g_provider->registerFilledBuffer(pBuffer);
+
+    // Get next empty buffer.
+    OMX_TextureData* empty = g_provider->getNextEmptyBuffer();
+    assert(empty);
+
+    return OMX_FillThisBuffer(handle, empty->m_omxBuffer);
 }
 
-COMXVideo::COMXVideo(OMX_TextureProviderSh provider) : m_video_codec_name("")
+COMXVideo::COMXVideo(OMX_EGLBufferProviderSh provider) : m_video_codec_name("")
 {
   m_is_open           = false;
   m_extradata         = NULL;
@@ -103,7 +113,7 @@ COMXVideo::COMXVideo(OMX_TextureProviderSh provider) : m_video_codec_name("")
   m_layer             = 0;
   // lcarlon: keep these inits.
   m_provider          = provider;
-  m_textureData       = NULL;
+  g_provider          = provider.get(); // FIXME: I don't really like this.
 }
 
 COMXVideo::~COMXVideo()
@@ -386,6 +396,8 @@ bool COMXVideo::PortSettingsChanged()
     return false;
   }
 
+  SetVideoEGLOutputPort();
+
   omx_err = m_omx_render.SetStateForComponent(OMX_StateExecuting);
   if(omx_err != OMX_ErrorNone)
   {
@@ -394,10 +406,18 @@ bool COMXVideo::PortSettingsChanged()
   }
 
   m_settings_changed = true;
-  return SetVideoEGLOutputPort();
+
+  OMX_TextureData* data = m_provider->getNextEmptyBuffer();
+  assert(data);
+
+  if ((omx_err = OMX_FillThisBuffer(m_omx_render.GetComponent(), data->m_omxBuffer)) != OMX_ErrorNone) {
+     LOG_ERROR(LOG_TAG, "Error: %x.", (unsigned int)omx_err);
+  }
+
+  return true;
 }
 
-bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspect, EDEINTERLACEMODE deinterlace, OMX_IMAGEFILTERANAGLYPHTYPE anaglyph, bool hdmi_clock_sync, int display, int layer, float fifo_size, OMX_TextureData* textureData)
+bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspect, EDEINTERLACEMODE deinterlace, OMX_IMAGEFILTERANAGLYPHTYPE anaglyph, bool hdmi_clock_sync, int display, int layer, float fifo_size)
 {
   CSingleLock lock (m_critSection);
   bool vflip = false;
@@ -426,7 +446,10 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   
   m_display = display;
   m_layer = layer;
-  m_textureData = textureData; // Used in case not NULL.
+
+  // TODO: Re-use old textures.
+  //m_textureData = textureData; // Used in case not NULL.
+  //m_textureData = NULL;
 
   // lcarlon: it is important that the generation of the texture is done in the rendering
   // thread. Beware that BlockingQueuedConnection hardlocks when on the same thread.
@@ -443,25 +466,33 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   // re-use an existing one. For instance seek and restart may want to simply close and reopen
   // the video player without generating a new texture.
   QSize videoSize(hints.width, hints.height);
-  if (!m_textureData) {
-     m_textureData = m_provider->instantiateTexture(videoSize);
+  //if (!m_textureData) {
+     //m_textureData = m_provider->instantiateTexture(videoSize);
+  m_provider->free();
+
+  if (m_provider->getBufferCount() <= 0) {
+     m_provider->instantiateTextures(videoSize, 4);
      LOG_VERBOSE(LOG_TAG, "Texture generated!");
   }
-  else {
-     // It means the user wants to re-use the texture. Just double-check the size is correct.
-     if (videoSize != m_textureData->m_textureSize) {
-        LOG_ERROR(LOG_TAG, "Trying to re-use a texture with a wrong size!");
-        return false;
-     }
-     LOG_VERBOSE(LOG_TAG, "Well done, reusing existing texture.");
-  }
-#endif
-  if (!m_textureData) {
-     LOG_WARNING(LOG_TAG, "No texture was instantiated. Can't go on.");
-     return false;
-  }
+  else
+     m_provider->cleanTextures();
 
-  emit textureDataReady(m_textureData);
+  //}
+  //else {
+     // It means the user wants to re-use the texture. Just double-check the size is correct.
+     //if (videoSize != m_textureData->m_textureSize) {
+     //   LOG_ERROR(LOG_TAG, "Trying to re-use a texture with a wrong size!");
+     //   return false;
+     //}
+     //LOG_VERBOSE(LOG_TAG, "Well done, reusing existing texture.");
+  //}
+#endif
+  //if (!m_textureData) {
+  //   LOG_WARNING(LOG_TAG, "No texture was instantiated. Can't go on.");
+  //   return false;
+  //}
+
+  //emit textureDataReady(m_textureData);
 
   if(!m_decoded_width || !m_decoded_height)
     return false;
@@ -778,8 +809,10 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   return true;
 }
 
+#include "lc_logging.h"
 void COMXVideo::Close()
 {
+  log_verbose("Closing video...");
   CSingleLock lock (m_critSection);
   m_omx_tunnel_clock.Deestablish();
   m_omx_tunnel_decoder.Deestablish();
@@ -793,6 +826,8 @@ void COMXVideo::Close()
   m_omx_decoder.Deinitialize();
   if(m_deinterlace || m_anaglyph)
     m_omx_image_fx.Deinitialize();
+
+  log_verbose("m_omx_render is %p freeing %d", &m_omx_render, g_provider->getBufferCount());
   m_omx_render.Deinitialize();
 
   m_is_open       = false;
@@ -988,11 +1023,12 @@ bool COMXVideo::SetVideoEGL()
    OMX_PARAM_PORTDEFINITIONTYPE portdef;
    portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
    portdef.nVersion.nVersion = OMX_VERSION;
-   portdef.nPortIndex = 221;
+   portdef.nPortIndex = m_omx_render.GetOutputPort();
    OMX_ERRORTYPE omx_err = m_omx_render.GetParameter(OMX_IndexParamPortDefinition, &portdef);
    if (omx_err != OMX_ErrorNone)
       CLog::Log(LOGERROR, "Failed to get port definition for renderer output port.");
-   portdef.nBufferCountActual = 1;
+
+   portdef.nBufferCountActual = 4;
    portdef.format.video.pNativeWindow = get_egl_display();
    omx_err = m_omx_render.SetParameter(OMX_IndexParamPortDefinition, &portdef);
    if (omx_err != OMX_ErrorNone)
@@ -1014,19 +1050,43 @@ bool COMXVideo::SetVideoEGLOutputPort()
    if (omx_err != OMX_ErrorNone)
       log_warn("Failed to set OMX_IndexParamBrcmVideoEGLRenderDiscardMode.");
 
-   m_omx_render.EnablePort(m_omx_render.GetOutputPort(), true);
-   omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &m_eglBuffer, 221, NULL, m_textureData->m_eglImage);
-   if (omx_err != OMX_ErrorNone) {
-      LOG_ERROR(LOG_TAG, "OpenMAXILTextureLoader::decode - OMX_UseEGLImage - failed with omxErr(0x%x)\n", omx_err);
-      CLog::Log(LOGERROR, "OpenMAXILTextureLoader::decode - OMX_UseEGLImage - failed with omxErr(0x%x)\n", omx_err);
-      return false;
+   OMX_PARAM_PORTDEFINITIONTYPE portFormat;
+   OMX_INIT_STRUCTURE(portFormat);
+   portFormat.nPortIndex = m_omx_render.GetOutputPort();
+   omx_err = m_omx_render.GetParameter(OMX_IndexParamPortDefinition, &portFormat);
+   if(omx_err != OMX_ErrorNone)
+     return omx_err;
+
+   m_omx_render.m_output_alignment     = portFormat.nBufferAlignment;
+   m_omx_render.m_output_buffer_count  = portFormat.nBufferCountActual;
+   m_omx_render.m_output_buffer_size   = portFormat.nBufferSize;
+
+   log_debug("Trying to enable to output port...");
+   m_omx_render.EnablePort(m_omx_render.GetOutputPort(), false);
+
+   // Buffers are freed using another technique.
+   m_omx_render.m_omx_output_use_buffers = false;
+
+   // Get buffers for images.
+   QList<OMX_TextureData*> datas = m_provider->getBuffers();
+   log_verbose("Creating buffers for %d images.", datas.size());
+   foreach (OMX_TextureData* data, datas) {
+      omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &(data->m_omxBuffer), 221, NULL, data->m_eglImage);
+      if (omx_err != OMX_ErrorNone) {
+         CLog::Log(LOGERROR, "OpenMAXILTextureLoader::decode - OMX_UseEGLImage - failed with omxErr(0x%x)\n", omx_err);
+         return false;
+      }
+
+      log_info("Buffer created %p", data->m_omxBuffer);
+      m_omx_render.m_omx_output_available.push(data->m_omxBuffer);
+      m_omx_render.m_omx_output_buffers.push_back(data->m_omxBuffer);
    }
 
    LOG_VERBOSE(LOG_TAG, "Component renderer: %x.", (unsigned int)m_omx_render.GetComponent());
    m_omx_render.SetCustomDecoderFillBufferDoneHandler(&fill_buffer_done_callback);
-   if ((omx_err = OMX_FillThisBuffer(m_omx_render.GetComponent(), m_eglBuffer)) != OMX_ErrorNone) {
-      LOG_ERROR(LOG_TAG, "Error: %x.", (unsigned int)omx_err);
-   }
+
+   // Taken from OMXCore.
+   m_omx_render.m_flush_output = false;
 
    return true;
 }

@@ -29,7 +29,7 @@ Rectangle {
     property bool enableVideoFullscreen: true
     property bool enableImageFullscreen: true
     property bool enableFlip: true
-    property string resSuffix: "720p"
+    property string resSuffix: "1080p"
     property int animDuration: 5000
 
     property var transformations: []

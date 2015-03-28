@@ -67,6 +67,7 @@ cp -a ../../3rdparty/ffmpeg/include ffmpeg
 cp -a ../../3rdparty/ffmpeg/lib ffmpeg
 
 # Clone LightLogger
+rm -rf LightLogger
 git clone https://github.com/carlonluca/LightLogger.git
 
 echo "Cleaning up..."

@@ -205,6 +205,9 @@ private:
   bool          m_flush_input;
   bool          m_flush_output;
   bool          m_resource_error;
+
+  // lcarlon: this is needed as an hack.
+  friend class COMXVideo;
 };
 
 class COMXCore

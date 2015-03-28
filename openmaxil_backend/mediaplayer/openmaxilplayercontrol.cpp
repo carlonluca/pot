@@ -21,6 +21,9 @@
  * along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
  */
 
+/*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
 #include "openmaxilplayercontrol.h"
 
 #include <private/qmediaplaylistnavigator_p.h>
@@ -73,17 +76,13 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    , m_ownStream(false)
    , m_seekToStartPending(false)
    , m_pendingSeekPosition(-1)
-   , m_mediaProcessor(new OMX_MediaProcessor(OMX_TextureProviderSh(new OMX_TextureProviderQQuickItem())))
+   , m_mediaProcessor(new OMX_MediaProcessor(make_shared<OMX_EGLBufferProvider>()))
    , m_textureData(NULL)
    , m_sceneGraphInitialized(false)
    , m_quickItem(NULL)
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
-   connect(m_mediaProcessor, SIGNAL(textureReady(const OMX_TextureData*)),
-           this, SIGNAL(textureReady(const OMX_TextureData*)));
-   connect(m_mediaProcessor, SIGNAL(textureInvalidated()),
-           this, SIGNAL(textureInvalidated()));
    connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
            this, SLOT(onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
    connect(m_mediaProcessor, SIGNAL(metadataChanged(QVariantMap)),
@@ -95,7 +94,7 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
 +-----------------------------------------------------------------------------*/
 OpenMAXILPlayerControl::~OpenMAXILPlayerControl()
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    delete m_mediaProcessor;
    m_mediaProcessor = NULL;
@@ -106,7 +105,7 @@ OpenMAXILPlayerControl::~OpenMAXILPlayerControl()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setMediaPlayer(QMediaPlayer* mediaPlayer)
 {
-   LOG_DEBUG(LOG_TAG, "Setting QMediaPlayer...");
+   log_debug_func;
    m_quickItem = dynamic_cast<QQuickItem*>(mediaPlayer->parent());
    if (!m_quickItem) {
       LOG_ERROR(LOG_TAG, "Failed to get declarative media player.");
@@ -125,7 +124,7 @@ void OpenMAXILPlayerControl::setMediaPlayer(QMediaPlayer* mediaPlayer)
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::play()
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    LOG_VERBOSE(LOG_TAG, "Deferring play() command...");
    PlayerCommandPlay* play = new PlayerCommandPlay;
@@ -138,7 +137,7 @@ void OpenMAXILPlayerControl::play()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::playInt()
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // Can be done in any thread.
    assert(m_mediaProcessor);
@@ -150,7 +149,7 @@ void OpenMAXILPlayerControl::playInt()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::pause()
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    PlayerCommandPause* pause = new PlayerCommandPause;
    pause->m_playerCommandType = PLAYER_COMMAND_TYPE_PAUSE;
@@ -162,7 +161,7 @@ void OpenMAXILPlayerControl::pause()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::pauseInt()
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    assert(m_mediaProcessor);
    m_mediaProcessor->pause();
@@ -173,7 +172,7 @@ void OpenMAXILPlayerControl::pauseInt()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::stop()
 {
-   LOG_DEBUG("%s", Q_FUNC_INFO);
+   log_debug_func;
 
    assert(m_mediaProcessor);
    m_mediaProcessor->stop();
@@ -224,17 +223,15 @@ void OpenMAXILPlayerControl::onStateChanged(OMX_MediaProcessor::OMX_MediaProcess
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::onItemSceneChanged()
 {
-   LOG_DEBUG(LOG_TAG, "Getting window...");
    QQuickWindow* window = m_quickItem->window();
-   if (!window) {
-      LOG_ERROR(LOG_TAG, "Failed to get QQuickWindow.");
+   if (!window)
       return;
-   }
 
    connect(window, SIGNAL(sceneGraphInitialized()),
            this, SLOT(onSceneGraphInitialized()), Qt::DirectConnection);
    connect(window, SIGNAL(afterRendering()),
            this, SLOT(onAfterRendering()), Qt::DirectConnection);
+
    window->update();
 }
 
@@ -245,6 +242,10 @@ void OpenMAXILPlayerControl::appendCommand(PlayerCommand* command)
 {
    QMutexLocker locker(&m_pendingCommandsMutex);
    m_pendingCommands.append(command);
+
+   QQuickWindow* window = m_quickItem->window();
+   if (window)
+      window->update();
 }
 
 /*------------------------------------------------------------------------------
@@ -299,14 +300,14 @@ void OpenMAXILPlayerControl::setMedia(const QMediaContent& content, QIODevice* s
 {
    Q_UNUSED(stream);
 
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
-   LOG_DEBUG(LOG_TAG, "Media: %s.", qPrintable(content.canonicalUrl().path()));
-   LOG_DEBUG(LOG_TAG, "setMedia thread is: 0x%x.", ((unsigned int)QThread::currentThread()));
+   log_debug_func;
+   log_debug("Media: %s.", qPrintable(content.canonicalUrl().path()));
+   log_debug("setMedia thread is: 0x%x.", ((unsigned int)QThread::currentThread()));
 
-   LOG_VERBOSE(LOG_TAG, "Deferring setMedia()...");
+   log_verbose("Deferring setMedia()...");
    QUrl url = content.canonicalUrl();
    if (url.isLocalFile() && !QFile(url.path()).exists()) {
-      LOG_DEBUG(LOG_TAG, "Does not exist!");
+      log_warn("Does not exist!");
       return;
    }
 
@@ -321,7 +322,7 @@ void OpenMAXILPlayerControl::setMedia(const QMediaContent& content, QIODevice* s
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setMediaInt(const QMediaContent& mediaContent)
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    m_mediaProcessor->stop();
 
@@ -347,7 +348,7 @@ QVariantMap OpenMAXILPlayerControl::getMetaData()
 +-----------------------------------------------------------------------------*/
 QMediaContent OpenMAXILPlayerControl::media() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    return m_currentResource;
 }
@@ -368,7 +369,7 @@ const QIODevice* OpenMAXILPlayerControl::mediaStream() const
 +-----------------------------------------------------------------------------*/
 bool OpenMAXILPlayerControl::isAudioAvailable() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    return m_mediaProcessor->hasAudio();
 }
@@ -378,7 +379,7 @@ bool OpenMAXILPlayerControl::isAudioAvailable() const
 +-----------------------------------------------------------------------------*/
 bool OpenMAXILPlayerControl::isVideoAvailable() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    return m_mediaProcessor->hasVideo();
 }
@@ -388,7 +389,7 @@ bool OpenMAXILPlayerControl::isVideoAvailable() const
 +-----------------------------------------------------------------------------*/
 QMediaTimeRange OpenMAXILPlayerControl::availablePlaybackRanges() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // TODO: Implement.
    return QMediaTimeRange();
@@ -399,7 +400,7 @@ QMediaTimeRange OpenMAXILPlayerControl::availablePlaybackRanges() const
 +-----------------------------------------------------------------------------*/
 int OpenMAXILPlayerControl::bufferStatus() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // TODO: Implement.
    return 0;
@@ -420,7 +421,7 @@ qint64 OpenMAXILPlayerControl::duration() const
 +-----------------------------------------------------------------------------*/
 bool OpenMAXILPlayerControl::isMuted() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    return m_mediaProcessor->muted();
 }
@@ -430,7 +431,7 @@ bool OpenMAXILPlayerControl::isMuted() const
 +-----------------------------------------------------------------------------*/
 bool OpenMAXILPlayerControl::isSeekable() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // TODO: Implement.
    return false;
@@ -441,7 +442,7 @@ bool OpenMAXILPlayerControl::isSeekable() const
 +-----------------------------------------------------------------------------*/
 QMediaPlayer::MediaStatus OpenMAXILPlayerControl::mediaStatus() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // TODO: Implement.
    return QMediaPlayer::UnknownMediaStatus;
@@ -452,7 +453,7 @@ QMediaPlayer::MediaStatus OpenMAXILPlayerControl::mediaStatus() const
 +-----------------------------------------------------------------------------*/
 qreal OpenMAXILPlayerControl::playbackRate() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    return 1.0;
 }
@@ -462,7 +463,7 @@ qreal OpenMAXILPlayerControl::playbackRate() const
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setPlaybackRate(qreal rate)
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // TODO: Implement.
 }
@@ -472,9 +473,9 @@ void OpenMAXILPlayerControl::setPlaybackRate(qreal rate)
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setPosition(qint64 position)
 {
-   LOG_DEBUG(LOG_TAG, "%s, %lld", Q_FUNC_INFO, position);
+   log_debug_func;
 
-  m_mediaProcessor->seek(position);
+   m_mediaProcessor->seek(position);
 }
 
 /*------------------------------------------------------------------------------
@@ -482,7 +483,7 @@ void OpenMAXILPlayerControl::setPosition(qint64 position)
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setVolume(int volume)
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // TODO: Implement.
 }
@@ -492,7 +493,7 @@ void OpenMAXILPlayerControl::setVolume(int volume)
 +-----------------------------------------------------------------------------*/
 QMediaPlayer::State OpenMAXILPlayerControl::state() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    assert(m_mediaProcessor);
    return convertState(m_mediaProcessor->state());
@@ -503,7 +504,7 @@ QMediaPlayer::State OpenMAXILPlayerControl::state() const
 +-----------------------------------------------------------------------------*/
 int OpenMAXILPlayerControl::volume() const
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    // TODO: Implement.
    return 0;
@@ -524,7 +525,7 @@ qint64 OpenMAXILPlayerControl::position() const
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setMuted(bool muted)
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+   log_debug_func;
 
    m_mediaProcessor->setMute(muted);
 }

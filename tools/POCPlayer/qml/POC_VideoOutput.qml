@@ -22,16 +22,15 @@
 */
 
 import QtQuick 2.0
-import QtMultimedia 5.0
 
 // The unique video surface.
-VideoOutput {
+Item {
+    property var sourceUrl
+
     signal controlBarDismissed()
 
     height: parent.height
     width:  parent.width
-
-    fillMode: VideoOutput.Stretch
 
     // Used to show the control bar.
     MouseArea {
@@ -40,6 +39,11 @@ VideoOutput {
             controlBar.toggleAnimated();
 
         z: 1
+    }
+
+    POC_VideoOutputSurface {
+        id: videoOutputSurface
+        source: parent.sourceUrl
     }
 
     // The control bar.
@@ -72,10 +76,12 @@ VideoOutput {
         // Unimplemented.
     }
 
-    // Text containing the position/duration.
-    POC_TextPosition {
-        anchors.top:   parent.top
-        anchors.right: parent.right
+    function rotateClock() {
+        videoOutputSurface.rotateClock();
+    }
+
+    function rotateCounter() {
+        videoOutputSurface.rotateCounter();
     }
 
     // Automatically pass the focus to the control bar.

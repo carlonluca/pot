@@ -41,7 +41,7 @@ POC_ControlBar {
             maximumValue:             1.0
             minimumValue:             0.0
             stepSize:                 0.01
-            value: (controlBar.parent.source).position/(controlBar.parent.source).duration;
+            value: videoOutputSurface.position/videoOutputSurface.duration;
             updateValueWhileDragging: false
 
             // NOTE: Remember to avoid seeking on value changed. That will result in
@@ -67,10 +67,10 @@ POC_ControlBar {
             KeyNavigation.up:    buttonVolume
 
             function seek() {
-                var position = (controlBar.parent.source).position;
-                var duration = (controlBar.parent.source).duration;
+                var position = (videoOutputSurface.source).position;
+                var duration = (videoOutputSurface.source).duration;
                 console.log("Seeking to " + value*position/duration);
-                (controlBar.parent.source).seek(value*duration);
+                videoOutputSurface.source.seek(value*duration);
             }
         }
 
@@ -78,7 +78,7 @@ POC_ControlBar {
             id: buttonPlayPause
             Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
             text: "Play/Pause"
-            onClicked: (controlBar.parent.source).playPause();
+            onClicked: (videoOutputSurface.source).playPause();
 
             KeyNavigation.right: buttonStop
             KeyNavigation.down:  buttonStop
@@ -193,8 +193,8 @@ POC_ControlBar {
             maximumValue:     1.0
             minimumValue:     0.0
             stepSize:         0.05
-            onValueChanged:   controlBar.parent.source.volume = value;
-            value:            controlBar.parent.source.volume
+            onValueChanged:   videoOutputSurface.source.volume = value;
+            value:            videoOutputSurface.source.volume
         }
 
         Text {

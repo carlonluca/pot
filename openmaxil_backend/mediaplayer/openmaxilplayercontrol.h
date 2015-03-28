@@ -153,6 +153,9 @@ public:
     void setMediaInt(const QMediaContent& mediaContent);
 
     QVariantMap getMetaData();
+    OMX_MediaProcessor* getMediaProcessor() {
+       return m_mediaProcessor;
+    }
 
 public Q_SLOTS:
     void setPosition(qint64 pos);
@@ -169,8 +172,6 @@ public Q_SLOTS:
 
 signals:
     void metaDataChanged(const QVariantMap metaData);
-    void textureReady(const OMX_TextureData* textureData);
-    void textureInvalidated();
 
 private slots:
     void onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);

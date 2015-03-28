@@ -30,25 +30,51 @@
 #include <QQmlEngine>
 #include <QQmlContext>
 
+#include "lc_logging.h"
+
 #include "poc_utils.h"
 #include "poc_qmlutils.h"
+
+/*------------------------------------------------------------------------------
+|    definitions
++-----------------------------------------------------------------------------*/
+enum POC_Mode {
+	MODE_PLAYER,
+	MODE_LOOP,
+	MODE_ANIMATIONS
+};
+
+/*------------------------------------------------------------------------------
+|    show_local_media
++-----------------------------------------------------------------------------*/
+bool show_local_media(QQuickView* view, QStringList mediaList)
+{
+	for (int i = 0; i < mediaList.size(); i++)
+		if (!QFile(mediaList[i]).exists())
+			return log_warn("File %s does not exist.", qPrintable(mediaList[i]));
+
+	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
+	QMetaObject::invokeMethod(rootObject, "showLocalMedia", Q_ARG(QVariant, mediaList));
+
+	return true;
+}
 
 /*------------------------------------------------------------------------------
 |    show_local_media
 +-----------------------------------------------------------------------------*/
 bool show_local_media(QQuickView* view, QString fileAbsPath)
 {
-   QFile f(fileAbsPath);
-   if (!f.exists()) {
-      qWarning("File provided does not exist.");
-      return false;
-   }
+	QFile f(fileAbsPath);
+	if (!f.exists()) {
+		log_warn("File provided does not exist.");
+		return false;
+	}
 
-   QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
-   QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
-   QMetaObject::invokeMethod(mediaOutput, "showLocalMedia", Q_ARG(QVariant, fileAbsPath));
+	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
+	QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
+	QMetaObject::invokeMethod(mediaOutput, "showLocalMedia", Q_ARG(QVariant, fileAbsPath));
 
-   return true;
+	return true;
 }
 
 /*----------------------------------------------------------------------
@@ -56,28 +82,65 @@ bool show_local_media(QQuickView* view, QString fileAbsPath)
 +---------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
-    QGuiApplication app(argc, argv);
+	QGuiApplication app(argc, argv);
 
-    // Utility.
-    POC_QMLUtils qmlUtils;
+	// Utility.
+	QStringList args = app.arguments();
+	POC_Mode currentMode;
+	if (args.contains("--animations"))
+		currentMode = MODE_ANIMATIONS;
+	else if (args.contains("--loop"))
+		currentMode = MODE_LOOP;
+	else
+		currentMode = MODE_PLAYER;
 
-    QQuickView view;
-    view.engine()->rootContext()->setContextProperty("utils", &qmlUtils);
-    view.setSource(QUrl("qrc:///qml/main.qml"));
-    view.setResizeMode(QQuickView::SizeRootObjectToView);
+	POC_QMLUtils qmlUtils;
+
+	QQuickView view;
+	view.engine()->rootContext()->setContextProperty("utils", &qmlUtils);
+	switch (currentMode) {
+	case MODE_ANIMATIONS:
+		view.setSource(QUrl("qrc:///qml/main_animations.qml"));
+		break;
+	case MODE_LOOP:
+		view.setSource(QUrl("qrc:///qml/main_loop.qml"));
+		break;
+	default:
+		view.setSource(QUrl("qrc:///qml/main.qml"));
+		break;
+	}
+
+	qInstallMessageHandler(&log_handler);
+	LC_QMLLogger::registerObject(view.rootContext());
+
+	view.setResizeMode(QQuickView::SizeRootObjectToView);
 #ifdef RASPBERRY
-    view.showFullScreen();
+	view.showFullScreen();
 #else
-    view.resize(800, 400);
-    view.show();
+	view.resize(800, 400);
+	view.show();
 #endif // RASPBERRY
-    qApp->connect(view.engine(), SIGNAL(quit()), qApp, SLOT(quit()));
+	qApp->connect(view.engine(), SIGNAL(quit()), qApp, SLOT(quit()));
 
-    // If file path is provided from the command line, I start the player
-    // immediately.
-    QStringList args = app.arguments();
-    if (args.size() > 1)
-       show_local_media(&view, args.at(1));
+	// If file path is provided from the command line, I start the player
+	// immediately.
+	switch (currentMode) {
+	case MODE_LOOP: {
+		QStringList list;
+		for (int i = 2; i < args.size(); i++)
+			list << args.at(i);
+		if (list.size() < 1)
+			return log_warn("No items to play.");
+		if (!show_local_media(&view, list))
+			return 1;
+		break;
+	}
+	default:
+      if (args.size() > 1)
+         if (!show_local_media(&view, args.at(1)))
+				return 1;
+		break;
+	}
 
-    return app.exec();
+	return app.exec();
 }
