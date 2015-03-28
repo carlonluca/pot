@@ -405,7 +405,9 @@ bool OMX_MediaProcessor::play()
          return false;
       }
 
-      flushStreams(startpts);
+      // This can't be done here otherwise artifacts are shown at the beginning
+      // of the video.
+      //flushStreams(startpts);
 #endif
 
       //m_av_clock->OMXStart(0.0);
