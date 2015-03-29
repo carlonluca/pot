@@ -10,3 +10,4 @@ library.
 In tools/POCPlayer there is a sample player used to test the backend.
 
 For more information on the project refer to http://goo.gl/KphzdD.
+For some build instructions: http://goo.gl/9TZPxn.
