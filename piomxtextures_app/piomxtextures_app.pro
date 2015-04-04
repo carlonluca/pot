@@ -1,9 +1,9 @@
 #
 # Project: PiOmxTextures
 # Author:  Luca Carlon
-# Date:    04.06.2013
+# Date:    04.03.2015
 #
-# Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
+# Copyright (c) 2012-2015 Luca Carlon. All rights reserved.
 #
 # This file is part of PiOmxTextures.
 #
@@ -21,8 +21,25 @@
 # along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
 #
 
-TEMPLATE = subdirs
-QT       += quick declarative
+TEMPLATE = app
 
-SUBDIRS     += mediaplayer
-OTHER_FILES += openmaxil.json
+QT += core core-private gui gui-private opengl quick quick-private
+CONFIG += no_private_qt_headers_warning
+
+# Macro definitions
+#DEFINES += LOG_LEVEL_DEBUG
+DEFINES += VERBOSE
+DEFINES += ENABLE_VIDEO_TEST
+DEFINES += ENABLE_MEDIA_PROCESSOR
+
+include(piomxtextures_app.pri)
+include($$_PRO_FILE_PWD_/../piomxtextures_src/piomxtextures_src.pri)
+
+SOURCES += \
+   main.cpp \
+#  main_ffmpeg.cpp \
+#  main_v4l2.cpp \
+#  main_demux.cpp \
+#  main_omxplayer.cpp
+
+RESOURCES += resources.qrc

@@ -47,7 +47,7 @@ if [ ! -d "3rdparty/ffmpeg" ]; then
 fi
 
 cd 3rdparty/ffmpeg
-git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -bn2.5 --depth=1
+git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -bn2.5.3 --depth=1
 cd ffmpeg_src;
 
 export PATH=$PATH:"$COMPILER_PATH"

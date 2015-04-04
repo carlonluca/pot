@@ -1,11 +1,11 @@
 <RCC>
     <qresource prefix="/">
-        <file>main.qml</file>
         <file>resources/qt-logo.png</file>
         <file>resources/1.jpg</file>
         <file>resources/2.jpg</file>
         <file>resources/3.jpg</file>
         <file>resources/4.jpg</file>
-        <file>OMX_CrossImage.qml</file>
+        <file alias="main.qml">qml/main.qml</file>
+        <file alias="OMX_CrossImage.qml">qml/OMX_CrossImage.qml</file>
     </qresource>
 </RCC>

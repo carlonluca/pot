@@ -108,6 +108,8 @@ bool OMX_MediaProcessorElement::play()
    //return m_mediaProc->play();
    m_pendingPlay = true;
    update();
+
+   return true;
 }
 
 bool OMX_MediaProcessorElement::stop()
@@ -116,6 +118,8 @@ bool OMX_MediaProcessorElement::stop()
    //return m_mediaProc->stop();
    m_pendingStop = true;
    update();
+
+   return true;
 }
 
 bool OMX_MediaProcessorElement::pause()

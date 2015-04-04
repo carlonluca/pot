@@ -709,21 +709,6 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
     return false;
   }
 
-  if (m_deinterlace_request != VS_DEINTERLACEMODE_OFF)
-  {
-    // the deinterlace component requires 3 additional video buffers in addition to the DPB (this is normally 2).
-    OMX_PARAM_U32TYPE extra_buffers;
-    OMX_INIT_STRUCTURE(extra_buffers);
-    extra_buffers.nU32 = 3;
-
-    omx_err = m_omx_decoder.SetParameter(OMX_IndexParamBrcmExtraBuffers, &extra_buffers);
-    if(omx_err != OMX_ErrorNone)
-    {
-      CLog::Log(LOGERROR, "COMXVideo::Open error OMX_IndexParamBrcmExtraBuffers omx_err(0x%08x)\n", omx_err);
-      return false;
-    }
-  }
-
   // broadcom omx entension:
   // When enabled, the timestamp fifo mode will change the way incoming timestamps are associated with output images.
   // In this mode the incoming timestamps get used without re-ordering on output images.
@@ -809,10 +794,8 @@ bool COMXVideo::Open(COMXStreamInfo &hints, OMXClock *clock, float display_aspec
   return true;
 }
 
-#include "lc_logging.h"
 void COMXVideo::Close()
 {
-  log_verbose("Closing video...");
   CSingleLock lock (m_critSection);
   m_omx_tunnel_clock.Deestablish();
   m_omx_tunnel_decoder.Deestablish();
@@ -826,8 +809,6 @@ void COMXVideo::Close()
   m_omx_decoder.Deinitialize();
   if(m_deinterlace || m_anaglyph)
     m_omx_image_fx.Deinitialize();
-
-  log_verbose("m_omx_render is %p freeing %d", &m_omx_render, g_provider->getBufferCount());
   m_omx_render.Deinitialize();
 
   m_is_open       = false;

@@ -1,9 +1,9 @@
 #
 # Project: PiOmxTextures
 # Author:  Luca Carlon
-# Date:    04.06.2013
+# Date:    04.03.2015
 #
-# Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
+# Copyright (c) 2012-2015 Luca Carlon. All rights reserved.
 #
 # This file is part of PiOmxTextures.
 #
@@ -21,15 +21,11 @@
 # along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
 #
 
-QT     += multimedia-private network
+TEMPLATE = lib
+
+VERSION = 4.4.0
+
+QT += core core-private gui gui-private opengl quick quick-private
 CONFIG += no_private_qt_headers_warning
 
-qtHaveModule(widgets) {
-    QT += widgets multimediawidgets-private
-    DEFINES += HAVE_WIDGETS
-}
-
-config_xvideo:qtHaveModule(widgets) {
-#    DEFINES += HAVE_XVIDEO
-#    LIBS += -lXv -lX11 -lXext
-}
+include($$_PRO_FILE_PWD_/../piomxtextures_src/piomxtextures_src.pri)

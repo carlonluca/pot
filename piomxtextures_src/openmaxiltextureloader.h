@@ -42,7 +42,7 @@
 #include <IL/OMX_Image.h>
 #include <IL/OMX_Component.h>
 
-#include "OMXComponent.h"
+#include <OMXComponent.h>
 #include "OMX_Core.h"
 
 

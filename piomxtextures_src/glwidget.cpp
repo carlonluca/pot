@@ -46,11 +46,9 @@
  * Copyright (c) 2012 Luca Carlon. All rights reserved.
  */
 
-#include <QtWidgets>
-#include <QtOpenGL>
 #include <QtConcurrent/QtConcurrentRun>
 
-#include <private/qguiapplication_p.h>
+#include <QApplication>
 #include <qpa/qplatformintegration.h>
 #include <qpa/qplatformnativeinterface.h>
 

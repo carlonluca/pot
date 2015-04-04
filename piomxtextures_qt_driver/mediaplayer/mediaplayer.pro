@@ -3,7 +3,7 @@
 # Author:  Luca Carlon
 # Date:    04.06.2013
 #
-# Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
+# Copyright (c) 2012-2015 Luca Carlon. All rights reserved.
 #
 # This file is part of PiOmxTextures.
 #
@@ -29,21 +29,22 @@ load(qt_plugin)
 
 QT += quick
 
-include(../common.pri)
+QT     += multimedia-private network
+CONFIG += no_private_qt_headers_warning
 
-DEFINES += BUILD_LOG_LEVEL_DEBUG
+qtHaveModule(widgets) {
+    QT += widgets multimediawidgets-private
+    DEFINES += HAVE_WIDGETS
+}
 
-message($$_PRO_FILE_PWD_)
-INCLUDEPATH += $$PWD
-INCLUDEPATH += \
-#   $$_PRO_FILE_PWD_/../3rdparty/ffmpeg/include \
-   $$_PRO_FILE_PWD_/../3rdparty/PiOmxTextures/include \
-   $$_PRO_FILE_PWD_/../3rdparty/LightLogger
+config_xvideo:qtHaveModule(widgets) {
+#    DEFINES += HAVE_XVIDEO
+#    LIBS += -lXv -lX11 -lXext
+}
 
-LIBS += \
-   -lEGL \
-#   -L$$_PRO_FILE_PWD_/../3rdparty/ffmpeg/lib -lavformat -lavcodec -lavutil -lswscale -lswresample \
-   -L$$_PRO_FILE_PWD_/../3rdparty/PiOmxTextures/lib -lPiOmxTextures
+include($$_PRO_FILE_PWD_/../../piomxtextures_src/piomxtextures_src.pri)
+
+LIBS += -lEGL
 
 HEADERS += \
     $$PWD/openmaxilplayercontrol.h \

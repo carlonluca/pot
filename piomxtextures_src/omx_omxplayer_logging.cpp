@@ -103,7 +103,6 @@ void CLog::Close()
 +-----------------------------------------------------------------------------*/
 void CLog::Log(int loglevel, const char *format, ... )
 {
-#define ENABLE_OMXPLAYER_LOGS
 #ifdef ENABLE_OMXPLAYER_LOGS
    if (loglevel < m_logLevel)
       return;

@@ -23,14 +23,14 @@
 
 QT          += quick multimedia
 
-INCLUDEPATH += $$_PRO_FILE_PWD_/../../../LightLogger
+INCLUDEPATH += $$_PRO_FILE_PWD_/../3rdparty/LightLogger
 
 SOURCES     += main.cpp \
     poc_qmlutils.cpp \
     poc_utils.cpp
 
 HEADERS     += \
-    $$_PRO_FILE_PWD_/../../../LightLogger/lc_logging.h \
+    $$_PRO_FILE_PWD_/../3rdparty/LightLogger/lc_logging.h \
     poc_qmlutils.h \
     poc_utils.h
 
