@@ -66,6 +66,7 @@ Usage: omxplayer [OPTIONS] [FILE]
         --anaglyph type         convert 3d to anaglyph
     -w  --hw                    Hw audio decoding
     -3  --3d mode               Switch tv into 3d mode (e.g. SBS/TB)
+    -M  --allow-mvc             Allow decoding of both views of MVC stereo stream
     -y  --hdmiclocksync         Display refresh rate to match video (default)
     -z  --nohdmiclocksync       Do not adjust display refresh rate to match video
     -t  --sid index             Show subtitle with index
@@ -100,6 +101,7 @@ Usage: omxplayer [OPTIONS] [FILE]
         --layout                Set output speaker layout (e.g. 5.1)
         --dbus_name name        default: org.mpris.MediaPlayer2.omxplayer
         --key-config <file>     Uses key bindings in <file> instead of the default
+        --alpha                 Set video transparency (0..255)
         --layer n               Set video render layer number (higher numbers are on top)
         --display n             Set display to output to
         --cookie 'cookie'       Send specified cookie as part of HTTP requests

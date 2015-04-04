@@ -159,6 +159,7 @@ public:
   bool BadState() const { return m_resource_error; }
   void ResetEos();
   void IgnoreNextError(OMX_S32 error) { m_ignore_error = error; }
+  // lcarlon: keep during merges.
   void SetCustomDecoderFillBufferDoneHandler(OMX_ERRORTYPE (*p)(OMX_HANDLETYPE, OMX_PTR, OMX_BUFFERHEADERTYPE*)){ CustomDecoderFillBufferDoneHandler = p;};
   void SetCustomDecoderEmptyBufferDoneHandler(OMX_ERRORTYPE (*p)(OMX_HANDLETYPE, OMX_PTR, OMX_BUFFERHEADERTYPE*)){ CustomDecoderEmptyBufferDoneHandler = p;};
 
@@ -174,6 +175,7 @@ private:
 
   OMX_CALLBACKTYPE  m_callbacks;
 
+  // lcarlon: keep during merges.
   //additional event handlers
   OMX_ERRORTYPE (*CustomDecoderFillBufferDoneHandler)(OMX_HANDLETYPE, OMX_PTR, OMX_BUFFERHEADERTYPE*);
   OMX_ERRORTYPE (*CustomDecoderEmptyBufferDoneHandler)(OMX_HANDLETYPE, OMX_PTR, OMX_BUFFERHEADERTYPE*);
@@ -206,6 +208,7 @@ private:
   bool          m_flush_output;
   bool          m_resource_error;
 
+  // lcarlon: keep during merges.
   // lcarlon: this is needed as an hack.
   friend class COMXVideo;
 };

@@ -56,6 +56,40 @@ enum EDEINTERLACEMODE
 
 #define CLASSNAME "COMXVideo"
 
+class OMXVideoConfig
+{
+public:
+  COMXStreamInfo hints;
+  bool use_thread;
+  CRect dst_rect;
+  float display_aspect;
+  EDEINTERLACEMODE deinterlace;
+  OMX_IMAGEFILTERANAGLYPHTYPE anaglyph;
+  bool hdmi_clock_sync;
+  bool allow_mvc;
+  int alpha;
+  int display;
+  int layer;
+  float queue_size;
+  float fifo_size;
+
+  OMXVideoConfig()
+  {
+    use_thread = true;
+    dst_rect.SetRect(0, 0, 0, 0);
+    display_aspect = 0.0f;
+    deinterlace = VS_DEINTERLACEMODE_OFF;
+    anaglyph = OMX_ImageFilterAnaglyphNone;
+    hdmi_clock_sync = false;
+    allow_mvc = false;
+    alpha = 255;
+    display = 0;
+    layer = 0;
+    queue_size = 10.0f;
+    fifo_size = (float)80*1024*60 / (1024*1024);
+  }
+};
+
 class DllAvUtil;
 class DllAvFormat;
 class COMXVideo : public QObject
@@ -68,15 +102,7 @@ public:
   // Required overrides
   bool SendDecoderConfig();
   bool NaluFormatStartCodes(enum AVCodecID codec, uint8_t *in_extradata, int in_extrasize);
-  bool Open(COMXStreamInfo &hints,
-          OMXClock *clock,
-          float display_aspect = 0.0f,
-          EDEINTERLACEMODE deinterlace = VS_DEINTERLACEMODE_OFF,
-          OMX_IMAGEFILTERANAGLYPHTYPE anaglyph = OMX_ImageFilterAnaglyphNone,
-          bool hdmi_clock_sync = false,
-          int display = 0,
-          int layer = 0,
-          float fifo_size = 0.0f);
+  bool Open(OMXClock *clock, const OMXVideoConfig &config);
   bool PortSettingsChanged();
   void Close(void);
   unsigned int GetFreeSpace();
@@ -86,6 +112,7 @@ public:
   void SetDropState(bool bDrop);
   std::string GetDecoderName() { return m_video_codec_name; };
   void SetVideoRect(const CRect& SrcRect, const CRect& DestRect);
+  void SetAlpha(int alpha);
   bool SetVideoEGL();
   bool SetVideoEGLOutputPort();
   int GetInputBufferSize();
@@ -93,13 +120,9 @@ public:
   bool IsEOS();
   bool SubmittedEOS() { return m_submitted_eos; }
   bool BadState() { return m_omx_decoder.BadState(); };
-
 protected:
   // Video format
   bool              m_drop_state;
-  unsigned int      m_decoded_width;
-  unsigned int      m_decoded_height;
-  float             m_display_pixel_aspect;
 
   OMX_VIDEO_CODINGTYPE m_codingType;
 
@@ -118,15 +141,10 @@ protected:
 
   bool              m_setStartTime;
 
-  uint8_t           *m_extradata;
-  int               m_extrasize;
-
   std::string       m_video_codec_name;
 
   bool              m_deinterlace;
-  EDEINTERLACEMODE  m_deinterlace_request;
-  OMX_IMAGEFILTERANAGLYPHTYPE m_anaglyph;
-  bool              m_hdmi_clock_sync;
+  OMXVideoConfig    m_config;
 
   // lcarlon: modified members.
   OMX_EGLBufferProviderSh m_provider;
@@ -138,8 +156,6 @@ protected:
   OMX_DISPLAYTRANSFORMTYPE m_transform;
   bool              m_settings_changed;
   CCriticalSection  m_critSection;
-  int               m_display;
-  int               m_layer;
 };
 
 #endif

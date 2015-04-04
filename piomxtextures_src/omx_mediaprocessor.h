@@ -64,7 +64,8 @@ class AVPacket;
 class CRBP;
 class COMXCore;
 class COMXStreamInfo;
-
+class OMXVideoConfig;
+class OMXAudioConfig;
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor class
@@ -187,13 +188,9 @@ private:
 
     volatile long m_incr;
 
-    COMXStreamInfo* m_hints_audio;
-    COMXStreamInfo* m_hints_video;
+    OMXAudioConfig* m_audioConfig;
+    OMXVideoConfig* m_videoConfig;
 
-    float m_audio_fifo_size; // zero means use default
-    float m_video_fifo_size;
-    float m_audio_queue_size;
-    float m_video_queue_size;
     int m_playspeedCurrent;
     bool m_seekFlush;
     bool m_packetAfterSeek;

@@ -2,8 +2,8 @@
 
 #set -x
 
-OMXPLAYER_DBUS_ADDR="/tmp/omxplayerdbus"
-OMXPLAYER_DBUS_PID="/tmp/omxplayerdbus.pid"
+OMXPLAYER_DBUS_ADDR="/tmp/omxplayerdbus.${USER}"
+OMXPLAYER_DBUS_PID="/tmp/omxplayerdbus.${USER}.pid"
 export DBUS_SESSION_BUS_ADDRESS=`cat $OMXPLAYER_DBUS_ADDR`
 export DBUS_SESSION_BUS_PID=`cat $OMXPLAYER_DBUS_PID`
 
@@ -30,6 +30,13 @@ status)
 	echo "Paused: $paused"
 	;;
 
+volume)
+	volume=`dbus-send --print-reply=double --session --reply-timeout=500 --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.freedesktop.DBus.Properties.Volume ${2:+double:}$2`
+	[ $? -ne 0 ] && exit 1
+	volume="$(awk '{print $2}' <<< "$volume")"
+	echo "Volume: $volume"
+	;;
+
 pause)
 	dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.Action int32:16 >/dev/null
 	;;
@@ -44,6 +51,10 @@ seek)
 
 setposition)
 	dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.SetPosition objpath:/not/used int64:$2 >/dev/null
+	;;
+
+setalpha)
+	dbus-send --print-reply=literal --session --dest=org.mpris.MediaPlayer2.omxplayer /org/mpris/MediaPlayer2 org.mpris.MediaPlayer2.Player.SetAlpha objpath:/not/used int64:$2 >/dev/null
 	;;
 
 setvideopos)
@@ -79,7 +90,7 @@ showsubtitles)
 	;;
 
 *)
-	echo "usage: $0 status|pause|stop|seek|volumeup|volumedown|setposition [position in microseconds]|hidevideo|unhidevideo|togglesubtitles|hidesubtitles|showsubtitles|setvideopos [x1 y1 x2 y2]" >&2
+	echo "usage: $0 status|pause|stop|seek|volumeup|volumedown|setposition [position in microseconds]|hidevideo|unhidevideo|togglesubtitles|hidesubtitles|showsubtitles|setvideopos [x1 y1 x2 y2]|setalpha [alpha (0..255)]" >&2
 	exit 1
 	;;
 esac

@@ -73,19 +73,13 @@ extern "C" {
 #define DISPLAY_TEXT_SHORT(text) DISPLAY_TEXT(text, 1000)
 #define DISPLAY_TEXT_LONG(text) DISPLAY_TEXT(text, 2000)
 
-typedef enum {CONF_FLAGS_FORMAT_NONE, CONF_FLAGS_FORMAT_SBS, CONF_FLAGS_FORMAT_TB } FORMAT_3D_T;
+typedef enum {CONF_FLAGS_FORMAT_NONE, CONF_FLAGS_FORMAT_SBS, CONF_FLAGS_FORMAT_TB, CONF_FLAGS_FORMAT_FP } FORMAT_3D_T;
 enum PCMChannels  *m_pChannelMap        = NULL;
 volatile sig_atomic_t g_abort           = false;
-bool              m_passthrough         = false;
 long              m_Volume              = 0;
 long              m_Amplification       = 0;
-bool              m_Deinterlace         = false;
-bool              m_NoDeinterlace       = false;
 bool              m_NativeDeinterlace   = false;
-OMX_IMAGEFILTERANAGLYPHTYPE m_anaglyph  = OMX_ImageFilterAnaglyphNone;
 bool              m_HWDecode            = false;
-std::string       deviceString          = "";
-int               m_use_hw_audio        = false;
 bool              m_osd                 = true;
 bool              m_no_keys             = false;
 std::string       m_external_subtitles_path;
@@ -102,14 +96,12 @@ unsigned int      m_subtitle_lines      = 3;
 bool              m_Pause               = false;
 OMXReader         m_omx_reader;
 int               m_audio_index_use     = 0;
-bool              m_thread_player       = false;
 OMXClock          *m_av_clock           = NULL;
 OMXControl        m_omxcontrol;
 Keyboard          *m_keyboard           = NULL;
-COMXStreamInfo    m_hints_audio;
-COMXStreamInfo    m_hints_video;
+OMXAudioConfig    m_config_audio;
+OMXVideoConfig    m_config_video;
 OMXPacket         *m_omx_pkt            = NULL;
-bool              m_hdmi_clock_sync     = false;
 bool              m_no_hdmi_clock_sync  = false;
 bool              m_stop                = false;
 int               m_subtitle_index      = -1;
@@ -121,12 +113,8 @@ int               m_tv_show_info        = 0;
 bool              m_has_video           = false;
 bool              m_has_audio           = false;
 bool              m_has_subtitle        = false;
-float             m_display_aspect      = 0.0f;
-bool              m_boost_on_downmix    = true;
 bool              m_gen_log             = false;
 bool              m_loop                = false;
-int               m_layer               = 0;
-int               m_display             = 0;
 
 enum{ERROR=-1,SUCCESS,ONEBYTE};
 
@@ -360,6 +348,8 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
         score += 1<<18;
       if (is3d == CONF_FLAGS_FORMAT_TB  && !(tv->struct_3d_mask & HDMI_3D_STRUCT_TOP_AND_BOTTOM))
         score += 1<<18;
+      if (is3d == CONF_FLAGS_FORMAT_FP  && !(tv->struct_3d_mask & HDMI_3D_STRUCT_FRAME_PACKING))
+        score += 1<<18;
 
       // prefer square pixels modes
       float par = get_display_aspect_ratio((HDMI_ASPECT_T)tv->aspect_ratio)*(float)tv->height/(float)tv->width;
@@ -387,10 +377,14 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
     // if we are closer to ntsc version of framerate, let gpu know
     int ifps = (int)(fps+0.5f);
     bool ntsc_freq = fabs(fps*1001.0f/1000.0f - ifps) < fabs(fps-ifps);
-    vc_gencmd(response, sizeof response, "hdmi_ntsc_freqs %d", ntsc_freq);
+
+    /* inform TV of ntsc setting */
+    HDMI_PROPERTY_PARAM_T property;
+    property.property = HDMI_PROPERTY_PIXEL_CLOCK_TYPE;
+    property.param1 = ntsc_freq ? HDMI_PIXEL_CLOCK_TYPE_NTSC : HDMI_PIXEL_CLOCK_TYPE_PAL;
+    property.param2 = 0;
 
     /* inform TV of any 3D settings. Note this property just applies to next hdmi mode change, so no need to call for 2D modes */
-    HDMI_PROPERTY_PARAM_T property;
     property.property = HDMI_PROPERTY_3D_STRUCTURE;
     property.param1 = HDMI_3D_FORMAT_NONE;
     property.param2 = 0;
@@ -400,10 +394,13 @@ void SetVideoMode(int width, int height, int fpsrate, int fpsscale, FORMAT_3D_T 
         property.param1 = HDMI_3D_FORMAT_SBS_HALF;
       else if (is3d == CONF_FLAGS_FORMAT_TB && tv_found->struct_3d_mask & HDMI_3D_STRUCT_TOP_AND_BOTTOM)
         property.param1 = HDMI_3D_FORMAT_TB_HALF;
+      else if (is3d == CONF_FLAGS_FORMAT_FP && tv_found->struct_3d_mask & HDMI_3D_STRUCT_FRAME_PACKING)
+        property.param1 = HDMI_3D_FORMAT_FRAME_PACKING;
       m_BcmHost.vc_tv_hdmi_set_property(&property);
     }
 
-    printf("ntsc_freq:%d %s%s\n", ntsc_freq, property.param1 == HDMI_3D_FORMAT_SBS_HALF ? "3DSBS":"", property.param1 == HDMI_3D_FORMAT_TB_HALF ? "3DTB":"");
+    printf("ntsc_freq:%d %s\n", ntsc_freq, property.param1 == HDMI_3D_FORMAT_SBS_HALF ? "3DSBS" :
+            property.param1 == HDMI_3D_FORMAT_TB_HALF ? "3DTB" : property.param1 == HDMI_3D_FORMAT_FRAME_PACKING ? "3DFP":"");
     sem_t tv_synced;
     sem_init(&tv_synced, 0, 0);
     m_BcmHost.vc_tv_register_callback(CallbackTvServiceCallback, &tv_synced);
@@ -467,11 +464,11 @@ static void blank_background(bool enable)
   uint32_t vc_image_ptr;
   VC_IMAGE_TYPE_T type = VC_IMAGE_RGB565;
   uint16_t image = 0x0000; // black
-  int             layer = m_layer - 1;
+  int             layer = m_config_video.layer - 1;
 
   VC_RECT_T dst_rect, src_rect;
 
-  display = vc_dispmanx_display_open(m_display);
+  display = vc_dispmanx_display_open(m_config_video.display);
   assert(display);
 
   resource = vc_dispmanx_resource_create( type, 1 /*width*/, 1 /*height*/, &vc_image_ptr );
@@ -489,7 +486,7 @@ static void blank_background(bool enable)
   assert(update);
 
   element = vc_dispmanx_element_add(update, display, layer, &dst_rect, resource, &src_rect,
-                                    DISPMANX_PROTECTION_NONE, NULL, NULL, (DISPMANX_TRANSFORM_T)0 );
+                                    DISPMANX_PROTECTION_NONE, NULL, NULL, DISPMANX_STEREOSCOPIC_MONO );
   assert(element);
 
   ret = vc_dispmanx_update_submit_sync( update );
@@ -506,7 +503,7 @@ int main(int argc, char *argv[])
   bool                  m_send_eos            = false;
   bool                  m_packet_after_seek   = false;
   bool                  m_seek_flush          = false;
-  bool                  m_new_win_pos         = false;
+  bool                  m_chapter_seek        = false;
   std::string           m_filename;
   double                m_incr                = 0;
   double                m_loop_from           = 0;
@@ -518,19 +515,13 @@ int main(int argc, char *argv[])
   FORMAT_3D_T           m_3d                  = CONF_FLAGS_FORMAT_NONE;
   bool                  m_refresh             = false;
   double                startpts              = 0;
-  CRect                 DestRect              = {0,0,0,0};
+  CRect                 SrcRect               = {0,0,0,0};
   bool                  m_blank_background    = false;
   bool sentStarted = false;
-  float audio_fifo_size = 0.0; // zero means use default
-  float video_fifo_size = 0.0;
-  float audio_queue_size = 0.0;
-  float video_queue_size = 0.0;
   float m_threshold      = -1.0f; // amount of audio/video required to come out of buffering
   float m_timeout        = 10.0f; // amount of time file/network operation can stall for before timing out
   int m_orientation      = -1; // unset
   float m_fps            = 0.0f; // unset
-  bool m_live            = false; // set to true for live tv or vod for low buffering
-  enum PCMLayout m_layout = PCM_LAYOUT_2_0;
   TV_DISPLAY_STATE_T   tv_state;
   double last_seek_pos = 0;
   bool idle = false;
@@ -569,6 +560,7 @@ int main(int argc, char *argv[])
   const int anaglyph_opt    = 0x20d;
   const int native_deinterlace_opt = 0x20e;
   const int display_opt     = 0x20f;
+  const int alpha_opt       = 0x210;
   const int http_cookie_opt = 0x300;
   const int http_user_agent_opt = 0x301;
 
@@ -590,6 +582,7 @@ int main(int argc, char *argv[])
     { "anaglyph",     required_argument,  NULL,          anaglyph_opt },
     { "hw",           no_argument,        NULL,          'w' },
     { "3d",           required_argument,  NULL,          '3' },
+    { "allow-mvc",    no_argument,        NULL,          'M' },
     { "hdmiclocksync", no_argument,       NULL,          'y' },
     { "nohdmiclocksync", no_argument,     NULL,          'z' },
     { "refresh",      no_argument,        NULL,          'r' },
@@ -623,6 +616,7 @@ int main(int argc, char *argv[])
     { "dbus_name",    required_argument,  NULL,          dbus_name_opt },
     { "loop",         no_argument,        NULL,          loop_opt },
     { "layer",        required_argument,  NULL,          layer_opt },
+    { "alpha",        required_argument,  NULL,          alpha_opt },
     { "display",      required_argument,  NULL,          display_opt },
     { "cookie",       required_argument,  NULL,          http_cookie_opt },
     { "user-agent",   required_argument,  NULL,          http_user_agent_opt },
@@ -641,7 +635,7 @@ int main(int argc, char *argv[])
   //Build default keymap just in case the --key-config option isn't used
   map<int,int> keymap = KeyConfig::buildDefaultKeymap();
 
-  while ((c = getopt_long(argc, argv, "wiIhvkn:l:o:cslbpd3:yzt:rg", longopts, NULL)) != -1)
+  while ((c = getopt_long(argc, argv, "wiIhvkn:l:o:cslbpd3:Myzt:rg", longopts, NULL)) != -1)
   {
     switch (c) 
     {
@@ -652,53 +646,59 @@ int main(int argc, char *argv[])
         m_gen_log = true;
         break;
       case 'y':
-        m_hdmi_clock_sync = true;
+        m_config_video.hdmi_clock_sync = true;
         break;
       case 'z':
         m_no_hdmi_clock_sync = true;
         break;
       case '3':
         mode = optarg;
-        if(mode != "SBS" && mode != "TB")
+        if(mode != "SBS" && mode != "TB" && mode != "FP")
         {
           print_usage();
           return 0;
         }
         if(mode == "TB")
           m_3d = CONF_FLAGS_FORMAT_TB;
+        else if(mode == "FP")
+          m_3d = CONF_FLAGS_FORMAT_FP;
         else
           m_3d = CONF_FLAGS_FORMAT_SBS;
+        m_config_video.allow_mvc = true;
+        break;
+      case 'M':
+        m_config_video.allow_mvc = true;
         break;
       case 'd':
-        m_Deinterlace = true;
+        m_config_video.deinterlace = VS_DEINTERLACEMODE_FORCE;
         break;
       case no_deinterlace_opt:
-        m_NoDeinterlace = true;
+        m_config_video.deinterlace = VS_DEINTERLACEMODE_OFF;
         break;
       case native_deinterlace_opt:
-        m_NoDeinterlace = true;
+        m_config_video.deinterlace = VS_DEINTERLACEMODE_OFF;
         m_NativeDeinterlace = true;
         break;
       case anaglyph_opt:
-        m_anaglyph = (OMX_IMAGEFILTERANAGLYPHTYPE)atoi(optarg);
+        m_config_video.anaglyph = (OMX_IMAGEFILTERANAGLYPHTYPE)atoi(optarg);
         break;
       case 'w':
-        m_use_hw_audio = true;
+        m_config_audio.hwdecode = true;
         break;
       case 'p':
-        m_passthrough = true;
+        m_config_audio.passthrough = true;
         break;
       case 's':
         m_stats = true;
         break;
       case 'o':
-        deviceString = optarg;
-        if(deviceString != "local" && deviceString != "hdmi" && deviceString != "both")
+        m_config_audio.device = optarg;
+        if(m_config_audio.device != "local" && m_config_audio.device != "hdmi" && m_config_audio.device != "both")
         {
           print_usage();
           return 0;
         }
-        deviceString = "omx:" + deviceString;
+        m_config_audio.device = "omx:" + m_config_audio.device;
         break;
       case 'i':
         m_dump_format      = true;
@@ -766,8 +766,8 @@ int main(int argc, char *argv[])
         m_subtitle_lines = std::max(atoi(optarg), 1);
         break;
       case pos_opt:
-  sscanf(optarg, "%f %f %f %f", &DestRect.x1, &DestRect.y1, &DestRect.x2, &DestRect.y2) == 4 ||
-  sscanf(optarg, "%f,%f,%f,%f", &DestRect.x1, &DestRect.y1, &DestRect.x2, &DestRect.y2);
+        sscanf(optarg, "%f %f %f %f", &m_config_video.dst_rect.x1, &m_config_video.dst_rect.y1, &m_config_video.dst_rect.x2, &m_config_video.dst_rect.y2) == 4 ||
+        sscanf(optarg, "%f,%f,%f,%f", &m_config_video.dst_rect.x1, &m_config_video.dst_rect.y1, &m_config_video.dst_rect.x2, &m_config_video.dst_rect.y2);
         break;
       case vol_opt:
 	m_Volume = atoi(optarg);
@@ -776,25 +776,25 @@ int main(int argc, char *argv[])
 	m_Amplification = atoi(optarg);
         break;
       case boost_on_downmix_opt:
-        m_boost_on_downmix = true;
+        m_config_audio.boostOnDownmix = true;
         break;
       case no_boost_on_downmix_opt:
-        m_boost_on_downmix = false;
+        m_config_audio.boostOnDownmix = false;
         break;
       case audio_fifo_opt:
-  audio_fifo_size = atof(optarg);
+        m_config_audio.fifo_size = atof(optarg);
         break;
       case video_fifo_opt:
-  video_fifo_size = atof(optarg);
+        m_config_video.fifo_size = atof(optarg);
         break;
       case audio_queue_opt:
-  audio_queue_size = atof(optarg);
+        m_config_audio.queue_size = atof(optarg);
         break;
       case video_queue_opt:
-  video_queue_size = atof(optarg);
+        m_config_video.queue_size = atof(optarg);
         break;
       case threshold_opt:
-  m_threshold = atof(optarg);
+        m_threshold = atof(optarg);
         break;
       case timeout_opt:
         m_timeout = atof(optarg);
@@ -806,7 +806,7 @@ int main(int argc, char *argv[])
         m_fps = atof(optarg);
         break;
       case live_opt:
-        m_live = true;
+        m_config_audio.is_live = true;
         break;
       case layout_opt:
       {
@@ -815,7 +815,7 @@ int main(int argc, char *argv[])
         for (i=0; i<sizeof layouts/sizeof *layouts; i++)
           if (strcmp(optarg, layouts[i]) == 0)
           {
-            m_layout = (enum PCMLayout)i;
+            m_config_audio.layout = (enum PCMLayout)i;
             break;
           }
         if (i == sizeof layouts/sizeof *layouts)
@@ -840,10 +840,13 @@ int main(int argc, char *argv[])
         keymap = KeyConfig::parseConfigFile(optarg);
         break;
       case layer_opt:
-        m_layer = atoi(optarg);
+        m_config_video.layer = atoi(optarg);
+        break;
+      case alpha_opt:
+        m_config_video.alpha = atoi(optarg);
         break;
       case display_opt:
-        m_display = atoi(optarg);
+        m_config_video.display = atoi(optarg);
         break;
       case http_cookie_opt:
         m_cookie = optarg;
@@ -928,7 +931,7 @@ int main(int argc, char *argv[])
   const CStdString m_musicExtensions = ".nsv|.m4a|.flac|.aac|.strm|.pls|.rm|.rma|.mpa|.wav|.wma|.ogg|.mp3|.mp2|.m3u|.mod|.amf|.669|.dmf|.dsm|.far|.gdm|"
                  ".imf|.it|.m15|.med|.okt|.s3m|.stm|.sfx|.ult|.uni|.xm|.sid|.ac3|.dts|.cue|.aif|.aiff|.wpl|.ape|.mac|.mpc|.mp+|.mpp|.shn|.zip|.rar|"
                  ".wv|.nsf|.spc|.gym|.adx|.dsp|.adp|.ymf|.ast|.afc|.hps|.xsp|.xwav|.waa|.wvs|.wam|.gcm|.idsp|.mpdsp|.mss|.spt|.rsd|.mid|.kar|.sap|"
-                 ".cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt|.brstm|.wtv|.mka";
+                 ".cmc|.cmr|.dmc|.mpt|.mpd|.rmt|.tmc|.tm8|.tm2|.oga|.url|.pxml|.tta|.rss|.cm3|.cms|.dlt|.brstm|.mka";
   if (m_filename.find_last_of(".") != string::npos)
   {
     CStdString extension = m_filename.substr(m_filename.find_last_of("."));
@@ -970,9 +973,7 @@ int main(int argc, char *argv[])
     m_keyboard->setDbusName(m_dbus_name);
   }
 
-  m_thread_player = true;
-
-  if(!m_omx_reader.Open(m_filename.c_str(), m_dump_format, m_live, m_timeout, m_cookie.c_str(), m_user_agent.c_str()))
+  if(!m_omx_reader.Open(m_filename.c_str(), m_dump_format, m_config_audio.is_live, m_timeout, m_cookie.c_str(), m_user_agent.c_str()))
     goto do_exit;
 
   if (m_dump_format_exit)
@@ -1001,23 +1002,23 @@ int main(int argc, char *argv[])
 
   // you really don't want want to match refresh rate without hdmi clock sync
   if ((m_refresh || m_NativeDeinterlace) && !m_no_hdmi_clock_sync)
-    m_hdmi_clock_sync = true;
+    m_config_video.hdmi_clock_sync = true;
 
   if(!m_av_clock->OMXInitialize())
     goto do_exit;
 
-  if(m_hdmi_clock_sync && !m_av_clock->HDMIClockSync())
+  if(m_config_video.hdmi_clock_sync && !m_av_clock->HDMIClockSync())
     goto do_exit;
 
   m_av_clock->OMXStateIdle();
   m_av_clock->OMXStop();
   m_av_clock->OMXPause();
 
-  m_omx_reader.GetHints(OMXSTREAM_AUDIO, m_hints_audio);
-  m_omx_reader.GetHints(OMXSTREAM_VIDEO, m_hints_video);
+  m_omx_reader.GetHints(OMXSTREAM_AUDIO, m_config_audio.hints);
+  m_omx_reader.GetHints(OMXSTREAM_VIDEO, m_config_video.hints);
 
   if (m_fps > 0.0f)
-    m_hints_video.fpsrate = m_fps * DVD_TIME_BASE, m_hints_video.fpsscale = DVD_TIME_BASE;
+    m_config_video.hints.fpsrate = m_fps * DVD_TIME_BASE, m_config_video.hints.fpsscale = DVD_TIME_BASE;
 
   if(m_audio_index_use > 0)
     m_omx_reader.SetActiveStream(OMXSTREAM_AUDIO, m_audio_index_use-1);
@@ -1027,7 +1028,7 @@ int main(int argc, char *argv[])
     memset(&tv_state, 0, sizeof(TV_DISPLAY_STATE_T));
     m_BcmHost.vc_tv_get_display_state(&tv_state);
 
-    SetVideoMode(m_hints_video.width, m_hints_video.height, m_hints_video.fpsrate, m_hints_video.fpsscale, m_3d);
+    SetVideoMode(m_config_video.hints.width, m_config_video.hints.height, m_config_video.hints.fpsrate, m_config_video.hints.fpsscale, m_3d);
   }
   // get display aspect
   TV_DISPLAY_STATE_T current_tv_state;
@@ -1035,17 +1036,16 @@ int main(int argc, char *argv[])
   m_BcmHost.vc_tv_get_display_state(&current_tv_state);
   if(current_tv_state.state & ( VC_HDMI_HDMI | VC_HDMI_DVI )) {
     //HDMI or DVI on
-    m_display_aspect = get_display_aspect_ratio((HDMI_ASPECT_T)current_tv_state.display.hdmi.aspect_ratio);
+    m_config_video.display_aspect = get_display_aspect_ratio((HDMI_ASPECT_T)current_tv_state.display.hdmi.aspect_ratio);
   } else {
     //composite on
-    m_display_aspect = get_display_aspect_ratio((SDTV_ASPECT_T)current_tv_state.display.sdtv.display_options.aspect);
+    m_config_video.display_aspect = get_display_aspect_ratio((SDTV_ASPECT_T)current_tv_state.display.sdtv.display_options.aspect);
   }
-  m_display_aspect *= (float)current_tv_state.display.hdmi.height/(float)current_tv_state.display.hdmi.width;
+  m_config_video.display_aspect *= (float)current_tv_state.display.hdmi.height/(float)current_tv_state.display.hdmi.width;
 
   if (m_orientation >= 0)
-    m_hints_video.orientation = m_orientation;
-  if(m_has_video && !m_player_video.Open(m_hints_video, m_av_clock, DestRect, m_Deinterlace ? VS_DEINTERLACEMODE_FORCE:m_NoDeinterlace ? VS_DEINTERLACEMODE_OFF:VS_DEINTERLACEMODE_AUTO,
-                                         m_anaglyph, m_hdmi_clock_sync, m_thread_player, m_display_aspect, m_display, m_layer, video_queue_size, video_fifo_size))
+    m_config_video.hints.orientation = m_orientation;
+  if(m_has_video && !m_player_video.Open(m_av_clock, m_config_video))
     goto do_exit;
 
   if(m_has_subtitle || m_osd)
@@ -1066,7 +1066,7 @@ int main(int argc, char *argv[])
                                 m_centered,
                                 m_ghost_box,
                                 m_subtitle_lines,
-                                m_display, m_layer + 1,
+                                m_config_video.display, m_config_video.layer + 1,
                                 m_av_clock))
       goto do_exit;
   }
@@ -1087,26 +1087,24 @@ int main(int argc, char *argv[])
       m_player_subtitles.SetVisible(false);
   }
 
-  m_omx_reader.GetHints(OMXSTREAM_AUDIO, m_hints_audio);
+  m_omx_reader.GetHints(OMXSTREAM_AUDIO, m_config_audio.hints);
 
-  if (deviceString == "")
+  if (m_config_audio.device == "")
   {
     if (m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_ePCM, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) == 0)
-      deviceString = "omx:hdmi";
+      m_config_audio.device = "omx:hdmi";
     else
-      deviceString = "omx:local";
+      m_config_audio.device = "omx:local";
   }
 
-  if ((m_hints_audio.codec == CODEC_ID_AC3 || m_hints_audio.codec == CODEC_ID_EAC3) &&
+  if ((m_config_audio.hints.codec == CODEC_ID_AC3 || m_config_audio.hints.codec == CODEC_ID_EAC3) &&
       m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eAC3, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
-    m_passthrough = false;
-  if (m_hints_audio.codec == CODEC_ID_DTS &&
+    m_config_audio.passthrough = false;
+  if (m_config_audio.hints.codec == CODEC_ID_DTS &&
       m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eDTS, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
-    m_passthrough = false;
+    m_config_audio.passthrough = false;
 
-  if(m_has_audio && !m_player_audio.Open(m_hints_audio, m_av_clock, &m_omx_reader, deviceString, 
-                                         m_passthrough, m_use_hw_audio,
-                                         m_boost_on_downmix, m_thread_player, m_live, m_layout, audio_queue_size, audio_fifo_size))
+  if(m_has_audio && !m_player_audio.Open(m_av_clock, m_config_audio, &m_omx_reader))
     goto do_exit;
 
   if(m_has_audio)
@@ -1117,7 +1115,7 @@ int main(int argc, char *argv[])
   }
 
   if (m_threshold < 0.0f)
-    m_threshold = m_live ? 0.7f : 0.2f;
+    m_threshold = m_config_audio.is_live ? 0.7f : 0.2f;
 
   PrintSubtitleInfo();
 
@@ -1241,7 +1239,7 @@ int main(int argc, char *argv[])
           DISPLAY_TEXT_LONG(strprintf("Chapter %d", m_omx_reader.GetChapter()));
           FlushStreams(startpts);
           m_seek_flush = true;
-          m_new_win_pos = true;
+          m_chapter_seek = true;
         }
         else
         {
@@ -1255,7 +1253,7 @@ int main(int argc, char *argv[])
           DISPLAY_TEXT_LONG(strprintf("Chapter %d", m_omx_reader.GetChapter()));
           FlushStreams(startpts);
           m_seek_flush = true;
-          m_new_win_pos = true;
+          m_chapter_seek = true;
         }
         else
         {
@@ -1376,6 +1374,9 @@ int main(int argc, char *argv[])
           oldPos = m_av_clock->OMXMediaTime()*1e-6;
           m_incr = newPos - oldPos;
           break;
+      case KeyConfig::ACTION_SET_ALPHA:
+          m_player_video.SetAlpha(result.getArg());
+          break;
       case KeyConfig::ACTION_PAUSE:
         m_Pause = !m_Pause;
         if (m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_NORMAL && m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_PAUSE)
@@ -1407,30 +1408,16 @@ int main(int argc, char *argv[])
         }
         break;
       case KeyConfig::ACTION_MOVE_VIDEO:
-        sscanf(result.getWinArg(), "%f %f %f %f", &DestRect.x1, &DestRect.y1, &DestRect.x2, &DestRect.y2);
-        m_has_video = true;
-        m_new_win_pos = true;
-        m_seek_flush = true;
+        sscanf(result.getWinArg(), "%f %f %f %f", &m_config_video.dst_rect.x1, &m_config_video.dst_rect.y1, &m_config_video.dst_rect.x2, &m_config_video.dst_rect.y2);
+        m_player_video.SetVideoRect(SrcRect,m_config_video.dst_rect);
         break;
       case KeyConfig::ACTION_HIDE_VIDEO:
-        m_has_video = false;
-        m_player_video.Close();
-        if (m_live)
-        {
-          m_omx_reader.Close();
-          idle = true;
-        }
+        // set alpha to minimum
+        m_player_video.SetAlpha(0);
         break;
       case KeyConfig::ACTION_UNHIDE_VIDEO:
-        m_has_video = true;
-        if (m_live)
-        {
-          idle = false;
-          if(!m_omx_reader.Open(m_filename.c_str(), m_dump_format, true))
-            goto do_exit;
-        }
-        m_new_win_pos = true;
-        m_seek_flush = true;
+        // set alpha to maximum
+        m_player_video.SetAlpha(255);
         break;
       case KeyConfig::ACTION_DECREASE_VOLUME:
         m_Volume -= 300;
@@ -1465,7 +1452,7 @@ int main(int argc, char *argv[])
       if(m_has_subtitle)
         m_player_subtitles.Pause();
 
-      if (!m_new_win_pos)
+      if (!m_chapter_seek)
       {
         pts = m_av_clock->OMXMediaTime();
 
@@ -1478,7 +1465,6 @@ int main(int argc, char *argv[])
         {
           unsigned t = (unsigned)(startpts*1e-6);
           auto dur = m_omx_reader.GetStreamLength() / 1000;
-
           DISPLAY_TEXT_LONG(strprintf("Seek\n%02d:%02d:%02d / %02d:%02d:%02d",
               (t/3600), (t/60)%60, t%60, (dur/3600), (dur/60)%60, dur%60));
           printf("Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
@@ -1486,15 +1472,13 @@ int main(int argc, char *argv[])
         }
       }
 
-      m_player_video.Close();
-
       sentStarted = false;
 
       if (m_omx_reader.IsEof())
         goto do_exit;
 
-      if(m_has_video && !m_player_video.Open(m_hints_video, m_av_clock, DestRect, m_Deinterlace ? VS_DEINTERLACEMODE_FORCE:m_NoDeinterlace ? VS_DEINTERLACEMODE_OFF:VS_DEINTERLACEMODE_AUTO,
-                                         m_anaglyph, m_hdmi_clock_sync, m_thread_player, m_display_aspect, m_display, m_layer, video_queue_size, video_fifo_size))
+      // Quick reset to reduce delay during loop & seek.
+      if (m_has_video && !m_player_video.Reset())
         goto do_exit;
 
       CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
@@ -1505,7 +1489,6 @@ int main(int argc, char *argv[])
         m_player_subtitles.Resume();
       m_packet_after_seek = false;
       m_seek_flush = false;
-      m_new_win_pos= false;
       m_incr = 0;
     }
     else if(m_packet_after_seek && TRICKPLAY(m_av_clock->OMXPlaySpeed()))
@@ -1610,7 +1593,7 @@ int main(int argc, char *argv[])
         m_player_audio.GetLevel(), m_player_video.GetLevel(), m_player_audio.GetDelay(), (float)m_player_audio.GetCacheTotal());
 
       // keep latency under control by adjusting clock (and so resampling audio)
-      if (m_live)
+      if (m_config_audio.is_live)
       {
         float latency = DVD_NOPTS_VALUE;
         if (m_has_audio && audio_pts != DVD_NOPTS_VALUE)
@@ -1796,5 +1779,9 @@ do_exit:
   g_RBP.Deinitialize();
 
   printf("have a nice day ;)\n");
+
+  // normal exit status on user quit or playback end
+  if (m_stop || m_send_eos)
+    return 0;
   return 1;
 }

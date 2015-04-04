@@ -44,6 +44,8 @@
 #include "omxplayer_lib/OMXPlayerSubtitles.h"
 #include "omxplayer_lib/OMXStreamInfo.h"
 #include "omxplayer_lib/DllOMX.h"
+#include "omxplayer_lib/OMXVideo.h"
+#include "omxplayer_lib/OMXAudio.h"
 
 #define ENABLE_HDMI_CLOCK_SYNC false
 #define FONT_PATH              "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
@@ -100,12 +102,8 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
    m_subtitle_index(0),
    m_audio_index(0),
    m_incr(0),
-   m_hints_audio(new COMXStreamInfo),
-   m_hints_video(new COMXStreamInfo),
-   m_audio_fifo_size(0.0f), // zero means use default
-   m_video_fifo_size(0.0f),
-   m_audio_queue_size(0.0f),
-   m_video_queue_size(0.0f),
+   m_audioConfig(new OMXAudioConfig()),
+   m_videoConfig(new OMXVideoConfig()),
    m_playspeedCurrent(playspeed_normal),
    m_seekFlush(false),
    m_packetAfterSeek(false),
@@ -163,8 +161,8 @@ OMX_MediaProcessor::~OMX_MediaProcessor()
    m_RBP->Deinitialize();
 
    LOG_VERBOSE(LOG_TAG, "Freeing hints...");
-   delete m_hints_audio;
-   delete m_hints_video;
+   delete m_audioConfig;
+   delete m_videoConfig;
 
    LOG_VERBOSE(LOG_TAG, "Freeing OpenMAX structures...");
    delete m_RBP;
@@ -275,11 +273,11 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
    m_av_clock->OMXStop();
    m_av_clock->OMXPause();
 
-   m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
-   m_omx_reader->GetHints(OMXSTREAM_VIDEO, *m_hints_video);
+   m_omx_reader->GetHints(OMXSTREAM_AUDIO, m_audioConfig->hints);
+   m_omx_reader->GetHints(OMXSTREAM_VIDEO, m_videoConfig->hints);
 
    if (m_fps > 0.0f)
-       m_hints_video->fpsrate = m_fps * DVD_TIME_BASE, m_hints_video->fpsscale = DVD_TIME_BASE;
+       m_videoConfig->hints.fpsrate = m_fps * DVD_TIME_BASE, m_videoConfig->hints.fpsscale = DVD_TIME_BASE;
 
    // Set audio stream to use.
    // TODO: Implement a way to change it runtime.
@@ -297,18 +295,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 
    if (m_has_video) {
       LOG_VERBOSE(LOG_TAG, "Opening video using OMX...");
-      if (!m_player_video->Open(
-             *m_hints_video,
-             m_av_clock,
-             VS_DEINTERLACEMODE_OFF, /* deinterlace */
-             OMX_ImageFilterAnaglyphNone,
-             ENABLE_HDMI_CLOCK_SYNC,
-             true,                   /* threaded */
-             1.0,                    /* display aspect, unused */
-             0,                      /* display */
-             0,                      /* layer */
-             m_video_queue_size, m_video_fifo_size
-             ))
+      if (!m_player_video->Open(m_av_clock, *m_videoConfig))
          return false;
    }
 
@@ -333,7 +320,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
       m_subtitle_index = m_omx_reader->SubtitleStreamCount() - 1;
 #endif
 
-   m_omx_reader->GetHints(OMXSTREAM_AUDIO, *m_hints_audio);
+   m_omx_reader->GetHints(OMXSTREAM_AUDIO, m_audioConfig->hints);
 
 #if 0
    if ((m_hints_audio.codec == CODEC_ID_AC3 || m_hints_audio.codec == CODEC_ID_EAC3) &&
@@ -347,19 +334,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 
    LOG_VERBOSE(LOG_TAG, "Opening audio using OMX...");
    if (m_has_audio) {
-      if (!m_player_audio->Open(
-             *m_hints_audio,
-             m_av_clock,
-             m_omx_reader,
-             "omx:hdmi",         /* TODO: implement way to change */
-             false,              /* TODO: passthrough */
-             false,              /* TODO: hw decode */
-             false,              /* TODO: downmix boost */
-             true,               /* threaded */
-             false,              /* is_live */
-             PCM_LAYOUT_2_0,
-             m_audio_queue_size, m_audio_fifo_size
-             ))
+      if (!m_player_audio->Open(m_av_clock, *m_audioConfig, m_omx_reader))
          return false;
       if (m_has_audio)
           m_player_audio->SetVolume(pow(10, 0 / 2000.0));
@@ -684,24 +659,12 @@ void OMX_MediaProcessor::mediaDecoding()
             flushStreams(startpts);
          }
 
-         m_player_video->Close();
          sentStarted = false;
 
          if (m_omx_reader->IsEof())
             break;
 
-         if (m_has_video && !m_player_video->Open(
-                *m_hints_video,
-                m_av_clock,
-                VS_DEINTERLACEMODE_OFF, /* deinterlace */
-                OMX_ImageFilterAnaglyphNone,
-                ENABLE_HDMI_CLOCK_SYNC,
-                true,                   /* threaded */
-                1.0,                    /* display aspect, unused */
-                0,                      /* display */
-                0,                      /* layer */
-                m_video_queue_size, m_video_fifo_size
-                )) {
+         if (m_has_video && !m_player_video->Reset()) {
             m_incr = 0;
             break;
          }
@@ -710,6 +673,8 @@ void OMX_MediaProcessor::mediaDecoding()
 
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
          m_av_clock->OMXPause();
+#else
+         m_av_clock->OMXResume();
 #endif
 
 #ifdef ENABLE_SUBTITLES
