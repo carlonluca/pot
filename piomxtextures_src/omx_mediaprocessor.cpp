@@ -540,8 +540,6 @@ bool OMX_MediaProcessor::seek(qint64 position)
 +-----------------------------------------------------------------------------*/
 qint64 OMX_MediaProcessor::streamPosition()
 {
-   // FIXME: OMXMediaTime seems to lock.
-   return 0;
    if (!m_av_clock)
       return -1;
    return m_av_clock->OMXMediaTime(false)*1E-3;
