@@ -331,8 +331,21 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
       m_passthrough = false;
 #endif
 
+   // Read the output location.
+   QByteArray a = qgetenv("AUDIO_OUT");
+   if (a.isNull())
+      m_audioConfig->device = "omx:hdmi";
+   else if (a == QByteArray("hdmi"))
+      m_audioConfig->device = "omx:hdmi";
+   else if (a == QByteArray("local"))
+      m_audioConfig->device = "omx:local";
+   else if (a == QByteArray("both"))
+      m_audioConfig->device = "omx:both";
+   else
+      m_audioConfig->device = "omx:hdmi";
 
-   LOG_VERBOSE(LOG_TAG, "Opening audio using OMX...");
+   log_verbose("Opening audio using OMX...");
+   log_verbose("Using %s output device...", m_audioConfig->device.c_str());
    if (m_has_audio) {
       if (!m_player_audio->Open(m_av_clock, *m_audioConfig, m_omx_reader))
          return false;
