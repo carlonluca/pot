@@ -47,7 +47,7 @@ enum POC_Mode {
 /*------------------------------------------------------------------------------
 |    show_local_media
 +-----------------------------------------------------------------------------*/
-bool show_local_media(QQuickView* view, QStringList mediaList)
+bool show_media(QQuickView* view, QStringList mediaList)
 {
 	for (int i = 0; i < mediaList.size(); i++)
 		if (!QFile(mediaList[i]).exists())
@@ -62,17 +62,11 @@ bool show_local_media(QQuickView* view, QStringList mediaList)
 /*------------------------------------------------------------------------------
 |    show_local_media
 +-----------------------------------------------------------------------------*/
-bool show_local_media(QQuickView* view, QString fileAbsPath)
+bool show_media(QQuickView* view, QString fileUri)
 {
-	QFile f(fileAbsPath);
-	if (!f.exists()) {
-		log_warn("File provided does not exist.");
-		return false;
-	}
-
 	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
 	QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
-	QMetaObject::invokeMethod(mediaOutput, "showLocalMedia", Q_ARG(QVariant, fileAbsPath));
+   QMetaObject::invokeMethod(mediaOutput, "showUrlMedia", Q_ARG(QVariant, fileUri));
 
 	return true;
 }
@@ -97,6 +91,15 @@ int main(int argc, char* argv[])
 	POC_QMLUtils qmlUtils;
 
 	QQuickView view;
+
+   // Set EGL to 24bit color depth.
+   QSurfaceFormat curSurface = view.format();
+   curSurface.setRedBufferSize(8);
+   curSurface.setGreenBufferSize(8);
+   curSurface.setBlueBufferSize(8);
+   curSurface.setAlphaBufferSize(0);
+   view.setFormat(curSurface);
+
 	view.engine()->rootContext()->setContextProperty("utils", &qmlUtils);
 	switch (currentMode) {
 	case MODE_ANIMATIONS:
@@ -131,13 +134,13 @@ int main(int argc, char* argv[])
 			list << args.at(i);
 		if (list.size() < 1)
 			return log_warn("No items to play.");
-		if (!show_local_media(&view, list))
+      if (!show_media(&view, list))
 			return 1;
 		break;
 	}
 	default:
       if (args.size() > 1)
-         if (!show_local_media(&view, args.at(1)))
+         if (!show_media(&view, args.at(1)))
 				return 1;
 		break;
 	}

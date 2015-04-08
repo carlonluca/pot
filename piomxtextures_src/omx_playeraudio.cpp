@@ -55,10 +55,10 @@ OMX_PlayerAudio::~OMX_PlayerAudio()
 +-----------------------------------------------------------------------------*/
 void OMX_PlayerAudio::SetMuted(bool mute)
 {
-       m_mute = mute;
+	m_mute = mute;
 
-       if (m_decoder)
-	       m_decoder->SetMute(m_mute);
+	if (m_decoder)
+		m_decoder->SetMute(m_mute);
 }
 
 /*------------------------------------------------------------------------------
@@ -66,7 +66,7 @@ void OMX_PlayerAudio::SetMuted(bool mute)
 +-----------------------------------------------------------------------------*/
 bool OMX_PlayerAudio::GetMuted()
 {
-       return m_mute;
+	return m_mute;
 }
 
 /*------------------------------------------------------------------------------
@@ -77,7 +77,7 @@ bool OMX_PlayerAudio::GetMuted()
  * @param volume Volume in mB or percentage [0, 100].
  * @param linear
  */
-void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
+void OMX_PlayerAudio::SetCurrentVolume(double volume, bool linear)
 {
    if (!linear) {
       OMXPlayerAudio::SetVolume(volume);
@@ -103,25 +103,32 @@ void OMX_PlayerAudio::SetCurrentVolume(long volume, bool linear)
    OMX_S32 mbMax = omxVolume.sVolume.nMax;
    OMX_S32 mbMin = omxVolume.sVolume.nMin;
 #else
-   OMX_S32 mbMax = 2;
-   OMX_S32 mbMin = -6;
+#define MAX 1000
+#define MIN -3000
 #endif
 
-   double expMin   = exp(mbMin);
-   double expMax   = exp(mbMax);
-   double mbVolume = log((double)volume/100*(expMax - expMin) + expMin);
-   LOG_VERBOSE(LOG_TAG, "Setting volume to %fmB.", mbVolume);
+	//double expMin   = exp(mbMin);
+	//double expMax   = exp(mbMax);
+	//double mbVolume = log((double)volume/100*(expMax - expMin) + expMin);
+	double mbVolume = volume/100.0f*(MAX - MIN) + MIN;
+	LOG_VERBOSE(LOG_TAG, "Setting volume to %fmB.", mbVolume);
 
    // omxplayer expects millibels here.
-   OMXPlayerAudio::SetVolume(mbVolume*1000);
+	OMXPlayerAudio::SetVolume(pow(10, mbVolume/2000.0f));
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_PlayerAudio::GetCurrentVolume
 +-----------------------------------------------------------------------------*/
-long OMX_PlayerAudio::GetCurrentVolume(bool linear)
+double OMX_PlayerAudio::GetCurrentVolume(bool linear)
 {
-   return 0;
+	if (!linear)
+		return OMXPlayerAudio::GetVolume();
+
+	const float mbVol = OMXPlayerAudio::GetVolume();
+	const double vol = (log10(mbVol)*2000.0f - MIN)*100.0f/(MAX - MIN);
+
+	return (long)vol;
 
 #if 0
    long mbVol = OMXPlayerAudio::GetCurrentVolume();

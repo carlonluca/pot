@@ -202,6 +202,12 @@ POC_ControlBar {
             text: qsTr("Volume Down")
         }
 
+		  CheckBox {
+			  text: qsTr("Mute")
+			  checked: mediaPlayer.muted
+			  onCheckedChanged: mediaPlayer.muted = !mediaPlayer.muted
+		  }
+
         // Handle the escape key to exit volume "mode".
         Keys.onPressed: {
             if (event.key === Qt.Key_Escape) {

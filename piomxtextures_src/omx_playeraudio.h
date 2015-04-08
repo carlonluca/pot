@@ -39,8 +39,8 @@ public:
    OMX_PlayerAudio();
    virtual ~OMX_PlayerAudio();
 
-   void SetCurrentVolume(long volume, bool linear);
-   long GetCurrentVolume(bool linear);
+	void SetCurrentVolume(double volume, bool linear);
+	double GetCurrentVolume(bool linear);
 
    void SetMuted(bool mute);
    bool GetMuted();

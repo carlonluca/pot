@@ -53,7 +53,7 @@ Item {
       * Determines the type of media and plays it using the passed path.
       */
     function showLocalMedia(mediaPath) {
-        var mediaUri = "file://" + mediaPath;
+		  var mediaUri = "file://" + mediaPath;
         showUrlMedia(mediaUri);
     }
 

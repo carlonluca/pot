@@ -234,7 +234,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 
    m_omx_reader = new OMX_Reader;
    if (!m_omx_reader->Open(filename.toStdString(), true)) {
-      LOG_ERROR(LOG_TAG, "Failed to open source.");
+      log_err("Failed to open source %s.", qPrintable(filename));
       return false;
    }
 
@@ -566,7 +566,7 @@ long OMX_MediaProcessor::volume(bool linear)
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::setMute(bool muted)
 {
-       m_player_audio->SetMuted(muted);
+   m_player_audio->SetMuted(muted);
 }
 
 /*------------------------------------------------------------------------------
@@ -574,7 +574,7 @@ void OMX_MediaProcessor::setMute(bool muted)
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::muted()
 {
-       return m_player_audio->GetMuted();
+   return m_player_audio->GetMuted();
 }
 
 /*------------------------------------------------------------------------------

@@ -301,15 +301,15 @@ void OpenMAXILPlayerControl::setMedia(const QMediaContent& content, QIODevice* s
    Q_UNUSED(stream);
 
    log_debug_func;
-   log_debug("Media: %s.", qPrintable(content.canonicalUrl().path()));
+   log_debug("Media: %s.", qPrintable(content.canonicalUrl().toString()));
    log_debug("setMedia thread is: 0x%x.", ((unsigned int)QThread::currentThread()));
 
    log_verbose("Deferring setMedia()...");
-   QUrl url = content.canonicalUrl();
+   /*QUrl url = content.canonicalUrl();
    if (url.isLocalFile() && !QFile(url.path()).exists()) {
       log_warn("Does not exist!");
       return;
-   }
+   }*/
 
    PlayerCommandSetMedia* setMedia = new PlayerCommandSetMedia;
    setMedia->m_playerCommandType = PLAYER_COMMAND_TYPE_SET_MEDIA;
@@ -483,9 +483,8 @@ void OpenMAXILPlayerControl::setPosition(qint64 position)
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setVolume(int volume)
 {
-   log_debug_func;
-
-   // TODO: Implement.
+	log_debug("Setting volume to: %d.", volume);
+	m_mediaProcessor->setVolume(volume, true);
 }
 
 /*------------------------------------------------------------------------------
@@ -506,8 +505,7 @@ int OpenMAXILPlayerControl::volume() const
 {
    log_debug_func;
 
-   // TODO: Implement.
-   return 0;
+	return m_mediaProcessor->volume(true);
 }
 
 /*------------------------------------------------------------------------------
