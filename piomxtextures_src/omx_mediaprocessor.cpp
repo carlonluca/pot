@@ -90,6 +90,9 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 #ifdef ENABLE_SUBTITLES
    m_has_subtitle(false),
 #endif
+	m_av_clock(NULL),
+	m_player_video(NULL),
+	m_player_audio(NULL),
    m_omx_reader(NULL),
    m_omx_pkt(NULL),
    m_RBP(new CRBP),
@@ -109,6 +112,7 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
    m_packetAfterSeek(false),
    startpts(0),
    m_loop(false),
+	m_muted(false),
    m_loop_from(0.0f),
    m_fps(0.0f)
 {
@@ -252,6 +256,9 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 #ifdef ENABLE_SUBTITLES
    m_player_subtitles = new OMXPlayerSubtitles;
 #endif
+
+	// Set the mute property according to current state.
+	m_player_audio->SetMuted(m_muted);
 
    m_filename = filename;
 
@@ -566,7 +573,10 @@ long OMX_MediaProcessor::volume(bool linear)
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::setMute(bool muted)
 {
-   m_player_audio->SetMuted(muted);
+	m_muted = muted;
+
+	if (m_player_audio)
+		m_player_audio->SetMuted(muted);
 }
 
 /*------------------------------------------------------------------------------
@@ -574,7 +584,7 @@ void OMX_MediaProcessor::setMute(bool muted)
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::muted()
 {
-   return m_player_audio->GetMuted();
+	return m_muted;
 }
 
 /*------------------------------------------------------------------------------

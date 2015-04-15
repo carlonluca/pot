@@ -178,7 +178,7 @@ private:
 #endif
     bool m_buffer_empty;
     bool m_pendingStop;
-    bool m_pendingPause;
+	 bool m_pendingPause;
 
     int m_subtitle_index;
     int m_audio_index;
@@ -199,6 +199,7 @@ private:
     QVariantMap m_metadata;
 
     bool m_loop;
+	 bool m_muted;
     double m_loop_from;
     float m_fps;
 };

@@ -66,7 +66,7 @@ bool show_media(QQuickView* view, QString fileUri)
 {
 	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
 	QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
-   QMetaObject::invokeMethod(mediaOutput, "showUrlMedia", Q_ARG(QVariant, fileUri));
+	QMetaObject::invokeMethod(mediaOutput, "showUrlMedia", Q_ARG(QVariant, fileUri));
 
 	return true;
 }
@@ -92,13 +92,13 @@ int main(int argc, char* argv[])
 
 	QQuickView view;
 
-   // Set EGL to 24bit color depth.
-   QSurfaceFormat curSurface = view.format();
-   curSurface.setRedBufferSize(8);
-   curSurface.setGreenBufferSize(8);
-   curSurface.setBlueBufferSize(8);
-   curSurface.setAlphaBufferSize(0);
-   view.setFormat(curSurface);
+	// Set EGL to 24bit color depth.
+	QSurfaceFormat curSurface = view.format();
+	curSurface.setRedBufferSize(8);
+	curSurface.setGreenBufferSize(8);
+	curSurface.setBlueBufferSize(8);
+	curSurface.setAlphaBufferSize(0);
+	view.setFormat(curSurface);
 
 	view.engine()->rootContext()->setContextProperty("utils", &qmlUtils);
 	switch (currentMode) {
