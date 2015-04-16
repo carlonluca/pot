@@ -40,6 +40,7 @@
 
 #include <omx_mediaprocessor.h>
 #include <omx_textureprovider.h>
+#include <omx_utils.h>
 
 QT_BEGIN_NAMESPACE
 
@@ -57,7 +58,6 @@ enum PlayerCommandType {
    PLAYER_COMMAND_TYPE_STOP,
    PLAYER_COMMAND_TYPE_FREE_TEXTURE_DATA
 };
-
 
 /*------------------------------------------------------------------------------
 |    PlayerCommand class

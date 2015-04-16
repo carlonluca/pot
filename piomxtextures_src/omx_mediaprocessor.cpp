@@ -32,10 +32,12 @@
 #include <cstring>
 
 #include "lc_logging.h"
+
 #include "omx_mediaprocessor.h"
 #include "omx_textureprovider.h"
 #include "omx_playeraudio.h"
 #include "omx_reader.h"
+#include "omx_utils.h"
 
 // omxplayer lib.
 #include "omxplayer_lib/linux/RBP.h"
@@ -526,6 +528,8 @@ bool OMX_MediaProcessor::pause()
 bool OMX_MediaProcessor::seek(qint64 position)
 {
    LOG_VERBOSE(LOG_TAG, "Seek %lldms.", position);
+	if (!m_av_clock)
+		return false;
 
    // Get current position in ms.
    qint64 current  = m_av_clock->OMXMediaTime(false)*1E-3;
@@ -575,7 +579,7 @@ void OMX_MediaProcessor::setMute(bool muted)
 {
 	m_muted = muted;
 
-	if (m_player_audio)
+	if (LIKELY(m_player_audio != NULL))
 		m_player_audio->SetMuted(muted);
 }
 
@@ -704,7 +708,7 @@ void OMX_MediaProcessor::mediaDecoding()
 #endif
 
          unsigned t = (unsigned)(startpts*1e-6);
-         LOG_VERBOSE(LOG_TAG, "Seeked to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
+			LOG_VERBOSE(LOG_TAG, "Seeked to: %02d:%02d:%02d", (t/3600), (t/60)%60, t%60);
          m_packetAfterSeek = false;
          m_seekFlush       = false;
       }
@@ -717,7 +721,7 @@ void OMX_MediaProcessor::mediaDecoding()
 
          seek_pos *= 1000.0;
 
-#if 1
+#if 0
          if (m_omx_reader->SeekTime((int)seek_pos, m_av_clock->OMXPlaySpeed() < 0, &startpts))
          {
             ; //FlushStreams(DVD_NOPTS_VALUE);
@@ -725,10 +729,6 @@ void OMX_MediaProcessor::mediaDecoding()
 #endif // 0
 
          CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
-
-         //unsigned t = (unsigned)(startpts*1e-6);
-         unsigned t = (unsigned)(pts*1e-6);
-         printf("Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
          m_packetAfterSeek = false;
       }
 

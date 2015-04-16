@@ -41,7 +41,8 @@
 enum POC_Mode {
 	MODE_PLAYER,
 	MODE_LOOP,
-	MODE_ANIMATIONS
+	MODE_ANIMATIONS,
+	MODE_SEEK
 };
 
 /*------------------------------------------------------------------------------
@@ -64,6 +65,8 @@ bool show_media(QQuickView* view, QStringList mediaList)
 +-----------------------------------------------------------------------------*/
 bool show_media(QQuickView* view, QString fileUri)
 {
+	log_info("Showing media: %s.", qPrintable(fileUri));
+
 	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
 	QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
 	QMetaObject::invokeMethod(mediaOutput, "showUrlMedia", Q_ARG(QVariant, fileUri));
@@ -85,6 +88,8 @@ int main(int argc, char* argv[])
 		currentMode = MODE_ANIMATIONS;
 	else if (args.contains("--loop"))
 		currentMode = MODE_LOOP;
+	else if (args.contains("--seektest"))
+		currentMode = MODE_SEEK;
 	else
 		currentMode = MODE_PLAYER;
 
@@ -107,6 +112,9 @@ int main(int argc, char* argv[])
 		break;
 	case MODE_LOOP:
 		view.setSource(QUrl("qrc:///qml/main_loop.qml"));
+		break;
+	case MODE_SEEK:
+		view.setSource(QUrl(QStringLiteral("qrc:///qml/main_seektest.qml")));
 		break;
 	default:
 		view.setSource(QUrl("qrc:///qml/main.qml"));
@@ -139,8 +147,8 @@ int main(int argc, char* argv[])
 		break;
 	}
 	default:
-      if (args.size() > 1)
-         if (!show_media(&view, args.at(1)))
+		if (args.size() > 2)
+			if (!show_media(&view, args.at(2)))
 				return 1;
 		break;
 	}

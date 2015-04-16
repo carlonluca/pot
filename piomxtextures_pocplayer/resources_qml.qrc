@@ -22,5 +22,6 @@
         <file>qml/POC_CrossImage.qml</file>
         <file>qml/main_loop.qml</file>
         <file>qml/POC_VideoOutputSurface.qml</file>
+        <file>qml/main_seektest.qml</file>
     </qresource>
 </RCC>

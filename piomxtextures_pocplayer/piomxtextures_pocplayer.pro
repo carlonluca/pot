@@ -60,3 +60,6 @@ OTHER_FILES += qml/main.qml \
     qml/main_loop.qml \
     qml/POC_CrossImage.qml \
     qml/POC_VideoOutputSurface.qml
+
+DISTFILES += \
+    qml/main_seektest.qml
