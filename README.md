@@ -11,3 +11,5 @@ In tools/POCPlayer there is a sample player used to test the backend.
 
 For more information on the project refer to http://goo.gl/KphzdD.<br/>
 For some build instructions: http://goo.gl/9TZPxn.
+
+For a demo: https://www.youtube.com/watch?v=SeJxQN-W2uA.
