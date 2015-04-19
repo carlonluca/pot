@@ -159,13 +159,13 @@ private:
 
     QMutex m_sendCmd;
 
-    OMXClock*           m_av_clock;
-    OMXPlayerVideo*     m_player_video;
-    OMX_PlayerAudio*    m_player_audio;
+	 OMXClock*           m_av_clock;
+	 OMXPlayerVideo*     m_player_video;
+	 OMX_PlayerAudio*    m_player_audio;
 #ifdef ENABLE_SUBTITLES
     OMXPlayerSubtitles* m_player_subtitles;
 #endif
-    OMX_Reader*         m_omx_reader;
+	 OMX_Reader*         m_omx_reader;
     OMXPacket*          m_omx_pkt;
 
     CRBP*     m_RBP;

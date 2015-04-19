@@ -173,8 +173,6 @@ void OpenMAXILPlayerControl::pauseInt()
 void OpenMAXILPlayerControl::stop()
 {
    log_debug_func;
-
-   assert(m_mediaProcessor);
    m_mediaProcessor->stop();
 }
 
@@ -183,10 +181,7 @@ void OpenMAXILPlayerControl::stop()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::stopInt()
 {
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
-
-   // Can be done in any thread.
-   assert(m_mediaProcessor); 
+	log_debug_func;
    m_mediaProcessor->stop();
 }
 

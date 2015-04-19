@@ -146,6 +146,11 @@ int main(int argc, char* argv[])
 			return 1;
 		break;
 	}
+	case MODE_PLAYER:
+		if (args.size() > 1)
+			if (!show_media(&view, args.at(1)))
+				return 1;
+		break;
 	default:
 		if (args.size() > 2)
 			if (!show_media(&view, args.at(2)))

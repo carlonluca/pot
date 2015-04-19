@@ -234,7 +234,8 @@ HEADERS  += \
     $$SRC/omx_textureprovider.h \
     $$SRC/omx_playeraudio.h \
     $$SRC/omx_reader.h \
-    $$SRC/ilclient/*
+    $$SRC/ilclient/* \
+    $$SRC/omx_utils.h
 
 HEADERS += \
     $$SRC/omxplayer_lib/Unicode.h \

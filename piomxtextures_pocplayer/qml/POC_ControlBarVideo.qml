@@ -91,7 +91,7 @@ POC_ControlBar {
             id: buttonStop
             Layout.alignment: Qt.AlignVCenter | Qt.AlignHCenter
             text: "Stop"
-            onClicked: controlBar.parent.source.stop();
+				onClicked: (videoOutputSurface.source).stop();
 
             KeyNavigation.right: buttonVolume
             KeyNavigation.down:  buttonVolume

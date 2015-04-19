@@ -92,10 +92,10 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 #ifdef ENABLE_SUBTITLES
    m_has_subtitle(false),
 #endif
-	m_av_clock(NULL),
-	m_player_video(NULL),
-	m_player_audio(NULL),
-   m_omx_reader(NULL),
+	m_av_clock(new OMXClock),
+	m_player_video(new OMXPlayerVideo(provider)),
+	m_player_audio(new OMX_PlayerAudio),
+	m_omx_reader(new OMX_Reader),
    m_omx_pkt(NULL),
    m_RBP(new CRBP),
    m_OMX(new COMXCore),
@@ -238,7 +238,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
    if (url.isLocalFile() && filename.startsWith("file://"))
       filename = url.path();
 
-   m_omx_reader = new OMX_Reader;
+	//m_omx_reader = new OMX_Reader;
    if (!m_omx_reader->Open(filename.toStdString(), true)) {
       log_err("Failed to open source %s.", qPrintable(filename));
       return false;
@@ -252,12 +252,12 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
    emit metadataChanged(m_metadata);
 
    // Players.
-   m_av_clock         = new OMXClock;
-   m_player_video     = new OMXPlayerVideo(m_provider);
-   m_player_audio     = new OMX_PlayerAudio;
-#ifdef ENABLE_SUBTITLES
-   m_player_subtitles = new OMXPlayerSubtitles;
-#endif
+	//m_av_clock         = new OMXClock;
+	//m_player_video     = new OMXPlayerVideo(m_provider);
+	//m_player_audio     = new OMX_PlayerAudio;
+//#ifdef ENABLE_SUBTITLES
+//   m_player_subtitles = new OMXPlayerSubtitles;
+//#endif
 
 	// Set the mute property according to current state.
 	m_player_audio->SetMuted(m_muted);
@@ -390,13 +390,12 @@ bool OMX_MediaProcessor::play()
       return true;
    case STATE_STOPPED: {
       OMX_TextureData* d = NULL;
-      if (!m_av_clock)
-         if (!setFilenameInt(m_filename, d))
-            return false;
+		if (!setFilenameInt(m_filename, d))
+			return false;
 
       setState(STATE_PLAYING);
 
-#if 1
+#if 0
       if (!m_omx_reader->SeekTime(0, true, &startpts)) {
          LOG_WARNING(LOG_TAG, "Failed to seek to the beginning.");
          return false;
@@ -1056,8 +1055,8 @@ void OMX_MediaProcessor::cleanup()
 
    if (m_omx_reader) {
       m_omx_reader->Close();
-      delete m_omx_reader;
-      m_omx_reader = NULL;
+		//delete m_omx_reader;
+		//m_omx_reader = NULL;
    }
 
    m_metadata.clear();
@@ -1065,8 +1064,8 @@ void OMX_MediaProcessor::cleanup()
 
    if (m_av_clock) {
       m_av_clock->OMXDeinitialize();
-      delete m_av_clock;
-      m_av_clock = NULL;
+		//delete m_av_clock;
+		//m_av_clock = NULL;
    }
 
    vc_tv_show_info(0);
@@ -1080,18 +1079,18 @@ void OMX_MediaProcessor::cleanup()
    LOG_VERBOSE(LOG_TAG, "Freeing texture...");
    //m_provider->free();
 
-#ifdef ENABLE_SUBTITLES
-   delete m_player_subtitles;
-   m_player_subtitles = NULL;
-#endif
+//#ifdef ENABLE_SUBTITLES
+//   delete m_player_subtitles;
+//   m_player_subtitles = NULL;
+//#endif
 
-   delete m_player_audio;
-   delete m_player_video;
-   delete m_av_clock;
+	//delete m_player_audio;
+	//delete m_player_video;
+	//delete m_av_clock;
 
-   m_player_audio = NULL;
-   m_player_video = NULL;
-   m_av_clock = NULL;
+	//m_player_audio = NULL;
+	//m_player_video = NULL;
+	//m_av_clock = NULL;
 
    LOG_INFORMATION(LOG_TAG, "Cleanup done.");
 }
