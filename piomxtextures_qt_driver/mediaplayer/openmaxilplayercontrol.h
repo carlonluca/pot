@@ -39,9 +39,11 @@
 
 #include <limits.h>
 
+#include <openmaxilvideorenderercontrol.h>
+
 #include <omx_mediaprocessor.h>
 #include <omx_textureprovider.h>
-#include <omx_utils.h>
+#include <omx_globals.h>
 
 QT_BEGIN_NAMESPACE
 
@@ -53,170 +55,96 @@ class QMediaPlaylistNavigator;
 class QSocketNotifier;
 class OpenMAXILVideoRendererControl;
 
-enum PlayerCommandType {
-   PLAYER_COMMAND_TYPE_SET_MEDIA,
-   PLAYER_COMMAND_TYPE_PLAY,
-   PLAYER_COMMAND_TYPE_PAUSE,
-   PLAYER_COMMAND_TYPE_STOP,
-   PLAYER_COMMAND_TYPE_FREE_TEXTURE_DATA
-};
-
-/*------------------------------------------------------------------------------
-|    PlayerCommand class
-+-----------------------------------------------------------------------------*/
-struct PlayerCommand
-{
-   virtual ~PlayerCommand() {}
-
-   PlayerCommandType m_playerCommandType;
-};
-
-/*------------------------------------------------------------------------------
-|    PlayerCommandSetMedia class
-+-----------------------------------------------------------------------------*/
-struct PlayerCommandSetMedia : public PlayerCommand
-{
-   virtual ~PlayerCommandSetMedia() {}
-
-   QMediaContent m_mediaContent;
-};
-
-/*------------------------------------------------------------------------------
-|    PlayerCommandPlay class
-+-----------------------------------------------------------------------------*/
-struct PlayerCommandPlay : public PlayerCommand
-{
-   virtual ~PlayerCommandPlay() {}
-
-   QSize m_mediaSize;
-};
-
-/*------------------------------------------------------------------------------
-|    PlayerCommandPause class
-+-----------------------------------------------------------------------------*/
-struct PlayerCommandPause : public PlayerCommand
-{
-   virtual ~PlayerCommandPause() {}
-};
-
-/*------------------------------------------------------------------------------
-|    PlayerCommandStop class
-+-----------------------------------------------------------------------------*/
-struct PlayerCommandStop : public PlayerCommand
-{
-   virtual ~PlayerCommandStop() {}
-};
-
-/*------------------------------------------------------------------------------
-|    PlayerCommandStop class
-+-----------------------------------------------------------------------------*/
-struct PlayerCommandFreeTextureData : public PlayerCommand
-{
-   virtual ~PlayerCommandFreeTextureData() {}
-
-   OMX_TextureData* m_textureData;
-};
-
 /*------------------------------------------------------------------------------
 |    OpenMAXILPlayerControl class
 +-----------------------------------------------------------------------------*/
 class OpenMAXILPlayerControl : public QMediaPlayerControl
 {
-    Q_OBJECT
+   Q_OBJECT
 public:
-    OpenMAXILPlayerControl(QObject* parent = 0);
-    ~OpenMAXILPlayerControl();
+   OpenMAXILPlayerControl(QObject* parent = 0);
+   ~OpenMAXILPlayerControl();
 
-    void setMediaPlayer(QMediaPlayer* mediaPlayer);
-    QMediaPlayer::State state() const;
-    QMediaPlayer::MediaStatus mediaStatus() const;
+   void setMediaPlayer(QMediaPlayer* mediaPlayer);
+   QMediaPlayer::State state() const;
+   QMediaPlayer::MediaStatus mediaStatus() const;
 
-    qint64 position() const;
-    qint64 duration() const;
+   qint64 position() const;
+   qint64 duration() const;
 
-    int bufferStatus() const;
+   int bufferStatus() const;
 
-    int volume() const;
-    bool isMuted() const;
+   int volume() const;
+   bool isMuted() const;
 
-    bool isAudioAvailable() const;
-    bool isVideoAvailable() const;
+   bool isAudioAvailable() const;
+   bool isVideoAvailable() const;
 
-    bool isSeekable() const;
-    QMediaTimeRange availablePlaybackRanges() const;
+   bool isSeekable() const;
+   QMediaTimeRange availablePlaybackRanges() const;
 
-    qreal playbackRate() const;
-    void setPlaybackRate(qreal rate);
+   qreal playbackRate() const;
+   void setPlaybackRate(qreal rate);
 
-    QMediaContent media() const;
-    const QIODevice* mediaStream() const;
+   QMediaContent media() const;
+   const QIODevice* mediaStream() const;
 
-    void setMedia(const QMediaContent&, QIODevice*);
-    void setMediaInt(const QMediaContent& mediaContent);
+   void setMedia(const QMediaContent&, QIODevice*);
 
-    QVariantMap getMetaData();
-    OMX_MediaProcessor* getMediaProcessor() {
-       return m_mediaProcessor;
-    }
+   QVariantMap getMetaData();
+   OMX_MediaProcessor* getMediaProcessor() {
+      return m_mediaProcessor;
+   }
 
-    void setVideoRenderer(OpenMAXILVideoRendererControl* renderer) {
-       m_renderer = renderer;
-    }
+   void setVideoRenderer(OpenMAXILVideoRendererControl* renderer) {
+      m_renderer = renderer;
+      m_renderer->connect(m_texProvider.get(), SIGNAL(frameReady()),
+                          SLOT(onUpdateTriggered()), Qt::UniqueConnection);
+   }
 
-    void requestUpdate() {
-       if (LIKELY(m_quickItem != NULL))
-          m_quickItem->update();
-    }
+   void requestUpdate() {
+      if (LIKELY(m_quickItem != NULL))
+         m_quickItem->update();
+   }
 
 public Q_SLOTS:
-    void setPosition(qint64 pos);
+   void setPosition(qint64 pos);
 
-    void play();
-    void pause();
-    void stop();
+   void play();
+   void pause();
+   void stop();
 
-    void setVolume(int volume);
-    void setMuted(bool muted);
-
-    void onSceneGraphInitialized();
-    void onAfterRendering();
+   void setVolume(int volume);
+   void setMuted(bool muted);
 
 signals:
-    void metaDataChanged(const QVariantMap metaData);
+   void metaDataChanged(const QVariantMap metaData);
 
 private slots:
-    void onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
-    void onItemSceneChanged();
-    void playInt();
-    void pauseInt();
-    void stopInt();
+   void onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
+   void onItemSceneChanged();
 
 private:
-    void appendCommand(PlayerCommand* command);
-    void processCommands();
-    QMediaPlayer::State convertState(OMX_MediaProcessor::OMX_MediaProcessorState state) const;
+   QMediaPlayer::State convertState(OMX_MediaProcessor::OMX_MediaProcessorState state) const;
 
-    bool m_ownStream;
-    QMediaPlayer::MediaStatus m_mediaStatus;
-    QStack<QMediaPlayer::State> m_stateStack;
-    QStack<QMediaPlayer::MediaStatus> m_mediaStatusStack;
+   bool m_ownStream;
+   QMediaPlayer::MediaStatus m_mediaStatus;
+   QStack<QMediaPlayer::State> m_stateStack;
+   QStack<QMediaPlayer::MediaStatus> m_mediaStatusStack;
 
-    bool m_seekToStartPending;
-    qint64 m_pendingSeekPosition;
-    QMediaContent m_currentResource;
+   bool m_seekToStartPending;
+   qint64 m_pendingSeekPosition;
+   QMediaContent m_currentResource;
 
-    OMX_TextureProvider* m_texProvider;
-    OMX_MediaProcessor*  m_mediaProcessor;
-    OMX_TextureData*     m_textureData;
+   OMX_EGLBufferProviderSh m_texProvider;
+   OMX_MediaProcessor*     m_mediaProcessor;
 
-    QList<PlayerCommand*> m_pendingCommands;
-    QMutex                m_pendingCommandsMutex;
-    bool                  m_sceneGraphInitialized;
+   bool                  m_sceneGraphInitialized;
 
-    QMediaPlayer* m_mediaPlayer;
-    QQuickItem*   m_quickItem;
+   QMediaPlayer* m_mediaPlayer;
+   QQuickItem*   m_quickItem;
 
-    OpenMAXILVideoRendererControl* m_renderer;
+   OpenMAXILVideoRendererControl* m_renderer;
 };
 
 /*------------------------------------------------------------------------------

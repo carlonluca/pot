@@ -54,12 +54,15 @@ enum POC_Mode {
 +-----------------------------------------------------------------------------*/
 bool show_media(QQuickView* view, QStringList mediaList)
 {
-	for (int i = 0; i < mediaList.size(); i++)
+   QStringList uriList;
+   for (int i = 0; i < mediaList.size(); i++) {
 		if (!QFile(mediaList[i]).exists())
 			return log_warn("File %s does not exist.", qPrintable(mediaList[i]));
+      uriList.append(QUrl::fromUserInput(mediaList[i]).toString());
+   }
 
 	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
-	QMetaObject::invokeMethod(rootObject, "showLocalMedia", Q_ARG(QVariant, mediaList));
+   QMetaObject::invokeMethod(rootObject, "showLocalMedia", Q_ARG(QVariant, uriList));
 
 	return true;
 }
@@ -67,13 +70,14 @@ bool show_media(QQuickView* view, QStringList mediaList)
 /*------------------------------------------------------------------------------
 |    show_local_media
 +-----------------------------------------------------------------------------*/
-bool show_media(QQuickView* view, QString fileUri)
+bool show_media(QQuickView* view, QString mediaLocation)
 {
-	log_info("Showing media: %s.", qPrintable(fileUri));
+   log_info("Showing media: %s.", qPrintable(mediaLocation));
+   QUrl uri = QUrl::fromUserInput(mediaLocation);
 
 	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
 	QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
-	QMetaObject::invokeMethod(mediaOutput, "showUrlMedia", Q_ARG(QVariant, fileUri));
+   QMetaObject::invokeMethod(mediaOutput, "showUrlMedia", Q_ARG(QVariant, uri.toString()));
 
 	return true;
 }
@@ -83,6 +87,7 @@ bool show_media(QQuickView* view, QString fileUri)
 +---------------------------------------------------------------------*/
 int main(int argc, char* argv[])
 {
+	QGuiApplication::setAttribute(Qt::AA_ShareOpenGLContexts, true);
 	QGuiApplication app(argc, argv);
 
 	// Utility.

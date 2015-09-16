@@ -32,7 +32,13 @@
 /*------------------------------------------------------------------------------
 |    definitions
 +-----------------------------------------------------------------------------*/
+#define LIKELY(x)       __builtin_expect((x), 1)
+#define UNLIKELY(x)     __builtin_expect((x), 0)
+
 EGLDisplay get_egl_display();
-EGLContext get_egl_context();
+EGLContext get_global_egl_context();
+
+const char* get_egl_errstr(EGLint err);
+const char* get_egl_errstr();
 
 #endif // OMX_GLOBALS_H

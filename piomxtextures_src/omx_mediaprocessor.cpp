@@ -28,8 +28,10 @@
 #include <QOpenGLContext>
 #include <QElapsedTimer>
 #include <QUrl>
+#include <QtConcurrent/QtConcurrent>
 
 #include <cstring>
+#include <mutex>
 
 #include "lc_logging.h"
 
@@ -37,7 +39,7 @@
 #include "omx_textureprovider.h"
 #include "omx_playeraudio.h"
 #include "omx_reader.h"
-#include "omx_utils.h"
+#include "omx_globals.h"
 
 // omxplayer lib.
 #include "omxplayer_lib/linux/RBP.h"
@@ -48,6 +50,8 @@
 #include "omxplayer_lib/DllOMX.h"
 #include "omxplayer_lib/OMXVideo.h"
 #include "omxplayer_lib/OMXAudio.h"
+
+using namespace QtConcurrent;
 
 #define ENABLE_HDMI_CLOCK_SYNC false
 #define FONT_PATH              "/usr/share/fonts/truetype/freefont/FreeSans.ttf"
@@ -71,6 +75,16 @@ playspeed_slow_max = 7, playspeed_rew_max = 8,
 playspeed_rew_min = 13, playspeed_normal = 14,
 playspeed_ff_min = 15, playspeed_ff_max = 19;
 
+const char* OMX_MediaProcessor::STATE_STR[] = {
+	"STATE_STOPPED",
+	"STATE_INACTIVE",
+	"STATE_PAUSED",
+	"STATE_PLAYING"
+};
+
+#define INVOKE(...) \
+   QMetaObject::invokeMethod(this, __VA_ARGS__)
+
 /*------------------------------------------------------------------------------
 |    get_mem_gpu
 +-----------------------------------------------------------------------------*/
@@ -83,12 +97,27 @@ static int get_mem_gpu(void)
    return gpu_mem;
 }
 
+std::once_flag flag1;
+
+/*------------------------------------------------------------------------------
+|    print_build_once
++-----------------------------------------------------------------------------*/
+static void print_build_once()
+{
+   std::call_once(flag1, []() {
+      log_info("POT build %s %s.", __DATE__, __TIME__);
+   });
+}
+
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::OMX_MediaProcessor
 +-----------------------------------------------------------------------------*/
 OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
+   QObject(),
    m_provider(provider),
+   m_thread(new OMX_QThread),
    m_state(STATE_INACTIVE),
+   m_sendCmd(QMutex::Recursive),
 #ifdef ENABLE_SUBTITLES
    m_has_subtitle(false),
 #endif
@@ -118,11 +147,15 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
    m_loop_from(0.0f),
    m_fps(0.0f)
 {
-   qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorError>("OMX_MediaProcessor::OMX_MediaProcessorError");
-   qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorState>("OMX_MediaProcessor::OMX_MediaProcessorState");
+   print_build_once();
 
-   int gpu_mem = get_mem_gpu();
-   int min_gpu_mem = 64;
+	qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorError>(
+				"OMX_MediaProcessor::OMX_MediaProcessorError");
+	qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorState>(
+				"OMX_MediaProcessor::OMX_MediaProcessorState");
+
+   const int gpu_mem = get_mem_gpu();
+   const int min_gpu_mem = 256;
    if (gpu_mem > 0 && gpu_mem < min_gpu_mem)
       LOG_WARNING(LOG_TAG, "Only %dM of gpu_mem is configured. Try running"
                   " \"sudo raspi-config\" and ensure that \"memory_split\" has "
@@ -131,9 +164,34 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
    m_RBP->Initialize();
    m_OMX->Initialize();
 
-   // Move to a new thread.
-   moveToThread(&m_thread);
-   m_thread.start();
+   // Set the pool to have exactly one thread. One pool for each media processor.
+   m_tpool.setMaxThreadCount(1);
+
+   // Change thread affinity.
+   moveToThread(m_thread);
+   m_thread->start();
+
+   INVOKE("init");
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::init
++-----------------------------------------------------------------------------*/
+void OMX_MediaProcessor::init()
+{
+   log_info("Initializing GPU context in media processor...");
+   if (!checkCurrentThread(Q_FUNC_INFO))
+      return;
+   m_provider->init();
+
+   connect(this, SIGNAL(destroyed(QObject*)),
+           m_provider.get(), SLOT(free()));
+   connect(this, SIGNAL(destroyed(QObject*)),
+           m_provider.get(), SLOT(deinit()));
+   connect(this, SIGNAL(destroyed(QObject*)),
+           m_thread, SLOT(quit()));
+   connect(m_thread, SIGNAL(finished()),
+           m_thread, SLOT(deleteLater()));
 }
 
 /*------------------------------------------------------------------------------
@@ -141,40 +199,9 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 +-----------------------------------------------------------------------------*/
 OMX_MediaProcessor::~OMX_MediaProcessor()
 {
-   stop();
+   log_dtor_func;
 
-   LOG_VERBOSE(LOG_TAG, "Waiting for thread to die...");
-   m_thread.quit();
-   m_thread.wait();
-
-   // TODO: Fix this! When freeing players, a lock seems to hang!
-   LOG_VERBOSE(LOG_TAG, "Freeing players...");
-#ifdef ENABLE_SUBTITLES
-   delete m_player_subtitles;
-#endif
-   delete m_player_audio;
-   delete m_player_video;
-
-   LOG_VERBOSE(LOG_TAG, "Freeing clock...");
-   if (m_av_clock) {
-      m_av_clock->OMXDeinitialize();
-      delete m_av_clock;
-   }
-
-   // TODO: This should really be done, but still it seems to sefault sometimes.
-   LOG_VERBOSE(LOG_TAG, "Deinitializing hardware libs...");
-   m_OMX->Deinitialize();
-   m_RBP->Deinitialize();
-
-   LOG_VERBOSE(LOG_TAG, "Freeing hints...");
-   delete m_audioConfig;
-   delete m_videoConfig;
-
-   LOG_VERBOSE(LOG_TAG, "Freeing OpenMAX structures...");
-   delete m_RBP;
-   delete m_OMX;
-   delete m_omx_pkt;
-   delete m_omx_reader;
+   cleanup();
 }
 
 /*------------------------------------------------------------------------------
@@ -197,38 +224,35 @@ QStringList OMX_MediaProcessor::streams()
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::setFilename
 +-----------------------------------------------------------------------------*/
-/**
- * @brief OMX_MediaProcessor::setFilename Sets the filename and returns the texture
- * data that will be used.
- * @param filename
- * @param textureData
- * @return
- */
-bool OMX_MediaProcessor::setFilename(QString filename, OMX_TextureData*& textureData)
+bool OMX_MediaProcessor::setFilename(QString filename)
 {
-   QMutexLocker locker(&m_sendCmd);
-   if (!checkCurrentThread())
-      return false;
-   return setFilenameInt(filename, textureData);
+   return INVOKE("setFilenameInt", Q_ARG(QString, filename));
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::setFilenameInt
 +-----------------------------------------------------------------------------*/
-inline
-bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& textureData)
+bool OMX_MediaProcessor::setFilenameInt(QString filename)
 {
    log_verbose_func;
+   if (!checkCurrentThread(Q_FUNC_INFO))
+      return false;
+
+   QMutexLocker locker(&m_sendCmd);
+   if (m_filename == filename)
+      return true;
 
    switch (m_state) {
    case STATE_INACTIVE:
       break;
    case STATE_STOPPED:
-      cleanup();
+      closeAll();
       break;
    case STATE_PAUSED:
    case STATE_PLAYING:
-      return false; // TODO: Reimplement.
+      stopInt();
+      closeAll();
+      break;
    }
 
    LOG_VERBOSE(LOG_TAG, "Opening %s...", qPrintable(filename));
@@ -273,6 +297,7 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
    m_has_subtitle  = m_omx_reader->SubtitleStreamCount();
 #endif
    m_loop          = m_loop && m_omx_reader->CanSeek();
+   m_incr          = 0;
 
    LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
    if (!m_av_clock->OMXInitialize())
@@ -370,20 +395,17 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 }
 
 /*------------------------------------------------------------------------------
-|    OMX_MediaProcessor::play
+|    OMX_MediaProcessor::playInt
 +-----------------------------------------------------------------------------*/
-bool OMX_MediaProcessor::play()
+bool OMX_MediaProcessor::playInt()
 {
    // I need to invoke this in another thread (this object is owned by another
    // thread).
-   LOG_VERBOSE(LOG_TAG, "Play");
-   QMutexLocker locker(&m_sendCmd);
-   if (!checkCurrentThread())
+   log_verbose_func;
+   if (!checkCurrentThread(Q_FUNC_INFO))
       return false;
 
-   LOG_VERBOSE(LOG_TAG, "Cleaning textures...");
-   m_provider->cleanTextures();
-
+   QMutexLocker locker(&m_sendCmd);
    switch (m_state) {
    case STATE_INACTIVE:
       return false;
@@ -392,31 +414,14 @@ bool OMX_MediaProcessor::play()
    case STATE_PLAYING:
       return true;
    case STATE_STOPPED: {
-      OMX_TextureData* d = NULL;
-		if (!setFilenameInt(m_filename, d))
-			return false;
-
       setState(STATE_PLAYING);
 
-#if 0
-      if (!m_omx_reader->SeekTime(0, true, &startpts)) {
-         LOG_WARNING(LOG_TAG, "Failed to seek to the beginning.");
-         return false;
-      }
-
-      // This can't be done here otherwise artifacts are shown at the beginning
-      // of the video.
-      //flushStreams(startpts);
-#endif
-
-      //m_av_clock->OMXStart(0.0);
       m_av_clock->OMXPause();
       m_av_clock->OMXStateExecute();
       m_av_clock->OMXResume();
-      //m_av_clock->OMXMediaTime(0.0D);
 
       LOG_VERBOSE(LOG_TAG, "Starting thread.");
-      return QMetaObject::invokeMethod(this, "mediaDecoding");
+      QtConcurrent::run(&m_tpool, this, &OMX_MediaProcessor::mediaDecoding);
    }
    default:
       return false;
@@ -443,14 +448,29 @@ bool OMX_MediaProcessor::play()
 }
 
 /*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::play
++-----------------------------------------------------------------------------*/
+bool OMX_MediaProcessor::play()
+{
+   return INVOKE("playInt");
+}
+
+/*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::stop
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::stop()
 {
-   log_verbose("Stop");
+   return INVOKE("stopInt");
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::stopInt
++-----------------------------------------------------------------------------*/
+bool OMX_MediaProcessor::stopInt()
+{
+   log_verbose_func;
+
    QMutexLocker locker(&m_sendCmd);
-   if (!checkCurrentThread())
-      return false;
 
    switch (m_state) {
    case STATE_INACTIVE:
@@ -465,7 +485,6 @@ bool OMX_MediaProcessor::stop()
    }
 
    m_pendingStop = true;
-   setState(STATE_STOPPED);
 
    // Wait for command completion.
    m_mutexPending.lock();
@@ -475,8 +494,8 @@ bool OMX_MediaProcessor::stop()
    }
    m_mutexPending.unlock();
 
-   m_provider->cleanTextures();
-   cleanup();
+   setState(STATE_STOPPED);
+   //cleanup();
 
    LOG_INFORMATION(LOG_TAG, "Stop command issued.");
    return true;
@@ -487,11 +506,17 @@ bool OMX_MediaProcessor::stop()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::pause()
 {
-   LOG_VERBOSE(LOG_TAG, "Pause");
-   QMutexLocker locker(&m_sendCmd);
-   if (!checkCurrentThread())
-      return false;
+   return INVOKE("pauseInt");
+}
 
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::pauseInt
++-----------------------------------------------------------------------------*/
+bool OMX_MediaProcessor::pauseInt()
+{
+   log_debug_func;
+
+   QMutexLocker locker(&m_sendCmd);
    switch (m_state) {
    case STATE_INACTIVE:
    case STATE_STOPPED:
@@ -520,6 +545,7 @@ bool OMX_MediaProcessor::pause()
       m_waitPendingCommand.wait(&m_mutexPending);
    }
    m_mutexPending.unlock();
+
    LOG_INFORMATION(LOG_TAG, "Pause command issued.");
    return true;
 }
@@ -855,10 +881,6 @@ void OMX_MediaProcessor::mediaDecoding()
             OMXClock::OMXSleep(10);
             continue;
          }
-         if (m_loop) {
-            m_incr = m_loop_from - (m_av_clock->OMXMediaTime() ? m_av_clock->OMXMediaTime() / DVD_TIME_BASE : last_seek_pos);
-            continue;
-         }
 
          if (!sendEos && m_has_video)
             m_player_video->SubmitEOS();
@@ -868,6 +890,12 @@ void OMX_MediaProcessor::mediaDecoding()
          if ((m_has_video && !m_player_video->IsEOS()) ||
              (m_has_audio && !m_player_audio->IsEOS()) ) {
             OMXClock::OMXSleep(10);
+            continue;
+         }
+
+         if (m_loop)
+         {
+            m_incr = m_loop_from - (m_av_clock->OMXMediaTime() ? m_av_clock->OMXMediaTime() / DVD_TIME_BASE : last_seek_pos);
             continue;
          }
 
@@ -920,7 +948,8 @@ void OMX_MediaProcessor::mediaDecoding()
    m_av_clock->OMXStop();
    m_av_clock->OMXStateIdle();
 
-   cleanup();
+   //cleanup();
+   m_incr = m_loop_from - (m_av_clock->OMXMediaTime() ? m_av_clock->OMXMediaTime() / DVD_TIME_BASE : last_seek_pos);
 
    setState(STATE_STOPPED);
    emit playbackCompleted();
@@ -986,13 +1015,13 @@ void OMX_MediaProcessor::flushStreams(double pts)
 /*------------------------------------------------------------------------------
 |    OMX_VideoProcessor::checkCurrentThread
 +-----------------------------------------------------------------------------*/
-inline
-bool OMX_MediaProcessor::checkCurrentThread()
+inline bool OMX_MediaProcessor::checkCurrentThread(const char* ms)
 {
-   if (QThread::currentThreadId() == m_thread.getThreadId()) {
-      LOG_ERROR(LOG_TAG, "Do not invoke in the object's thread!");
+   if (QThread::currentThreadId() != m_thread->getThreadId()) {
+      log_err("Method %s should be invoked in media processor thread!", ms);
       return false;
    }
+
    return true;
 }
 
@@ -1017,7 +1046,7 @@ void OMX_MediaProcessor::convertMetaData()
 /*------------------------------------------------------------------------------
 |    OMX_VideoProcessor::cleanup
 +-----------------------------------------------------------------------------*/
-void OMX_MediaProcessor::cleanup()
+void OMX_MediaProcessor::closeAll()
 {
    LOG_INFORMATION(LOG_TAG, "Cleaning up...");
 
@@ -1056,46 +1085,61 @@ void OMX_MediaProcessor::cleanup()
       m_omx_pkt = NULL;
    }
 
-   if (m_omx_reader) {
+   if (m_omx_reader)
       m_omx_reader->Close();
-		//delete m_omx_reader;
-		//m_omx_reader = NULL;
-   }
 
    m_metadata.clear();
    emit metadataChanged(m_metadata);
 
-   if (m_av_clock) {
+   if (m_av_clock)
       m_av_clock->OMXDeinitialize();
-		//delete m_av_clock;
-		//m_av_clock = NULL;
-   }
 
    vc_tv_show_info(0);
 
-   // lcarlon: free the texture. Invoke freeTexture so that it is the user
-   // of the class to do it cause it is commonly required to do it in the
-   // current OpenGL and EGL context. Do it here, after the stop command is
-   // considered finished: this is needed to avoid hardlock in case the
-   // used wants to free the texture in his own thread, which would still
-   // be blocked waiting for the stop command to finish.
-   LOG_VERBOSE(LOG_TAG, "Freeing texture...");
-   //m_provider->free();
-
-//#ifdef ENABLE_SUBTITLES
-//   delete m_player_subtitles;
-//   m_player_subtitles = NULL;
-//#endif
-
-	//delete m_player_audio;
-	//delete m_player_video;
-	//delete m_av_clock;
-
-	//m_player_audio = NULL;
-	//m_player_video = NULL;
-	//m_av_clock = NULL;
-
    LOG_INFORMATION(LOG_TAG, "Cleanup done.");
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::cleanup
++-----------------------------------------------------------------------------*/
+bool OMX_MediaProcessor::cleanup()
+{
+   log_verbose("Stopping pipeline...");
+   stopInt();
+
+   log_verbose("Closing all low level players...");
+   closeAll();
+
+   // TODO: Fix this! When freeing players, a lock seems to hang!
+   log_verbose("Freeing players...");
+#ifdef ENABLE_SUBTITLES
+   delete m_player_subtitles;
+#endif
+   delete m_player_audio;
+   delete m_player_video;
+
+   log_verbose("Freeing clock...");
+   if (m_av_clock) {
+      m_av_clock->OMXDeinitialize();
+      delete m_av_clock;
+   }
+
+   // TODO: This should really be done, but still it seems to sefault sometimes.
+   log_verbose("Deinitializing hardware libs...");
+   m_OMX->Deinitialize();
+   m_RBP->Deinitialize();
+
+   log_verbose("Freeing hints...");
+   delete m_audioConfig;
+   delete m_videoConfig;
+
+   log_verbose("Freeing OpenMAX structures...");
+   delete m_RBP;
+   delete m_OMX;
+   delete m_omx_pkt;
+   delete m_omx_reader;
+
+   return true;
 }
 
 /*------------------------------------------------------------------------------

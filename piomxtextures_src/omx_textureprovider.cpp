@@ -35,15 +35,15 @@
 
 #include <IL/OMX_Broadcom.h>
 
-#include "lc_logging.h"
-
 #include "omx_textureprovider.h"
 #include "omx_globals.h"
+#include "omx_logging.h"
 
 /*------------------------------------------------------------------------------
 |    check_gl_error
 +-----------------------------------------------------------------------------*/
 void check_gl_error() {
+#ifdef ENABLE_LOG_DEBUG
    GLenum err = glGetError();
 
    while (err != GL_NO_ERROR) {
@@ -73,6 +73,9 @@ void check_gl_error() {
 
       err = glGetError();
    }
+#else
+   return;
+#endif
 }
 
 /*------------------------------------------------------------------------------
@@ -119,17 +122,16 @@ void OMX_TextureData::freeData()
 
    // Destroy texture, EGL image and free the buffer.
    if (m_eglImage) {
-      log_info("Freeing KHR image...");
+      log_verbose("Freeing KHR image...");
       if (eglDestroyImageKHR(eglDisplay, m_eglImage) != EGL_TRUE) {
-         EGLint err = eglGetError();
-         LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %d.", err);
+         LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %s.", get_egl_errstr());
       }
 
       m_eglImage = NULL;
    }
 
    if (m_textureId) {
-      log_info("Freeing texture...");
+      log_verbose("Freeing texture...");
       glDeleteTextures(1, &m_textureId);
 
       check_gl_error();
@@ -142,73 +144,4 @@ void OMX_TextureData::freeData()
       delete[] m_textureData;
       m_textureData = NULL;
    }
-}
-
-/*------------------------------------------------------------------------------
-|    OpenMAXILTextureLoader::instantiateTexture
-+-----------------------------------------------------------------------------*/
-OMX_TextureData* OMX_TextureProviderQQuickItem::instantiateTexture(QSize size)
-{
-   EGLDisplay eglDisplay = get_egl_display();
-   if (!eglDisplay)
-      return (OMX_TextureData*)log_critical("Failed to get EGLDisplay.");
-
-   EGLContext eglContext = get_egl_context();
-   if (!eglContext)
-      return (OMX_TextureData*)log_critical("Failed to get EGLContext.");
-
-   EGLint attr[] = {EGL_GL_TEXTURE_LEVEL_KHR, 0, EGL_NONE};
-
-   GLuint textureId;
-   glGenTextures(1, &textureId);
-   glBindTexture(GL_TEXTURE_2D, textureId);
-
-   // It seems that only 4byte pixels is supported here.
-   //GLubyte* pixel = new GLubyte[size.width()*size.height()*2];
-   //memset(pixel, 0, size.width()*size.height()*2);
-   GLubyte* pixel = NULL;
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width(), size.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, pixel);
-
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-
-   log_info("Creating EGLImageKHR...");
-   EGLImageKHR eglImage = eglCreateImageKHR(
-            eglDisplay,
-            eglContext,
-            EGL_GL_TEXTURE_2D_KHR,
-            (EGLClientBuffer)textureId,
-            attr
-            );
-   log_verbose("EGL image %d created...", eglImage);
-
-   EGLint eglErr = eglGetError();
-   if (eglErr != EGL_SUCCESS) {
-      LOG_ERROR(LOG_TAG, "Failed to create KHR image: %d.", eglErr);
-      return 0;
-   }
-
-   log_verbose("Creating OMX_TextureData...");
-   OMX_TextureData* textureData = new OMX_TextureData;
-   textureData->m_textureId   = textureId;
-   textureData->m_textureData = pixel;
-   textureData->m_eglImage    = eglImage;
-   textureData->m_textureSize = size;
-   return textureData;
-}
-
-/*------------------------------------------------------------------------------
-|    OpenMAXILTextureLoader::freeTexture
-+-----------------------------------------------------------------------------*/
-void OMX_TextureProviderQQuickItem::freeTexture(OMX_TextureData* textureData)
-{
-   if (!textureData) {
-      log_warn("Trying to free a NULL texture data object.");
-      return;
-   }
-
-   textureData->freeData();
-   delete textureData;
 }

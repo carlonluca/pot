@@ -86,7 +86,6 @@ private:
 
     QString m_source;
     GLuint m_texture;
-    OMX_TextureProviderQQuickItem* m_provider;
     OMX_SGTexture* m_sgtexture;
     QTimer* m_timer;
     bool m_renderScheduled;

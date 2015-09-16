@@ -32,24 +32,25 @@
 #include <QQueue>
 #include <QMutex>
 #include <QSemaphore>
+#include <QOpenGLContext>
+#include <QThread>
 
 #include <IL/OMX_Video.h>
 #include <GLES2/gl2.h>
 #define EGL_EGLEXT_PROTOTYPES
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
+
 #include <assert.h>
 #include <memory>
 
 #include "omx_globals.h"
-#include "omx_utils.h"
 #include "omx_logging.h"
 
 /*------------------------------------------------------------------------------
 |    definitions
 +-----------------------------------------------------------------------------*/
 class QQuickItem;
-
 
 /*------------------------------------------------------------------------------
 |    OMX_TextureData class
@@ -72,39 +73,6 @@ public:
 };
 
 /*------------------------------------------------------------------------------
-|    OMX_TextureProvider class
-+-----------------------------------------------------------------------------*/
-/**
- * @brief The OMX_TextureProviderQQuickItem class can be instantiate by
- * a QQuickItem and passed to a OMX element. It MUST be instantiated in
- * the renderer thread.
- */
-class OMX_TextureProvider
-{
-public:
-   virtual ~OMX_TextureProvider() {}
-   virtual OMX_TextureData* instantiateTexture(QSize size) = 0;
-   virtual void freeTexture(OMX_TextureData* textureData) = 0;
-};
-typedef std::shared_ptr<OMX_TextureProvider> OMX_TextureProviderSh;
-
-/*------------------------------------------------------------------------------
-|    OMX_TextureProviderQQuickItem class
-+-----------------------------------------------------------------------------*/
-class OMX_TextureProviderQQuickItem : public OMX_TextureProvider
-{
-public:
-   OMX_TextureProviderQQuickItem() : OMX_TextureProvider() {
-      // Do nothing.
-   }
-
-   virtual ~OMX_TextureProviderQQuickItem() {}
-
-   OMX_TextureData* instantiateTexture(QSize size);
-   void freeTexture(OMX_TextureData* textureData);
-};
-
-/*------------------------------------------------------------------------------
 |    OMX_EGLBufferProvider class
 +-----------------------------------------------------------------------------*/
 class OMX_EGLBufferProvider : public QObject
@@ -112,24 +80,29 @@ class OMX_EGLBufferProvider : public QObject
 	Q_OBJECT
 public:
    OMX_EGLBufferProvider() :
-		QObject()
-	 , m_texProvider(new OMX_TextureProviderQQuickItem)
+      QObject()
 	 , m_currentDecoder(NULL)
 	 , m_currentRenderer(NULL)
+	 , m_mutex(QMutex::Recursive)
 	 , m_texCount(0)
+    , m_initialized(false)
+    , m_oglContext(NULL)
+    , m_eglContext(NULL)
+    , m_eglSurface(NULL)
+    , m_eglDisplay(NULL)
    {}
 
 	~OMX_EGLBufferProvider();
 
+   bool init();
    bool instantiateTextures(const QSize& s, int count);
+   OMX_TextureData* instantiateTexture(const QSize& size);
 	bool textureInstantiated();
 
    OMX_TextureData* getNextEmptyBuffer();
 	GLuint getNextTexture();
 
 	bool registerFilledBuffer(OMX_BUFFERHEADERTYPE* buffer);
-
-	void cleanTextures();
 
    QList<OMX_TextureData*> getBuffers() {
 		QMutexLocker locker1(&m_mutex);
@@ -141,14 +114,16 @@ public:
       return m_available.size();
    }
 
+public slots:
 	void free();
+   void deinit();
 
 signals:
 	void texturesReady();
 	void texturesFreed();
+   void frameReady();
 
 private:
-   OMX_TextureProviderSh m_texProvider;
    QQueue<OMX_TextureData*> m_filledQueue;
    QQueue<OMX_TextureData*> m_emptyQueue;
    QList<OMX_TextureData*> m_available;
@@ -156,6 +131,13 @@ private:
 	OMX_TextureData* m_currentRenderer;
 	QMutex m_mutex;
 	int m_texCount;
+   bool m_initialized;
+
+   // The context to be used to create buffers and textures.
+   QOpenGLContext* m_oglContext;
+   EGLContext m_eglContext;
+   EGLSurface m_eglSurface;
+   EGLDisplay m_eglDisplay;
 };
 
 typedef std::shared_ptr<OMX_EGLBufferProvider> OMX_EGLBufferProviderSh;
@@ -169,9 +151,12 @@ inline OMX_EGLBufferProvider::~OMX_EGLBufferProvider()
 
 	QMutexLocker locker(&m_mutex);
 	if (m_filledQueue.size() > 0)
-		log_warn("Leaking data in GPU: m_filledQueue size is %d.", m_filledQueue.size());
+      log_err("Leaking data in GPU: m_filledQueue size is %d.", m_filledQueue.size());
 	if (m_emptyQueue.size() > 0)
-		log_warn("Leaking data in GPU: m_emptyQueue size is %d.", m_emptyQueue.size());
+      log_err("Leaking data in GPU: m_emptyQueue size is %d.", m_emptyQueue.size());
+
+   if (m_initialized)
+      log_err("Provider is being destroyed while still inizialized. Leaking GPU resources.");
 }
 
 /*------------------------------------------------------------------------------
@@ -184,12 +169,92 @@ bool OMX_EGLBufferProvider::textureInstantiated()
 }
 
 /*------------------------------------------------------------------------------
+|    OMX_EGLBufferProvider::init
++-----------------------------------------------------------------------------*/
+inline
+bool OMX_EGLBufferProvider::init()
+{
+   // This method MUST be called in the same thread that is then creating buffers and
+   // textures.
+
+   QMutexLocker locker(&m_mutex);
+   if (m_initialized)
+      return true;
+   if (QOpenGLContext::currentContext()) {
+      log_info("Using old sync OGL architecture.");
+      m_oglContext = QOpenGLContext::currentContext();
+      m_eglContext = eglGetCurrentContext();
+
+      return true;
+   }
+
+   log_info("Initializing buffer provider...");
+
+   QOpenGLContext* sharedOglContext = QOpenGLContext::globalShareContext();
+   if (!sharedOglContext)
+      return log_err("Failed to get shared OGL context. Please enable it with the proper attr.");
+
+   log_verbose("Creating a new OpenGL context in thread %p.", QThread::currentThreadId());
+   m_oglContext = new QOpenGLContext();
+   m_oglContext->setShareContext(sharedOglContext);
+   m_oglContext->makeCurrent(sharedOglContext->surface());
+
+   // Get global strictures.
+   m_eglDisplay = get_egl_display();
+   if (!m_eglDisplay)
+      return false;
+
+   EGLContext eglGlobalContext = get_global_egl_context();
+   if (!eglGlobalContext)
+      return false;
+
+   // Get global EGL context config.
+   const int MAX_CONFIG = 100;
+   EGLConfig configs[MAX_CONFIG];
+   int confCount;
+   EGLBoolean success = eglGetConfigs(m_eglDisplay, configs, 100, &confCount);
+   if (success != EGL_TRUE)
+      return log_err("Failed to get EGL configs: %u.", success);
+
+   EGLint eglVal;
+   success = eglQueryContext(m_eglDisplay, eglGlobalContext, EGL_CONFIG_ID, &eglVal);
+   if (success != EGL_TRUE)
+      return log_err("Failed to get EGL context config: %u.", success);
+
+   log_debug("Global EGL context config index is %d.", eglVal);
+   if (eglVal >= MAX_CONFIG)
+      return log_err("Insufficient array size for EGL configs.");
+
+   EGLConfig eglConfig = configs[eglVal];
+   if (!eglConfig)
+      return log_err("Failed to get EGL config.");
+
+   // Create new EGL context.
+   m_eglContext = eglCreateContext(m_eglDisplay, eglConfig, eglGlobalContext, NULL);
+   if (!m_eglContext)
+      return log_err("Failed to create new EGL context.");
+
+   m_eglSurface = eglCreatePbufferSurface(m_eglDisplay, eglConfig, NULL);
+   if (eglMakeCurrent(m_eglDisplay, m_eglSurface, m_eglSurface, m_eglContext) != EGL_TRUE)
+      return log_err("Failed to make current EGL ctx.");
+
+   return (m_initialized = true);
+}
+
+/*------------------------------------------------------------------------------
 |    OMX_EGLBufferProvider::instantiateBuffers
 +-----------------------------------------------------------------------------*/
 inline
 bool OMX_EGLBufferProvider::instantiateTextures(const QSize& s, int count)
 {
-	QMutexLocker locker(&m_mutex);
+   QMutexLocker locker(&m_mutex);
+   if (!m_available.isEmpty())
+      if (m_available.at(0)->m_textureSize == s)
+         return log_verbose("Reusing allocated textures.");
+
+	// Free all textures.
+	free();
+
 	if (UNLIKELY(m_texCount != 0)) {
 		log_warn("There are currently %d textures available already.", m_texCount);
 		return false;
@@ -202,7 +267,7 @@ bool OMX_EGLBufferProvider::instantiateTextures(const QSize& s, int count)
 
    for (int i = 0; i < count; i++) {
       log_info("Instantiating texture data...");
-      OMX_TextureData* tex = m_texProvider->instantiateTexture(s);
+      OMX_TextureData* tex = instantiateTexture(s);
       m_emptyQueue.append(tex);
       m_available.append(tex);
 	}
@@ -215,19 +280,67 @@ bool OMX_EGLBufferProvider::instantiateTextures(const QSize& s, int count)
 }
 
 /*------------------------------------------------------------------------------
+|    OMX_EGLBufferProvider::instantiateTexture
++-----------------------------------------------------------------------------*/
+inline OMX_TextureData* OMX_EGLBufferProvider::instantiateTexture(const QSize& size)
+{
+   EGLint attr[] = {EGL_GL_TEXTURE_LEVEL_KHR, 0, EGL_NONE};
+
+   GLuint textureId;
+   glGenTextures(1, &textureId);
+   glBindTexture(GL_TEXTURE_2D, textureId);
+
+   // It seems that only 4byte pixels is supported here.
+   //GLubyte* pixel = new GLubyte[size.width()*size.height()*2];
+   //memset(pixel, 0, size.width()*size.height()*2);
+   GLubyte* pixel = NULL;
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width(), size.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+
+   log_info("Creating EGLImageKHR...");
+   EGLImageKHR eglImage = eglCreateImageKHR(
+            m_eglDisplay,
+            m_eglContext,
+            EGL_GL_TEXTURE_2D_KHR,
+            (EGLClientBuffer)textureId,
+            attr
+            );
+   log_verbose("EGL image %d created...", eglImage);
+
+   EGLint eglErr = eglGetError();
+   if (eglErr != EGL_SUCCESS) {
+      LOG_ERROR(LOG_TAG, "Failed to create KHR image: %d.", eglErr);
+      return 0;
+   }
+
+   log_verbose("Creating OMX_TextureData...");
+   OMX_TextureData* textureData = new OMX_TextureData;
+   textureData->m_textureId   = textureId;
+   textureData->m_textureData = pixel;
+   textureData->m_eglImage    = eglImage;
+   textureData->m_textureSize = size;
+
+   return textureData;
+}
+
+/*------------------------------------------------------------------------------
 |    OMX_EGLBufferProvider::getNextTexture
 +-----------------------------------------------------------------------------*/
 inline
 GLuint OMX_EGLBufferProvider::getNextTexture()
 {
-	QMutexLocker locker1(&m_mutex);
+	QMutexLocker locker(&m_mutex);
 
 	OMX_TextureData* data;
 	if (LIKELY(!m_filledQueue.empty()))
 		data = m_filledQueue.dequeue();
 	else {
 		if (LIKELY(m_currentRenderer != NULL)) {
-			log_warn("No decoded frame to show. Showing the same twice.");
+			log_disabled("No decoded frame to show. Showing the same twice.");
 			return m_currentRenderer->m_textureId;
 		}
 
@@ -248,7 +361,7 @@ GLuint OMX_EGLBufferProvider::getNextTexture()
 inline
 bool OMX_EGLBufferProvider::registerFilledBuffer(OMX_BUFFERHEADERTYPE* buffer)
 {
-	QMutexLocker locker1(&m_mutex);
+	QMutexLocker locker(&m_mutex);
 
 	if (UNLIKELY(m_currentDecoder == NULL)) {
 		log_warn("Can't register a filled buffer. None is being filled.");
@@ -257,6 +370,8 @@ bool OMX_EGLBufferProvider::registerFilledBuffer(OMX_BUFFERHEADERTYPE* buffer)
 
 	m_filledQueue.enqueue(m_currentDecoder);
 	m_currentDecoder = NULL;
+
+   emit frameReady();
 
 	return true;
 }
@@ -300,22 +415,36 @@ inline void OMX_EGLBufferProvider::free()
 
 	m_texCount = 0;
 
-	emit texturesFreed();
+   emit texturesFreed();
 }
 
 /*------------------------------------------------------------------------------
-|    OMX_EGLBufferProvider::cleanTextures
+|    OMX_EGLBufferProvider::deinit
 +-----------------------------------------------------------------------------*/
-inline void OMX_EGLBufferProvider::cleanTextures()
+inline void OMX_EGLBufferProvider::deinit()
 {
-	QMutexLocker locker(&m_mutex);
+   QMutexLocker locker(&m_mutex);
+   if (!m_initialized)
+      return;
 
-	m_currentDecoder = NULL;
-	m_emptyQueue.clear();
-	m_filledQueue.clear();
+   // Free EGL surface.
+   log_verbose("Destroying EGL surface...");
+   EGLBoolean ret = eglDestroySurface(m_eglDisplay, m_eglSurface);
+   if (ret != EGL_TRUE)
+      log_warn("Failed to destroy EGL surface: %u.", ret);
+   m_eglSurface = NULL;
 
-	foreach (OMX_TextureData* data, m_available)
-		m_emptyQueue << data;
+   // Free EGL context.
+   log_verbose("Destroying EGL aux context...");
+   ret = eglDestroyContext(m_eglDisplay, m_eglContext);
+   if (ret != EGL_TRUE)
+      log_warn("Failed to destroy EGL aux context: %u.", ret);
+
+   // Destroy OGL context.
+   log_verbose("Destroying OGL aux context...");
+   delete m_oglContext;
+
+   m_initialized = false;
 }
 
 #endif // OMX_TEXTUREPROVIDERQQUICKITEM_H

@@ -1,0 +1,2 @@
+/opt/rpi/sysroot/usr/local/Qt-rasp-5.5.0/bin/qmake ../pi CONFIG+=release DEFINES+=BUILD_LOG_LEVEL_VERBOSE
+time make -j20

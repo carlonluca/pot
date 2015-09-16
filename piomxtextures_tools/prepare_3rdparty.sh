@@ -25,4 +25,3 @@ git clone https://github.com/carlonluca/LightLogger.git --depth 1
 cd "$THIS_DIR"
 
 echo "All done. Bye bye ;-)"
-

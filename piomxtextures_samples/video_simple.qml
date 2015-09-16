@@ -1,9 +1,9 @@
 /*
  * Project: PiOmxTextures
  * Author:  Luca Carlon
- * Date:    08.08.2015
+ * Date:    08.22.2015
  *
- * Copyright (c) 2012-2015 Luca Carlon. All rights reserved.
+ * Copyright (c) 2015 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -22,8 +22,8 @@
  */
 
 import QtQuick 2.2
-import QtQml 2.2
-import QtQuick.Window 2.0
+import QtQml 2.0
+import QtQuick.Window 2.1
 import QtMultimedia 5.0
 
 /**
@@ -69,7 +69,7 @@ Rectangle {
 
 	Timer {
 		id: videoInterval
-		interval: 10
+		interval: 1000
 		repeat: true
 		running: myVideo.playbackState === MediaPlayer.PlayingState
 

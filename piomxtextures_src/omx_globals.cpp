@@ -30,6 +30,7 @@
 #include <qpa/qplatformnativeinterface.h>
 
 #include <omx_globals.h>
+#include <omx_logging.h>
 
 
 /*------------------------------------------------------------------------------
@@ -37,17 +38,83 @@
 +-----------------------------------------------------------------------------*/
 EGLDisplay get_egl_display()
 {
-    QPlatformNativeInterface* nativeInterface = QGuiApplicationPrivate::platformIntegration()->nativeInterface();
-    Q_ASSERT(nativeInterface);
-    return nativeInterface->nativeResourceForIntegration("egldisplay");
+   QPlatformNativeInterface* nativeInterface =
+         QGuiApplicationPrivate::platformIntegration()->nativeInterface();
+   Q_ASSERT(nativeInterface);
+
+   EGLDisplay d = nativeInterface->nativeResourceForIntegration("egldisplay");
+   if (!d)
+      log_warn("Couldn't get EGL display handle.");
+
+   return d;
 }
 
 /*------------------------------------------------------------------------------
 |    get_egl_context
 +-----------------------------------------------------------------------------*/
-EGLContext get_egl_context()
+EGLContext get_global_egl_context()
 {
-    QPlatformNativeInterface* nativeInterface = QGuiApplicationPrivate::platformIntegration()->nativeInterface();
-    Q_ASSERT(nativeInterface);
-    return nativeInterface->nativeResourceForContext("eglcontext", QOpenGLContext::currentContext());
+   QOpenGLContext* c = QOpenGLContext::globalShareContext();
+   if (!c)
+      return (void*)log_warn("Cannot get an OpenGL context.");
+
+   QPlatformNativeInterface* nativeInterface =
+         QGuiApplicationPrivate::platformIntegration()->nativeInterface();
+   Q_ASSERT(nativeInterface);
+
+   EGLContext eglc =
+         nativeInterface->nativeResourceForContext("eglcontext", c);
+   if (!eglc)
+      log_warn("Couldn't get EGL context from currrent OpenGL context.");
+
+   return eglc;
+}
+
+/*------------------------------------------------------------------------------
+|    get_egl_errstr
++-----------------------------------------------------------------------------*/
+const char* get_egl_errstr(EGLint err)
+{
+   switch (err) {
+   case EGL_SUCCESS:
+      return "EGL_SUCCESS";
+   case EGL_NOT_INITIALIZED:
+      return "EGL_NOT_INITIALIZED";
+   case EGL_BAD_ACCESS:
+      return "EGL_BAD_ACCESS";
+   case EGL_BAD_ALLOC:
+      return "EGL_BAD_ALLOC";
+   case EGL_BAD_ATTRIBUTE:
+      return "EGL_BAD_ATTRIBUTE";
+   case EGL_BAD_CONFIG:
+      return "EGL_BAD_CONFIG";
+   case EGL_BAD_CONTEXT:
+      return "EGL_BAD_CONFIG";
+   case EGL_BAD_CURRENT_SURFACE:
+      return "EGL_BAD_CURRENT_SURFACE";
+   case EGL_BAD_DISPLAY:
+      return "EGL_BAD_DISPLAY";
+   case EGL_BAD_MATCH:
+      return "EGL_BAD_MATCH";
+   case EGL_BAD_NATIVE_PIXMAP:
+      return "EGL_BAD_NATIVE_PIXMAP";
+   case EGL_BAD_NATIVE_WINDOW:
+      return "EGL_BAD_NATIVE_WINDOW";
+   case EGL_BAD_PARAMETER:
+      return "EGL_BAD_PARAMETER";
+   case EGL_BAD_SURFACE:
+      return "EGL_BAD_SURFACE";
+   case EGL_CONTEXT_LOST:
+      return "EGL_CONTEXT_LOST";
+   default:
+      return "UNKNOWN";
+   }
+}
+
+/*------------------------------------------------------------------------------
+|    get_egl_errstr
++-----------------------------------------------------------------------------*/
+const char* get_egl_errstr()
+{
+   return get_egl_errstr(eglGetError());
 }

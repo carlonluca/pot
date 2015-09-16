@@ -23,6 +23,7 @@
 #if defined(HAVE_OMXLIB)
 
 #include <QObject>
+#include <QByteArray>
 #include <memory>
 
 #include "OMXCore.h"
@@ -75,10 +76,20 @@ public:
 
   OMXVideoConfig()
   {
+    EDEINTERLACEMODE mode = VS_DEINTERLACEMODE_OFF;
+    QByteArray ba = qgetenv("INTERLACE_MODE");
+
+    bool convOk;
+    int im = ba.toInt(&convOk);
+    if (convOk && im < 3 && im >= 0)
+       mode = (EDEINTERLACEMODE)im;
+
+    log_verbose("Using deinterlace mode: %d.", mode);
+
     use_thread = true;
     dst_rect.SetRect(0, 0, 0, 0);
     display_aspect = 0.0f;
-	 deinterlace = VS_DEINTERLACEMODE_OFF; // lcarlon: keep this off
+    deinterlace = mode; // lcarlon: keep this off
     anaglyph = OMX_ImageFilterAnaglyphNone;
     hdmi_clock_sync = false;
     allow_mvc = false;
@@ -107,7 +118,7 @@ public:
   void Close(void);
   unsigned int GetFreeSpace();
   unsigned int GetSize();
-  int  Decode(uint8_t *pData, int iSize, double pts);
+  int  Decode(uint8_t *pData, int iSize, double dts, double pts);
   void Reset(void);
   void SetDropState(bool bDrop);
   std::string GetDecoderName() { return m_video_codec_name; };

@@ -32,6 +32,7 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include <QVariantMap>
+#include <QThreadPool>
 
 #include <GLES2/gl2.h>
 #include <stdexcept>
@@ -86,15 +87,17 @@ public:
         STATE_PLAYING
     };
 
+	 static const char* STATE_STR[];
+
     enum OMX_MediaProcessorError {
         ERROR_CANT_OPEN_FILE,
         ERROR_WRONG_THREAD
     };
 
     OMX_MediaProcessor(OMX_EGLBufferProviderSh provider);
-    ~OMX_MediaProcessor();
+    virtual ~OMX_MediaProcessor();
 
-    bool setFilename(QString filename, OMX_TextureData*& textureData);
+    bool setFilename(QString filename);
     QString filename();
     QStringList streams();
 
@@ -117,7 +120,7 @@ public:
     long volume(bool linear);
 
     void setMute(bool muted);
-    bool muted();
+	 bool muted();
 
     QVariantMap getMetaData();
 
@@ -137,18 +140,23 @@ signals:
     void stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
 
 private slots:
+    void init();
+    bool setFilenameInt(QString filename);
+    bool playInt();
+    bool stopInt();
+    bool pauseInt();
     void mediaDecoding();
-    void cleanup();
+    void closeAll();
+    bool cleanup();
 
 private:
-    bool setFilenameInt(QString filename, OMX_TextureData*& textureData);
     void setState(OMX_MediaProcessorState state);
     void setSpeed(int iSpeed);
     void flushStreams(double pts);
-    bool checkCurrentThread();
+    bool checkCurrentThread(const char* ms);
     void convertMetaData();
 
-    OMX_QThread m_thread;
+    OMX_QThread* m_thread;
     QString m_filename;
 
     AVFormatContext* fmt_ctx;
@@ -202,8 +210,11 @@ private:
 	 bool m_muted;
     double m_loop_from;
     float m_fps;
-};
 
+    // QtConcurrent uses a thread pool which on Pi1 counts only
+    // 1 thread. I need a separate pool here.
+    QThreadPool m_tpool;
+};
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::hasAudio
@@ -230,6 +241,7 @@ inline OMX_MediaProcessor::OMX_MediaProcessorState OMX_MediaProcessor::state() {
 |    OMX_MediaProcessor::setState
 +-----------------------------------------------------------------------------*/
 inline void OMX_MediaProcessor::setState(OMX_MediaProcessorState state) {
+	log_verbose("State changing from %s to %s...", STATE_STR[m_state], STATE_STR[state]);
    m_state = state;
    emit stateChanged(state);
 }

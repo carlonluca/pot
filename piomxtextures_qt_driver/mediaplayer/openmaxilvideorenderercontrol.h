@@ -32,8 +32,6 @@
 #include "QtMultimedia/qvideosurfaceformat.h"
 #include "QtMultimedia/qmediaplayer.h"
 
-#include "openmaxilplayercontrol.h"
-
 #include <omx_textureprovider.h>
 #include <omx_mediaprocessor.h>
 
@@ -41,6 +39,7 @@
 |    defintions
 +-----------------------------------------------------------------------------*/
 class OpenMAXILVideoBuffer;
+class OpenMAXILPlayerControl;
 
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoRendererControl class
@@ -63,7 +62,7 @@ public slots:
 private:
    OpenMAXILPlayerControl* m_control;
    OMX_MediaProcessor* m_mediaProcessor;
-   QMutex m_mutexData;
+   QMutex m_mutex;
 
    QAbstractVideoSurface* m_surface;
    QVideoSurfaceFormat* m_surfaceFormat;

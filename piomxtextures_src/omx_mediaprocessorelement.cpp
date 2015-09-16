@@ -156,8 +156,12 @@ bool OMX_MediaProcessorElement::openMedia(QString filepath)
       m_textureData->freeData();
       m_textureData = NULL;
    }
-   if (!m_mediaProc->setFilename(filepath, m_textureData))
-      return false;
+
+   assert(false);
+
+   // TODO: This needs refactoring.
+   //if (!m_mediaProc->setFilename(filepath, m_textureData))
+   //   return false;
 
    // Check to see if we should be auto-playing the media
    if (m_autoPlay) {

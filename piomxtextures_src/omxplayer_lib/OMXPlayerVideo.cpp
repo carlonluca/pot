@@ -52,7 +52,6 @@ OMXPlayerVideo::OMXPlayerVideo(OMX_EGLBufferProviderSh provider)
   m_iVideoDelay   = 0;
   m_iCurrentPts   = 0;
   m_provider       = provider; // lcarlon: keep during merges.
-  m_history_valid_pts = 0;
 
   pthread_cond_init(&m_packet_cond, NULL);
   pthread_cond_init(&m_picture_cond, NULL);
@@ -144,7 +143,6 @@ bool OMXPlayerVideo::Reset()
   m_flush_requested   = false;
   m_cached_size       = 0;
   m_iVideoDelay       = 0;
-  m_history_valid_pts = ~0;  // From OpenDecoder.
 
   // Keep consistency with old Close/Open logic by continuing to return a bool
   // with the success/failure of this call.  Although little can go wrong
@@ -192,26 +190,16 @@ void OMXPlayerVideo::SetVideoRect(const CRect& SrcRect, const CRect& DestRect)
   m_decoder->SetVideoRect(SrcRect, DestRect);
 }
 
-static unsigned count_bits(int32_t value)
-{
-  unsigned bits = 0;
-  for(;value;++bits)
-    value &= value - 1;
-  return bits;
-}
-
 bool OMXPlayerVideo::Decode(OMXPacket *pkt)
 {
   if(!pkt)
     return false;
 
-  // some packed bitstream AVI files set almost all pts values to DVD_NOPTS_VALUE, but have a scattering of real pts values.
-  // the valid pts values match the dts values.
-  // if a stream has had more than 4 valid pts values in the last 16, the use UNKNOWN, otherwise use dts
-  m_history_valid_pts = (m_history_valid_pts << 1) | (pkt->pts != DVD_NOPTS_VALUE);
+  double dts = pkt->dts;
   double pts = pkt->pts;
-  if(pkt->pts == DVD_NOPTS_VALUE && (m_iCurrentPts == DVD_NOPTS_VALUE || count_bits(m_history_valid_pts & 0xffff) < 4))
-    pts = pkt->dts;
+
+  if (dts != DVD_NOPTS_VALUE)
+    dts += m_iVideoDelay;
 
   if (pts != DVD_NOPTS_VALUE)
     pts += m_iVideoDelay;
@@ -226,7 +214,7 @@ bool OMXPlayerVideo::Decode(OMXPacket *pkt)
   }
 
   CLog::Log(LOGINFO, "CDVDPlayerVideo::Decode dts:%.0f pts:%.0f cur:%.0f, size:%d", pkt->dts, pkt->pts, m_iCurrentPts, pkt->size);
-  m_decoder->Decode(pkt->data, pkt->size, pts);
+  m_decoder->Decode(pkt->data, pkt->size, dts, pts);
   return true;
 }
 
@@ -234,17 +222,18 @@ void OMXPlayerVideo::Process()
 {
   OMXPacket *omx_pkt = NULL;
 
-  while(!m_bStop && !m_bAbort)
+  while(true)
   {
     Lock();
-    if(m_packets.empty())
+    if(!(m_bStop || m_bAbort) && m_packets.empty())
       pthread_cond_wait(&m_packet_cond, &m_lock);
-    UnLock();
 
-    if(m_bAbort)
+    if (m_bStop || m_bAbort)
+    {
+      UnLock();
       break;
+    }
 
-    Lock();
     if(m_flush && omx_pkt)
     {
       OMXReader::FreePacket(omx_pkt);
@@ -351,9 +340,6 @@ bool OMXPlayerVideo::OpenDecoder()
     printf("Video codec %s width %d height %d profile %d fps %f\n",
         m_decoder->GetDecoderName().c_str() , m_config.hints.width, m_config.hints.height, m_config.hints.profile, m_fps);
   }
-
-  // start from assuming all recent frames had valid pts
-  m_history_valid_pts = ~0;
 
   return true;
 }

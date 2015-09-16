@@ -35,28 +35,38 @@ INCLUDEPATH += \
    $$PWD/../3rdparty/LightLogger
 INCLUDEPATH += \
    $$PWD/../3rdparty/LightLogger \
-   $$PWD/../3rdparty/LightSmartPtr \
-   $$PWD/../3rdparty/ffmpeg/include \
+	$$PWD/../3rdparty/LightSmartPtr
+
+linux-rasp-pi-g++ {
+	message("Building for RPi1...");
+	FFMPEG_BUILD_DIR = ffmpeg_pi1
+}
+
+linux-rasp-pi2-g++ {
+	message("Building for RPi2...");
+	FFMPEG_BUILD_DIR = ffmpeg_pi2
+}
 
 LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
+INCLUDEPATH += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/include
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
 DEFINES += CONFIG_INCLUDE_FFMPEG
 contains(DEFINES, CONFIG_INCLUDE_FFMPEG) {
-LIBS += $$PWD/../3rdparty/ffmpeg/lib/libavformat.a \
-   $$PWD/../3rdparty/ffmpeg/lib/libavcodec.a \
-   $$PWD/../3rdparty/ffmpeg/lib/libavutil.a \
-   $$PWD/../3rdparty/ffmpeg/lib/libswscale.a \
-   $$PWD/../3rdparty/ffmpeg/lib/libswresample.a \
-   -lz -lssl -lcrypto -lsmbclient -lssh -lbz2
+LIBS += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavformat.a \
+	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavcodec.a \
+	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavutil.a \
+	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libswscale.a \
+	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libswresample.a \
+   -lz -lssl -lcrypto -lsmbclient -lssh -lbz2 -lpcre
 }
 else {
-LIBS += -L$$PWD/../3rdparty/ffmpeg/lib \
+LIBS += -L$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib \
    -lavformat -lavcodec -lavutil -lswscale -lswresample
 }
 
 # For omxplayer.
-LIBS += -lfreetype -lWFC -lpcre
+#LIBS += -lfreetype -lWFC -lpcre
 #INCLUDEPATH += /usr/include/freetype2
 CONFIG += link_pkgconfig
 PKGCONFIG += freetype2
@@ -235,8 +245,7 @@ HEADERS  += \
     $$SRC/omx_playeraudio.h \
     $$SRC/omx_reader.h \
     $$SRC/ilclient/* \
-    $$PWD/omx_logging.h \
-    $$SRC/omx_utils.h
+	 $$PWD/omx_logging.h
 
 HEADERS += \
     $$SRC/omxplayer_lib/Unicode.h \

@@ -73,12 +73,12 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
 {
     (void)pAppData;
 
-    if (pBuffer->nFlags & OMX_BUFFERFLAG_EOS)
-        return OMX_ErrorNone;
+    if (UNLIKELY(pBuffer->nFlags & OMX_BUFFERFLAG_EOS))
+       log_verbose("EOS in FillBufferDone cb.");
 
-	 COMXVideo* videoDecoder = static_cast<COMXVideo*>(pBuffer->pAppPrivate);
-	 OMX_EGLBufferProvider* provider = videoDecoder->m_provider.get();
-	 assert(provider->registerFilledBuffer(pBuffer));
+    COMXVideo* videoDecoder = static_cast<COMXVideo*>(pBuffer->pAppPrivate);
+    OMX_EGLBufferProvider* provider = videoDecoder->m_provider.get();
+    assert(provider->registerFilledBuffer(pBuffer));
 
     // Get next empty buffer.
 	 OMX_TextureData* empty = provider->getNextEmptyBuffer();
@@ -430,54 +430,18 @@ bool COMXVideo::Open(OMXClock *clock, const OMXVideoConfig &config)
   m_failed_eos    = false;
 
   if(!m_config.hints.width || !m_config.hints.height)
-    return false;
-
-  // TODO: Re-use old textures.
-  //m_textureData = textureData; // Used in case not NULL.
-  //m_textureData = NULL;
+	 return false;
 
   // lcarlon: it is important that the generation of the texture is done in the rendering
   // thread. Beware that BlockingQueuedConnection hardlocks when on the same thread.
-  LOG_VERBOSE(LOG_TAG, "Generating texture of size (%d, %d).", m_config.hints.width, m_config.hints.height);
-#if 0
-  QMetaObject::invokeMethod(
-           m_provider,
-           "instantiateTexture",
-           Qt::BlockingQueuedConnection,
-           Q_RETURN_ARG(OMX_TextureData*, textureData),
-           Q_ARG(QSize, QSize(hints.width, hints.height)));
-#else
+  log_verbose("Generating texture of size (%d, %d).",
+				  m_config.hints.width, m_config.hints.height);
+
   // lcarlon: there are cases in which I don't want to generate a new texture, but I want to
   // re-use an existing one. For instance seek and restart may want to simply close and reopen
   // the video player without generating a new texture.
   QSize videoSize(m_config.hints.width, m_config.hints.height);
-  //if (!m_textureData) {
-     //m_textureData = m_provider->instantiateTexture(videoSize);
-  m_provider->free();
-
-  if (m_provider->getBufferCount() <= 0) {
-     m_provider->instantiateTextures(videoSize, 4);
-     LOG_VERBOSE(LOG_TAG, "Texture generated!");
-  }
-  else
-     m_provider->cleanTextures();
-
-  //}
-  //else {
-     // It means the user wants to re-use the texture. Just double-check the size is correct.
-     //if (videoSize != m_textureData->m_textureSize) {
-     //   LOG_ERROR(LOG_TAG, "Trying to re-use a texture with a wrong size!");
-     //   return false;
-     //}
-     //LOG_VERBOSE(LOG_TAG, "Well done, reusing existing texture.");
-  //}
-#endif
-  //if (!m_textureData) {
-  //   LOG_WARNING(LOG_TAG, "No texture was instantiated. Can't go on.");
-  //   return false;
-  //}
-
-  //emit textureDataReady(m_textureData);
+  m_provider->instantiateTextures(videoSize, 4);
 
   if(!m_config.hints.width || !m_config.hints.height)
     return false;
@@ -690,22 +654,6 @@ bool COMXVideo::Open(OMXClock *clock, const OMXVideoConfig &config)
     return false;
   }
 
-  // broadcom omx entension:
-  // When enabled, the timestamp fifo mode will change the way incoming timestamps are associated with output images.
-  // In this mode the incoming timestamps get used without re-ordering on output images.
-  // recent firmware will actually automatically choose the timestamp stream with the least variance, so always enable
-  {
-    OMX_CONFIG_BOOLEANTYPE timeStampMode;
-    OMX_INIT_STRUCTURE(timeStampMode);
-    timeStampMode.bEnabled = OMX_TRUE;
-    omx_err = m_omx_decoder.SetParameter((OMX_INDEXTYPE)OMX_IndexParamBrcmVideoTimestampFifo, &timeStampMode);
-    if (omx_err != OMX_ErrorNone)
-    {
-      CLog::Log(LOGERROR, "COMXVideo::Open OMX_IndexParamBrcmVideoTimestampFifo error (0%08x)\n", omx_err);
-      return false;
-    }
-  }
-
   if(NaluFormatStartCodes(m_config.hints.codec, (uint8_t *)m_config.hints.extradata, m_config.hints.extrasize))
   {
     OMX_NALSTREAMFORMATTYPE nalStreamFormat;
@@ -752,6 +700,18 @@ bool COMXVideo::Open(OMXClock *clock, const OMXVideoConfig &config)
       break;
     case 270:
       m_transform = OMX_DISPLAY_ROT270;
+      break;
+    case 1:
+      m_transform = OMX_DISPLAY_MIRROR_ROT0;
+      break;
+    case 91:
+      m_transform = OMX_DISPLAY_MIRROR_ROT90;
+      break;
+    case 181:
+      m_transform = OMX_DISPLAY_MIRROR_ROT180;
+      break;
+    case 271:
+      m_transform = OMX_DISPLAY_MIRROR_ROT270;
       break;
     default:
       m_transform = OMX_DISPLAY_ROT0;
@@ -816,7 +776,7 @@ unsigned int COMXVideo::GetSize()
   return m_omx_decoder.GetInputBufferSize();
 }
 
-int COMXVideo::Decode(uint8_t *pData, int iSize, double pts)
+int COMXVideo::Decode(uint8_t *pData, int iSize, double dts, double pts)
 {
   CSingleLock lock (m_critSection);
   OMX_ERRORTYPE omx_err;
@@ -842,6 +802,7 @@ int COMXVideo::Decode(uint8_t *pData, int iSize, double pts)
 
       omx_buffer->nFlags = 0;
       omx_buffer->nOffset = 0;
+      omx_buffer->nTimeStamp = ToOMXTime((uint64_t)(pts != DVD_NOPTS_VALUE ? pts : dts != DVD_NOPTS_VALUE ? dts : 0));
 
       if(m_setStartTime)
       {
@@ -849,10 +810,11 @@ int COMXVideo::Decode(uint8_t *pData, int iSize, double pts)
         CLog::Log(LOGDEBUG, "OMXVideo::Decode VDec : setStartTime %f\n", (pts == DVD_NOPTS_VALUE ? 0.0 : pts) / DVD_TIME_BASE);
         m_setStartTime = false;
       }
-      else if(pts == DVD_NOPTS_VALUE)
+      else if (pts == DVD_NOPTS_VALUE && dts == DVD_NOPTS_VALUE)
         omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_UNKNOWN;
+      else if (pts == DVD_NOPTS_VALUE)
+        omx_buffer->nFlags |= OMX_BUFFERFLAG_TIME_IS_DTS;
 
-      omx_buffer->nTimeStamp = ToOMXTime((uint64_t)(pts == DVD_NOPTS_VALUE) ? 0 : pts);
       omx_buffer->nFilledLen = std::min((OMX_U32)demuxer_bytes, omx_buffer->nAllocLen);
       memcpy(omx_buffer->pBuffer, demuxer_content, omx_buffer->nFilledLen);
 

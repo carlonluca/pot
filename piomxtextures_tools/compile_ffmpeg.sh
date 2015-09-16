@@ -3,13 +3,13 @@
 # Author:  Luca Carlon
 # Date:    01.04.2012
 #
+
 #!/bin/bash
 
 
-# Configures and builds ffmpeg for the PiOmxTextures project. The result is placed in
-# <ffmpeg_sources>/ffmpeg_compiled. Both static and shared libraries are compiled.
+# Configures and builds ffmpeg for the PiOmxTextures project.
 # Usage:
-#    ./compile_ffmpeg.sh <n>, where n is the number of compilation threads to use.
+#    ./compile_ffmpeg.sh <pin>, where pin is either pi1 or pi2.
 
 function check_exists_dir {
    if [ ! -d $1 ]; then
@@ -20,9 +20,22 @@ function check_exists_dir {
 
 # Check the user provided the number of threads to use when building.
 if [ $# -ne 1 ]; then
-   echo "Illegal arguments. Please provide just one parameter with the number of parallel threads to use when building."
+	echo "Illegal arguments. Please provide just one parameter with pi1 or pi2 to build for Pi1 or Pi2 respectively."
    exit
 fi
+
+# Set CFLAGS.
+if [ "$1" == "pi1" ]; then
+	ECFLAGS="-mfpu=vfp -mfloat-abi=hard -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog"
+elif [ "$1" == "pi2" ]; then
+	ECFLAGS="-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard \
+		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog"
+else
+	echo "Please choose either pi1 or pi2."
+	exit 1
+fi
+
+echo "Building for $1..."
 
 # Check env.
 TEST="${RPI_SYSROOT:=false}"
@@ -33,7 +46,7 @@ fi
 
 TEST="${COMPILER_PATH:=false}"
 if [ "$TEST" == "false" ]; then
-   echo "Please set COMPILER_PATH."
+	echo "Please set COMPILER_PATH (location of arm-linux-gnueabihf-gcc)."
    exit
 fi
 
@@ -42,27 +55,27 @@ check_exists_dir "$COMPILER_PATH"
 
 echo "Downloading ffmpeg sources from git..."
 cd ..
-if [ ! -d "3rdparty/ffmpeg" ]; then
-   mkdir -p 3rdparty/ffmpeg
+if [ ! -d "3rdparty/ffmpeg/ffmpeg_$1" ]; then
+	mkdir -p 3rdparty/ffmpeg/ffmpeg_$1
 fi
 
 cd 3rdparty/ffmpeg
-git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -bn2.6 --depth=1
+rm -rf ffmpeg_src
+git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -bn2.7.2 --depth=1
 cd ffmpeg_src;
 
-export PATH=$PATH:"$COMPILER_PATH"
+export PATH="$COMPILER_PATH":$PATH
 export PKG_CONFIG_PATH="$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
 
 echo "Configuring..."
 echo "Prefix to $PWD..."
 ./configure \
 --sysroot=$RPI_SYSROOT \
---extra-cflags="-mfpu=vfp -mfloat-abi=hard -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog" \
+--extra-cflags="$ECFLAGS" \
 --enable-cross-compile \
 --enable-shared \
 --enable-static \
 --arch=arm \
---cpu=arm1176jzf-s \
 --target-os=linux \
 --disable-hwaccels \
 --enable-parsers \
@@ -286,11 +299,11 @@ echo "Prefix to $PWD..."
 
 echo "Building..."
 mkdir $PWD/ffmpeg_compiled
-make -j$1
+make -j$(grep -c "^processor" /proc/cpuinfo)
 make install
 
 echo "Cleaning up..."
-mv ffmpeg_compiled/include ../
-mv ffmpeg_compiled/lib ../
+mv ffmpeg_compiled/include ../ffmpeg_$1
+mv ffmpeg_compiled/lib ../ffmpeg_$1
 
 echo "Done! Bye bye! ;-)"

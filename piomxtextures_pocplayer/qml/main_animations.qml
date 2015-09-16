@@ -113,8 +113,8 @@ Rectangle {
                 deferredPlay.start();
             }
 
-            function showLocalMedia(localAbsPath) {
-                source = "file://" + localAbsPath;
+				function showLocalMedia(mediaUri) {
+					 source = mediaUri;
                 play();
             }
         }

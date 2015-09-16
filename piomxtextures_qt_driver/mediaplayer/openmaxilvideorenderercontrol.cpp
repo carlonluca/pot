@@ -25,17 +25,14 @@
 |    includes
 +-----------------------------------------------------------------------------*/
 #include <QQuickItem>
+#include <QAbstractVideoSurface>
+#include <QVideoSurfaceFormat>
+#include <QTimer>
+#include <QMutex>
 
-#include "QtMultimedia/qabstractvideosurface.h"
-#include "QtMultimedia/qvideosurfaceformat.h"
-#include "QtCore/qtimer.h"
-#include "QtCore/qmutex.h"
+#include "openmaxilplayercontrol.h"
 
-#include "openmaxilvideorenderercontrol.h"
-
-#include "lc_logging.h"
-
-static QMutex m_mutex;
+#include "omx_logging.h"
 
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoBuffer class
@@ -50,8 +47,8 @@ public:
       m_textureId  = textureId;
    }
 
-   ~OpenMAXILVideoBuffer() {
-      log_verbose("VideoBuffer freed.");
+   virtual ~OpenMAXILVideoBuffer() {
+      log_dtor_func;
    }
 
    QVariant handle() const {
@@ -84,6 +81,7 @@ OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OpenMAXILPlayerCont
    QVideoRendererControl(parent),
    m_control(control),
    m_mediaProcessor(control->getMediaProcessor()),
+   m_mutex(QMutex::Recursive),
    m_surface(NULL),
    m_surfaceFormat(NULL),
    m_frame(NULL),
@@ -104,15 +102,14 @@ OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OpenMAXILPlayerCont
 +-----------------------------------------------------------------------------*/
 OpenMAXILVideoRendererControl::~OpenMAXILVideoRendererControl()
 {
-   log_debug_func;
-
    QMutexLocker locker(&m_mutex);
+   log_dtor_func;
 
    // Stop the surface first.
    if (m_surface)
       m_surface->stop();
 
-   log_warn("Freeing frame and format...");
+   log_verbose("Freeing frame and format...");
    delete m_surfaceFormat;
    delete m_frame;
 #if 0
@@ -135,7 +132,7 @@ void OpenMAXILVideoRendererControl::setSurface(QAbstractVideoSurface* surface)
    log_debug_func;
 
    if (m_surface && m_surface->isActive())
-       m_surface->stop();
+      m_surface->stop();
    m_surface = surface;
 }
 
@@ -144,9 +141,7 @@ void OpenMAXILVideoRendererControl::setSurface(QAbstractVideoSurface* surface)
 +-----------------------------------------------------------------------------*/
 QAbstractVideoSurface* OpenMAXILVideoRendererControl::surface() const
 {
-   QMutexLocker locker(&m_mutex);
    log_debug_func;
-
    return m_surface;
 }
 
@@ -155,9 +150,8 @@ QAbstractVideoSurface* OpenMAXILVideoRendererControl::surface() const
 +-----------------------------------------------------------------------------*/
 void OpenMAXILVideoRendererControl::onTexturesReady()
 {
-   onTexturesFreed();
-
    QMutexLocker locker(&m_mutex);
+   onTexturesFreed(); // Cleanup.
 
    log_verbose("Setting up for new textures...");
    OMX_EGLBufferProviderSh provider = m_mediaProcessor->m_provider;
@@ -204,14 +198,14 @@ void OpenMAXILVideoRendererControl::onTexturesFreed()
 {
    QMutexLocker locker(&m_mutex);
 
-   log_verbose("Destroying QVideoSurfaceFormat.");
    if (m_surfaceFormat) {
+      log_verbose("Destroying QVideoSurfaceFormat...");
       delete m_surfaceFormat;
       m_surfaceFormat = NULL;
    }
 
-   log_verbose("Destroying QVideoFrame.");
    if (m_frame) {
+      log_verbose("Destroying QVideoFrame...");
       delete m_frame;
       m_frame = NULL;
    }
@@ -222,9 +216,7 @@ void OpenMAXILVideoRendererControl::onTexturesFreed()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILVideoRendererControl::onUpdateTriggered()
 {
-   // I don't like acquiring two locks at the same time...
-   QMutexLocker locker1(&m_mutex);
-   QMutexLocker locker2(&m_mutexData);
+   QMutexLocker locker(&m_mutex);
 
    if (UNLIKELY(!m_mediaProcessor || !m_mediaProcessor->m_provider.get()))
       return;
@@ -239,8 +231,8 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
    m_buffer->setHandle(t);
    m_surface->present(*m_frame);
 
-   assert(m_control);
-	m_control->requestUpdate();
+   //assert(m_control);
+   //m_control->requestUpdate();
 }
 
 /*------------------------------------------------------------------------------

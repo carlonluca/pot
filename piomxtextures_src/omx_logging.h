@@ -27,7 +27,11 @@
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
+#include <QString>
+
 #include <lc_logging.h>
+
+using namespace std;
 
 /*------------------------------------------------------------------------------
 |    definitions
@@ -40,7 +44,25 @@
 #define log_dtor(...)
 #endif // ENABLE_DTOR_LOGS
 
-#define log_dtor_func log_dtor("%s", __PRETTY_FUNCTION__)
+#define log_dtor_func \
+   log_dtor("%s", __PRETTY_FUNCTION__)
+
+#ifdef ENABLE_LOG_DEBUG
+#define logi_debug(f, ...)               \
+   {                                     \
+      QString p = QString::asprintf("[%p] ", this);  \
+      QString l = p + f;                  \
+      log_debug(l.toLocal8Bit().constData(), __VA_ARGS__); \
+   }
+#define logi_debug_func                                 \
+   {                                                    \
+      QString p = QString::asprintf("[%p] %s", this, Q_FUNC_INFO);  \
+      log_debug(p.toLocal8Bit().constData());                             \
+   }
+
+#else
+#define logi_debug
+#define logi_debug_func
+#endif
 
 #endif // OMX_LOGGING_H
-

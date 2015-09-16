@@ -1,7 +1,7 @@
 /*
  * Project: PiOmxTextures
  * Author:  Luca Carlon
- * Date:    08.08.2015
+ * Date:    08.24.2015
  *
  * Copyright (c) 2012-2015 Luca Carlon. All rights reserved.
  *
@@ -28,20 +28,18 @@ import QtMultimedia 5.0
 Rectangle {
 	property string uri1
 	property string uri2
-	property string uri3
 
 	color: "red"
 
 	Component.onCompleted: {
 		var arguments = Qt.application.arguments;
-		if (arguments.length < 5) {
+		if (arguments.length < 4) {
 			console.log("Too few arguments.");
 			Qt.quit();
 		}
 
 		uri1 = arguments[2];
 		uri2 = arguments[3];
-		uri3 = arguments[4];
 	}
 
 	Video {
@@ -66,20 +64,12 @@ Rectangle {
 		onStopped: {video2.seek(0); video2.play();}
 	}
 
-	Audio {
-		id: audio
-		source: uri3
-		autoPlay: true
-		onStopped: {audio.seek(0); audio.play();}
-	}
-
 	Timer {
-		interval: 500
+		interval: 1000
 		running: true; repeat: true
 		onTriggered: {
 			console.log("Position video1: " + video1.position + ".");
 			console.log("Position video2: " + video2.position + ".");
-			console.log("Position audio: " + audio.position + ".");
 		}
 	}
 }

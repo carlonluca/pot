@@ -1,9 +1,9 @@
 /*
+ * Project: PiOmxTextures
  * Author:  Luca Carlon
- * Company: -
- * Date:    04.11.2015
+ * Date:    08.23.2015
  *
- * Copyright (c) 2015 Luca Carlon. All rights reserved.
+ * Copyright (c) 2012-2015 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -14,17 +14,34 @@
  *
  * PiOmxTextures is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
  * GNU General Public License for more details.
  *
  * You should have received a copy of the GNU General Public License
  * along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OMX_UTILS_H
-#define OMX_UTILS_H
+import QtQuick 2.5
+import QtMultimedia 5.0
 
-#define LIKELY(x)       __builtin_expect((x), 1)
-#define UNLIKELY(x)     __builtin_expect((x), 0)
+Rectangle {
+	property var uri
 
-#endif // OMX_UTILS_H
+	color: "red"
+
+	Component.onCompleted: {
+		var arguments = Qt.application.arguments;
+		if (arguments.length < 3) {
+			console.log("Too few arguments.");
+			Qt.quit();
+		}
+
+		uri = arguments[2]
+	}
+
+	Audio {
+		id: myAudio
+		source: uri
+		autoPlay: true
+	}
+}

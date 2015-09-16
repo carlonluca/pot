@@ -23,7 +23,7 @@
 
 TEMPLATE = lib
 
-VERSION = 4.5.0
+VERSION = 5.0.0
 
 QT += core core-private gui gui-private opengl quick quick-private
 CONFIG += no_private_qt_headers_warning

@@ -21,8 +21,13 @@
 # along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
 #
 
-QT += quick multimedia
-
 TEMPLATE = lib
 
+QT += quick multimedia
+
 OTHER_FILES += video_*
+
+DISTFILES += \
+    audio_simple.qml \
+    video_concurrent.qml \
+    video_loop.qml
