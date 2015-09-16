@@ -22,50 +22,49 @@
  */
 
 import QtQuick 2.0
-import QtMultimedia 5.0
+import QtMultimedia 5.4
+import QtQuick.Layouts 1.1
 
 Rectangle {
+	id: myRect
+
 	anchors.fill: parent
+	color: "black"
 
-	Video {
-		id: myVideo
+	GridLayout {
 		anchors.fill: parent
-		muted: false
-		//autoPlay:true
-		//source: "file:///home/pi/big_buck_bunny_1080p_h264.mov"
 
-		onPlaybackStateChanged: {
-			if (playbackState === MediaPlayer.PlayingState)
-				myTimer.start();
+		rows: 1
+		columns: 2
+
+		Video {
+			id: myVideo1
+			source: "file:///home/pi/big_buck_bunny_720p_h264.mov"
+			autoPlay: true
+			muted: true
+
+			width: 700
+			height: 700
+
+			Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
+		}
+
+		Video {
+			id: myVideo2
+			source: "file:///home/pi/sintel_trailer_720p.mp4"
+			autoPlay: true
+			muted: false
+
+			width: 700
+			height: 700
+
+			Layout.alignment: Qt.AlignHCenter | Qt.AlignVCenter
 		}
 	}
 
-	Timer {
-		property int loops: 0
-
-		id: myTimer
-		interval: 10000
-		repeat: true
-		running: false
-		triggeredOnStart: false
-		onTriggered: {
-			loops++;
-			var index = loops%5;
-			var duration = myVideo.duration;
-			var position = index/5*duration;
-
-			myVideo.seek(position);
-			logger.info("Seeked " + loops + " times. Seeked to " + position + ".");
-		}
-	}
-
-	Item {
-		id: mediaOutput
-		objectName: "mediaOutput"
-
-		function showUrlMedia(uri) {
-			myVideo.source = uri;
-			myVideo.play();
-		}
+	Audio {
+		id: myAudio
+		source: "file:///home/pi/master_of_puppets.mp3"
+		autoPlay: true
 	}
 }

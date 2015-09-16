@@ -48,7 +48,7 @@ LIBS += $$PWD/../3rdparty/ffmpeg/lib/libavformat.a \
    $$PWD/../3rdparty/ffmpeg/lib/libavutil.a \
    $$PWD/../3rdparty/ffmpeg/lib/libswscale.a \
    $$PWD/../3rdparty/ffmpeg/lib/libswresample.a \
-   -lz -lssl -lcrypto -lsmbclient -lssh -lbz2
+   -lz -lssl -lcrypto -lsmbclient -lssh -lbz2 -lpcre
 }
 else {
 LIBS += -L$$PWD/../3rdparty/ffmpeg/lib \
@@ -56,8 +56,8 @@ LIBS += -L$$PWD/../3rdparty/ffmpeg/lib \
 }
 
 # For omxplayer.
-LIBS += -lfreetype -lWFC -lpcre
-INCLUDEPATH += /usr/include/freetype2
+#LIBS += -lfreetype -lWFC -lpcre
+#INCLUDEPATH += /usr/include/freetype2
 CONFIG += link_pkgconfig
 PKGCONFIG += freetype2
 
@@ -235,6 +235,7 @@ HEADERS  += \
     $$SRC/omx_playeraudio.h \
     $$SRC/omx_reader.h \
     $$SRC/ilclient/* \
+    $$PWD/omx_logging.h \
     $$SRC/omx_utils.h
 
 HEADERS += \

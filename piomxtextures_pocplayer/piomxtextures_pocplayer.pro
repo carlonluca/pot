@@ -23,16 +23,20 @@
 
 QT          += quick multimedia
 
+CONFIG += -std=c++11
+
 INCLUDEPATH += $$_PRO_FILE_PWD_/../3rdparty/LightLogger
 
 SOURCES     += main.cpp \
     poc_qmlutils.cpp \
-    poc_utils.cpp
+    poc_utils.cpp \
+    poc_uptime.cpp
 
 HEADERS     += \
     $$_PRO_FILE_PWD_/../3rdparty/LightLogger/lc_logging.h \
     poc_qmlutils.h \
-    poc_utils.h
+    poc_utils.h \
+    poc_uptime.h
 
 RESOURCES   += resources_qml.qrc \
     resources_imgs.qrc
@@ -62,4 +66,7 @@ OTHER_FILES += qml/main.qml \
     qml/POC_VideoOutputSurface.qml
 
 DISTFILES += \
-    qml/main_seektest.qml
+    qml/main_seektest.qml \
+    qml/main_multiple.qml \
+    qml/main_overlays.qml \
+    qml/main_multipleanim.qml

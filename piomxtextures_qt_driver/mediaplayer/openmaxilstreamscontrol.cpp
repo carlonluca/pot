@@ -60,4 +60,3 @@ void OpenMAXILStreamsControl::setActive(int streamNumber, bool state)
 {
    // TODO: Implement.
 }
-

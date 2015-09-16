@@ -78,7 +78,7 @@ public:
     use_thread = true;
     dst_rect.SetRect(0, 0, 0, 0);
     display_aspect = 0.0f;
-    deinterlace = VS_DEINTERLACEMODE_OFF;
+	 deinterlace = VS_DEINTERLACEMODE_OFF; // lcarlon: keep this off
     anaglyph = OMX_ImageFilterAnaglyphNone;
     hdmi_clock_sync = false;
     allow_mvc = false;
@@ -156,6 +156,11 @@ protected:
   OMX_DISPLAYTRANSFORMTYPE m_transform;
   bool              m_settings_changed;
   CCriticalSection  m_critSection;
+
+  // lcarlon: needed to access m_provider from the callback.
+  friend OMX_ERRORTYPE fill_buffer_done_callback(
+		  OMX_HANDLETYPE handle, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer);
+  // ====
 };
 
 #endif

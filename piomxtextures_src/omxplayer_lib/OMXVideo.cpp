@@ -68,9 +68,6 @@
 #define OMX_THEORA_DECODER      OMX_VIDEO_DECODER
 #define OMX_MJPEG_DECODER       OMX_VIDEO_DECODER
 
-// lcarlon: keep during merges.
-static OMX_EGLBufferProvider* g_provider;
-
 // lcarlon: needed callback for OMX componenent.
 OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer)
 {
@@ -79,13 +76,12 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
     if (pBuffer->nFlags & OMX_BUFFERFLAG_EOS)
         return OMX_ErrorNone;
 
-    assert(g_provider);
-    g_provider->registerFilledBuffer(pBuffer);
+	 COMXVideo* videoDecoder = static_cast<COMXVideo*>(pBuffer->pAppPrivate);
+	 OMX_EGLBufferProvider* provider = videoDecoder->m_provider.get();
+	 provider->registerFilledBuffer(pBuffer);
 
     // Get next empty buffer.
-    OMX_TextureData* empty = g_provider->getNextEmptyBuffer();
-    assert(empty);
-
+	 OMX_TextureData* empty = provider->getNextEmptyBuffer();
     return OMX_FillThisBuffer(handle, empty->m_omxBuffer);
 }
 
@@ -104,7 +100,6 @@ COMXVideo::COMXVideo(OMX_EGLBufferProviderSh provider) : m_video_codec_name("")
   m_pixel_aspect      = 1.0f;
   // lcarlon: keep these inits.
   m_provider          = provider;
-  g_provider          = provider.get(); // FIXME: I don't really like this.
 }
 
 COMXVideo::~COMXVideo()
@@ -1039,7 +1034,7 @@ bool COMXVideo::SetVideoEGLOutputPort()
    QList<OMX_TextureData*> datas = m_provider->getBuffers();
    log_verbose("Creating buffers for %d images.", datas.size());
    foreach (OMX_TextureData* data, datas) {
-      omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &(data->m_omxBuffer), 221, NULL, data->m_eglImage);
+		omx_err = OMX_UseEGLImage(m_omx_render.GetComponent(), &(data->m_omxBuffer), 221, this, data->m_eglImage);
       if (omx_err != OMX_ErrorNone) {
          CLog::Log(LOGERROR, "OpenMAXILTextureLoader::decode - OMX_UseEGLImage - failed with omxErr(0x%x)\n", omx_err);
          return false;

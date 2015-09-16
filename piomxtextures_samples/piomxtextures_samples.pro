@@ -23,4 +23,6 @@
 
 QT += quick multimedia
 
+TEMPLATE = lib
+
 OTHER_FILES += video_*

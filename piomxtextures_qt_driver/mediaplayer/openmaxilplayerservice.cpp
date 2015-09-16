@@ -38,7 +38,7 @@
 #include "openmaxilvideorenderercontrol.h"
 #include "openmaxilstreamscontrol.h"
 
-#include "lc_logging.h"
+#include "omx_logging.h"
 
 #include <private/qmediaplaylistnavigator_p.h>
 #include <qmediaplaylist.h>
@@ -61,7 +61,8 @@ OpenMAXILPlayerService::OpenMAXILPlayerService(QObject *parent):
     m_metaData            = new OpenMAXILMetaDataProvider(m_control, this);
     m_streamsControl      = new OpenMAXILStreamsControl(this);
     m_availabilityControl = new OpenMAXILAvailabilityControl(this);
-    m_videoRenderer       = new OpenMAXILVideoRendererControl(m_control->getMediaProcessor(), this);
+    m_videoRenderer       = new OpenMAXILVideoRendererControl(m_control, this);
+    m_control->setVideoRenderer(m_videoRenderer);
 }
 
 /*------------------------------------------------------------------------------
@@ -69,7 +70,7 @@ OpenMAXILPlayerService::OpenMAXILPlayerService(QObject *parent):
 +-----------------------------------------------------------------------------*/
 OpenMAXILPlayerService::~OpenMAXILPlayerService()
 {
-   // Do nothing.
+	log_dtor_func;
 }
 
 QMediaControl *OpenMAXILPlayerService::requestControl(const char *name)

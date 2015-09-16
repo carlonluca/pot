@@ -45,10 +45,11 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <openmaxilvideorenderercontrol.h>
+
 #include <omx_mediaprocessor.h>
 #include <omx_textureprovider.h>
-
-#include "lc_logging.h"
+#include <omx_logging.h>
 
 /*------------------------------------------------------------------------------
 |    definitions
@@ -80,6 +81,7 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    , m_textureData(NULL)
    , m_sceneGraphInitialized(false)
    , m_quickItem(NULL)
+   , m_renderer(NULL)
 {
    log_debug_func;
 
@@ -94,7 +96,7 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
 +-----------------------------------------------------------------------------*/
 OpenMAXILPlayerControl::~OpenMAXILPlayerControl()
 {
-   log_debug_func;
+	log_dtor_func;
 
    delete m_mediaProcessor;
    m_mediaProcessor = NULL;
@@ -222,12 +224,15 @@ void OpenMAXILPlayerControl::onItemSceneChanged()
    if (!window)
       return;
 
+   assert(m_renderer);
    connect(window, SIGNAL(sceneGraphInitialized()),
            this, SLOT(onSceneGraphInitialized()), Qt::DirectConnection);
    connect(window, SIGNAL(afterRendering()),
            this, SLOT(onAfterRendering()), Qt::DirectConnection);
+   connect(window, SIGNAL(frameSwapped()),
+           m_renderer, SLOT(onUpdateTriggered()));
 
-   window->update();
+   requestUpdate();
 }
 
 /*------------------------------------------------------------------------------

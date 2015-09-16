@@ -57,7 +57,8 @@ Rectangle {
 		index = index >= playlist.length ? 0 : index;
 
 		logger.info("Play count: " + count + ".");
-		logger.info("Opening video file: " + playlist[index]);
+		logger.info("Opening video file: " + playlist[index] + ".");
+		logger.info("Uptime: " + uptime.uptimeString() + ".");
 
 		mediaPlayer.source = "file://" + playlist[index];
 		mediaPlayer.play();

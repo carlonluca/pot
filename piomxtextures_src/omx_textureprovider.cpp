@@ -69,7 +69,7 @@ void check_gl_error() {
          return;
       }
 
-      log_err("GL error: %s.", err);
+		log_err("GL error: %s.", error);
 
       err = glGetError();
    }

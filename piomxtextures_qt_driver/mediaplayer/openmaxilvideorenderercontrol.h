@@ -32,6 +32,8 @@
 #include "QtMultimedia/qvideosurfaceformat.h"
 #include "QtMultimedia/qmediaplayer.h"
 
+#include "openmaxilplayercontrol.h"
+
 #include <omx_textureprovider.h>
 #include <omx_mediaprocessor.h>
 
@@ -47,7 +49,7 @@ class OpenMAXILVideoRendererControl : public QVideoRendererControl
 {
    Q_OBJECT
 public:
-   explicit OpenMAXILVideoRendererControl(OMX_MediaProcessor* p, QObject* parent = 0);
+   explicit OpenMAXILVideoRendererControl(OpenMAXILPlayerControl* control, QObject* parent = 0);
    ~OpenMAXILVideoRendererControl();
    void setSurface(QAbstractVideoSurface* surface);
    QAbstractVideoSurface* surface() const;
@@ -59,6 +61,7 @@ public slots:
    void onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState);
 
 private:
+   OpenMAXILPlayerControl* m_control;
    OMX_MediaProcessor* m_mediaProcessor;
    QMutex m_mutexData;
 
@@ -66,7 +69,6 @@ private:
    QVideoSurfaceFormat* m_surfaceFormat;
    QVideoFrame* m_frame;
    OpenMAXILVideoBuffer* m_buffer;
-   QTimer* m_updateTimer;
 };
 
 #endif // OPENMAXILVIDEORENDERERCONTROL_H

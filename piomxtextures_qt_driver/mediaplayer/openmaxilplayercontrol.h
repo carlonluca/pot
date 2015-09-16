@@ -31,6 +31,7 @@
 #include <QtCore/qstack.h>
 #include <QtCore/qsemaphore.h>
 #include <QtCore/qmutex.h>
+#include <QQuickItem>
 
 #include <qmediacontent.h>
 #include <qmediaplayer.h>
@@ -50,6 +51,7 @@ QT_BEGIN_NAMESPACE
 class QMediaPlaylist;
 class QMediaPlaylistNavigator;
 class QSocketNotifier;
+class OpenMAXILVideoRendererControl;
 
 enum PlayerCommandType {
    PLAYER_COMMAND_TYPE_SET_MEDIA,
@@ -157,6 +159,15 @@ public:
        return m_mediaProcessor;
     }
 
+    void setVideoRenderer(OpenMAXILVideoRendererControl* renderer) {
+       m_renderer = renderer;
+    }
+
+    void requestUpdate() {
+       if (LIKELY(m_quickItem != NULL))
+          m_quickItem->update();
+    }
+
 public Q_SLOTS:
     void setPosition(qint64 pos);
 
@@ -204,6 +215,8 @@ private:
 
     QMediaPlayer* m_mediaPlayer;
     QQuickItem*   m_quickItem;
+
+    OpenMAXILVideoRendererControl* m_renderer;
 };
 
 /*------------------------------------------------------------------------------

@@ -34,6 +34,7 @@
 
 #include "poc_utils.h"
 #include "poc_qmlutils.h"
+#include "poc_uptime.h"
 
 /*------------------------------------------------------------------------------
 |    definitions
@@ -42,7 +43,10 @@ enum POC_Mode {
 	MODE_PLAYER,
 	MODE_LOOP,
 	MODE_ANIMATIONS,
-	MODE_SEEK
+	MODE_SEEK,
+	MODE_MULTIPLE,
+	MODE_MULTIPLEANIM,
+	MODE_OVERLAYS
 };
 
 /*------------------------------------------------------------------------------
@@ -90,10 +94,17 @@ int main(int argc, char* argv[])
 		currentMode = MODE_LOOP;
 	else if (args.contains("--seektest"))
 		currentMode = MODE_SEEK;
+	else if (args.contains("--multipletest"))
+		currentMode = MODE_MULTIPLE;
+	else if (args.contains("--multipleanimtest"))
+		currentMode = MODE_MULTIPLEANIM;
+	else if (args.contains("--overlaystest"))
+		currentMode = MODE_OVERLAYS;
 	else
 		currentMode = MODE_PLAYER;
 
 	POC_QMLUtils qmlUtils;
+	POC_Uptime uptime;
 
 	QQuickView view;
 
@@ -106,18 +117,29 @@ int main(int argc, char* argv[])
 	view.setFormat(curSurface);
 
 	view.engine()->rootContext()->setContextProperty("utils", &qmlUtils);
+	view.engine()->rootContext()->setContextProperty("uptime", &uptime);
+
 	switch (currentMode) {
 	case MODE_ANIMATIONS:
-		view.setSource(QUrl("qrc:///qml/main_animations.qml"));
+		view.setSource(QUrl(QStringLiteral("qrc:///qml/main_animations.qml")));
 		break;
 	case MODE_LOOP:
-		view.setSource(QUrl("qrc:///qml/main_loop.qml"));
+		view.setSource(QUrl(QStringLiteral("qrc:///qml/main_loop.qml")));
 		break;
 	case MODE_SEEK:
 		view.setSource(QUrl(QStringLiteral("qrc:///qml/main_seektest.qml")));
 		break;
+	case MODE_MULTIPLE:
+		view.setSource(QUrl(QStringLiteral("qrc:///qml/main_multiple.qml")));
+		break;
+	case MODE_OVERLAYS:
+		view.setSource(QUrl(QStringLiteral("qrc:///qml/main_overlays.qml")));
+		break;
+	case MODE_MULTIPLEANIM:
+		view.setSource(QUrl(QStringLiteral("qrc:///qml/main_multipleanim.qml")));
+		break;
 	default:
-		view.setSource(QUrl("qrc:///qml/main.qml"));
+		view.setSource(QUrl(QStringLiteral("qrc:///qml/main.qml")));
 		break;
 	}
 
@@ -136,6 +158,7 @@ int main(int argc, char* argv[])
 	// If file path is provided from the command line, I start the player
 	// immediately.
 	switch (currentMode) {
+	case MODE_MULTIPLEANIM:
 	case MODE_LOOP: {
 		QStringList list;
 		for (int i = 2; i < args.size(); i++)
@@ -150,6 +173,8 @@ int main(int argc, char* argv[])
 		if (args.size() > 1)
 			if (!show_media(&view, args.at(1)))
 				return 1;
+		break;
+	case MODE_MULTIPLE:
 		break;
 	default:
 		if (args.size() > 2)

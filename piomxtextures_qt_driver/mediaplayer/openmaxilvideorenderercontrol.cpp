@@ -24,6 +24,8 @@
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
+#include <QQuickItem>
+
 #include "QtMultimedia/qabstractvideosurface.h"
 #include "QtMultimedia/qvideosurfaceformat.h"
 #include "QtCore/qtimer.h"
@@ -34,8 +36,6 @@
 #include "lc_logging.h"
 
 static QMutex m_mutex;
-
-#define FPS (30)
 
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoBuffer class
@@ -80,14 +80,14 @@ private:
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl
 +-----------------------------------------------------------------------------*/
-OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OMX_MediaProcessor* p, QObject *parent) :
+OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OpenMAXILPlayerControl* control, QObject* parent) :
    QVideoRendererControl(parent),
-   m_mediaProcessor(p),
+   m_control(control),
+   m_mediaProcessor(control->getMediaProcessor()),
    m_surface(NULL),
    m_surfaceFormat(NULL),
    m_frame(NULL),
-   m_buffer(NULL),
-   m_updateTimer(new QTimer(this))
+   m_buffer(NULL)
 {
    //connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
    //        this, SLOT(onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
@@ -97,13 +97,6 @@ OpenMAXILVideoRendererControl::OpenMAXILVideoRendererControl(OMX_MediaProcessor*
            this, SLOT(onTexturesReady()));
    connect(provider.get(), SIGNAL(texturesFreed()),
            this, SLOT(onTexturesFreed()));
-
-   m_updateTimer->setInterval(FPS);
-   m_updateTimer->setSingleShot(false);
-   connect(m_updateTimer, SIGNAL(timeout()),
-           this, SLOT(onUpdateTriggered()));
-
-   m_updateTimer->start();
 }
 
 /*------------------------------------------------------------------------------
@@ -233,19 +226,21 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
    QMutexLocker locker1(&m_mutex);
    QMutexLocker locker2(&m_mutexData);
 
-   if (!m_mediaProcessor || !m_mediaProcessor->m_provider.get())
+   if (UNLIKELY(!m_mediaProcessor || !m_mediaProcessor->m_provider.get()))
+      return;
+   if (UNLIKELY(!m_surface || !m_frame || !m_surfaceFormat))
       return;
 
-   if (m_surface && m_frame && m_surfaceFormat) {
-      if (!m_surface->isActive() && !m_surface->start(*m_surfaceFormat))
-         log_warn("Failed to start surface.");
+   if (UNLIKELY(!m_surface->isActive() && !m_surface->start(*m_surfaceFormat)))
+      log_warn("Failed to start surface.");
 
-      GLuint t = m_mediaProcessor->m_provider->getNextTexture();
+   GLuint t = m_mediaProcessor->m_provider->getNextTexture();
 
-      //log_debug("Setting texture %u.", t);
-      m_buffer->setHandle(t);
-      m_surface->present(*m_frame);
-   }
+   m_buffer->setHandle(t);
+   m_surface->present(*m_frame);
+
+   assert(m_control);
+	m_control->requestUpdate();
 }
 
 /*------------------------------------------------------------------------------
@@ -253,8 +248,11 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
 +-----------------------------------------------------------------------------*/
 void OpenMAXILVideoRendererControl::onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state)
 {
+   // FIXME: I should stop the update requests when there is no playback.
+#if 0
    if (state == OMX_MediaProcessor::STATE_PLAYING)
       m_updateTimer->start();
    else
       m_updateTimer->stop();
+#endif
 }

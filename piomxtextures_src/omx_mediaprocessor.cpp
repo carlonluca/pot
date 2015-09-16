@@ -262,6 +262,9 @@ bool OMX_MediaProcessor::setFilenameInt(QString filename, OMX_TextureData*& text
 	// Set the mute property according to current state.
 	m_player_audio->SetMuted(m_muted);
 
+	// Set the mute property according to current state.
+	m_player_audio->SetMuted(m_muted);
+
    m_filename = filename;
 
    m_has_video     = m_omx_reader->VideoStreamCount();
@@ -652,19 +655,19 @@ void OMX_MediaProcessor::mediaDecoding()
 
       // If a request is pending then consider done here.
       m_mutexPending.lock();
-      if (m_pendingPause) {
+		if (UNLIKELY(m_pendingPause)) {
          m_waitPendingCommand.wakeAll();
          m_pendingPause = false;
       }
       m_mutexPending.unlock();
 
       // TODO: Use a semaphore instead.
-      if (m_state == STATE_PAUSED) {
+		if (UNLIKELY(m_state == STATE_PAUSED)) {
          OMXClock::OMXSleep(2);
          continue;
       }
 
-      if (m_seekFlush || m_incr != 0) {
+		if (UNLIKELY(m_seekFlush || m_incr != 0)) {
          double seek_pos = 0;
          double pts      = m_av_clock->OMXMediaTime();
 
@@ -679,7 +682,7 @@ void OMX_MediaProcessor::mediaDecoding()
             unsigned t = (unsigned)(startpts*1e-6);
             //auto dur = m_omx_reader->GetStreamLength() / 1000;
 
-            log_info("Seek to: %02d:%02d:%02d\n", (t/3600), (t/60)%60, t%60);
+				log_info("Seek to: %02d:%02d:%02d", (t/3600), (t/60)%60, t%60);
             flushStreams(startpts);
          }
 
@@ -711,7 +714,7 @@ void OMX_MediaProcessor::mediaDecoding()
          m_packetAfterSeek = false;
          m_seekFlush       = false;
       }
-      else if (m_packetAfterSeek && TRICKPLAY(m_av_clock->OMXPlaySpeed())) {
+		else if (UNLIKELY(m_packetAfterSeek && TRICKPLAY(m_av_clock->OMXPlaySpeed()))) {
          double seek_pos     = 0;
          double pts          = 0;
 
@@ -720,14 +723,14 @@ void OMX_MediaProcessor::mediaDecoding()
 
          seek_pos *= 1000.0;
 
-#if 0
+#if 1
          if (m_omx_reader->SeekTime((int)seek_pos, m_av_clock->OMXPlaySpeed() < 0, &startpts))
          {
             ; //FlushStreams(DVD_NOPTS_VALUE);
          }
-#endif // 0
+#endif // 1
 
-         CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f\n", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
+			CLog::Log(LOGDEBUG, "Seeked %.0f %.0f %.0f", DVD_MSEC_TO_TIME(seek_pos), startpts, m_av_clock->OMXMediaTime());
          m_packetAfterSeek = false;
       }
 
@@ -831,7 +834,7 @@ void OMX_MediaProcessor::mediaDecoding()
 #endif
       }
 
-      if (!sentStarted)
+		if (UNLIKELY(!sentStarted))
       {
          CLog::Log(LOGDEBUG, "COMXPlayer::HandleMessages - player started RESET");
          m_av_clock->OMXReset(m_has_video, m_has_audio);
@@ -845,7 +848,7 @@ void OMX_MediaProcessor::mediaDecoding()
       if (m_omx_pkt)
          sendEos = false;
 
-      if (m_omx_reader->IsEof() && !m_omx_pkt) {
+		if (UNLIKELY(m_omx_reader->IsEof() && !m_omx_pkt)) {
          // demuxer EOF, but may have not played out data yet
          if ((m_has_video && m_player_video->GetCached()) ||
              (m_has_audio && m_player_audio->GetCached())) {
