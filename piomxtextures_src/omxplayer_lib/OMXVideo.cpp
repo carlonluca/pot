@@ -78,7 +78,7 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
 
 	 COMXVideo* videoDecoder = static_cast<COMXVideo*>(pBuffer->pAppPrivate);
 	 OMX_EGLBufferProvider* provider = videoDecoder->m_provider.get();
-	 provider->registerFilledBuffer(pBuffer);
+	 assert(provider->registerFilledBuffer(pBuffer));
 
     // Get next empty buffer.
 	 OMX_TextureData* empty = provider->getNextEmptyBuffer();

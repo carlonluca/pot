@@ -102,7 +102,7 @@ void OMX_PlayerAudio::SetCurrentVolume(double volume, bool linear)
    OMX_S32 mbMax = omxVolume.sVolume.nMax;
    OMX_S32 mbMin = omxVolume.sVolume.nMin;
 #else
-#define MAX 600
+#define MAX 1000
 #define MIN -3000
 #endif
 

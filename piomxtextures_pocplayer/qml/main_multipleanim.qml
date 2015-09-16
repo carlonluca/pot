@@ -25,130 +25,58 @@ import QtQuick 2.0
 import QtMultimedia 5.0
 
 Rectangle {
-	property var videoFront: video1
-	property var videoBack: video2
-	property int durationAnim: 3000
-
 	anchors.fill: parent
-	color: "black"
+	color: "red"
 
 	Video {
 		id: video1
-		x: 0; y: 0; z: 1; width: parent.width; height: parent.height
+		x: 0; y: 0; width: parent.width; height: parent.height
 		opacity: 1
 		fillMode: VideoOutput.Stretch
+		muted: opacity == 0
 		onStopped: play()
-		volume: z
 
-		Behavior on opacity {NumberAnimation {duration: durationAnim/2}}
-		Behavior on x {NumberAnimation {duration: durationAnim/2; easing.type: Easing.InOutCubic}}
-		Behavior on y {NumberAnimation {duration: durationAnim/2; easing.type: Easing.InOutCubic}}
-		Behavior on scale {NumberAnimation {duration: durationAnim/2; easing.type: Easing.InOutCubic}}
-		Behavior on z {NumberAnimation {duration: durationAnim}}
+		Behavior on opacity {NumberAnimation {duration: 1000}}
+		Behavior on x {NumberAnimation {duration: 1000}}
+		Behavior on y {NumberAnimation {duration: 1000}}
 	}
 
 	Video {
 		id: video2
-		x: 0; y: 0; z: 0; width: parent.width; height: parent.height
+		x: 0; y: 0; width: parent.width; height: parent.height
 		opacity: 0
 		fillMode: VideoOutput.Stretch
+		muted: opacity == 0
 		onStopped: play()
-		volume: z
 
-		Behavior on opacity {NumberAnimation {duration: durationAnim/2}}
-		Behavior on x {NumberAnimation {duration: durationAnim/2; easing.type: Easing.InOutCubic}}
-		Behavior on y {NumberAnimation {duration: durationAnim/2; easing.type: Easing.InOutCubic}}
-		Behavior on scale {NumberAnimation {duration: durationAnim/2; easing.type: Easing.InOutCubic}}
-		Behavior on z {NumberAnimation {duration: durationAnim}}
+		Behavior on opacity {NumberAnimation {duration: 1000}}
+		Behavior on x {NumberAnimation {duration: 1000}}
+		Behavior on y {NumberAnimation {duration: 1000}}
 	}
 
 	SequentialAnimation {
 		id: switchAnim
-
 		ScriptAction {
 			script: {
-				logger.debug("Moving 1...");
-
-				videoFront.z = 0;
-				videoBack.z = 1;
-
-				videoFront.opacity = 1.0;
-				videoBack.opacity = 1.0;
-
-				videoFront.scale = 1.0
-				videoBack.scale = 1.0;
-
-				videoFront.x = -videoFront.width/2;
-				videoBack.x = videoBack.width/2;
-				videoFront.y = -videoFront.height/2;
-				videoBack.y = videoBack.height/2;
-			}
-		}
-
-
-		PauseAnimation {
-			duration: durationAnim/2
-		}
-
-		ScriptAction {
-			script: {
-				logger.debug("Moving 2...");
-
-				videoFront.scale = 0.5;
-				videoBack.scale = 1.0;
-
-				videoFront.x = 0;
-				videoBack.x = 0;
-				videoFront.y = 0;
-				videoBack.y = 0;
-			}
-		}
-
-		PauseAnimation {
-			duration: durationAnim/2
-		}
-
-		ScriptAction {
-			script: {
-				logger.debug("Done...");
-				switchVideoRefs();
+				video1.opacity = 1
+				video2.opacity = 2
+				video1.x = -video1.width/2
+				video2.x = video2.width/2
+				video1.y = -video1.height/2
+				video2.y = video2.height/2
 			}
 		}
 	}
 
 	Timer {
-		property int i: 0
-		property bool j: true
-
 		interval: 5000
 		repeat: true
 		running: true
 		onTriggered: {
-			if (j)
-				switchZ();
-			else
-				switchOpacity();
-
-			if (i%2 === 0)
-				j = !j;
-			i++
+			video1.opacity = video1.opacity == 0 ? 1 : 0
+			video2.opacity = video2.opacity == 0 ? 1 : 0
+			//switchAnim.running = true
 		}
-	}
-
-	function switchOpacity() {
-		video1.opacity = (videoFront === video1) ? 0 : 1
-		video2.opacity = (videoFront === video1) ? 1 : 0
-		switchVideoRefs();
-	}
-
-	function switchZ() {
-		switchAnim.running = true;
-	}
-
-	function switchVideoRefs() {
-		var tmp = videoFront;
-		videoFront = videoBack;
-		videoBack = tmp;
 	}
 
 	function showLocalMedia(list) {
