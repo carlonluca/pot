@@ -65,7 +65,6 @@ public:
    OpenMAXILPlayerControl(QObject* parent = 0);
    ~OpenMAXILPlayerControl();
 
-   void setMediaPlayer(QMediaPlayer* mediaPlayer);
    QMediaPlayer::State state() const;
    QMediaPlayer::MediaStatus mediaStatus() const;
 
@@ -102,11 +101,6 @@ public:
                           SLOT(onUpdateTriggered()), Qt::UniqueConnection);
    }
 
-   void requestUpdate() {
-      if (LIKELY(m_quickItem != NULL))
-         m_quickItem->update();
-   }
-
 public Q_SLOTS:
    void setPosition(qint64 pos);
 
@@ -121,28 +115,23 @@ signals:
    void metaDataChanged(const QVariantMap metaData);
 
 private slots:
-   void onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
-   void onItemSceneChanged();
+	void onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
+	void onMediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus status);
 
 private:
-   QMediaPlayer::State convertState(OMX_MediaProcessor::OMX_MediaProcessorState state) const;
+	QMediaPlayer::State convertState(
+			const OMX_MediaProcessor::OMX_MediaProcessorState& state) const;
+	QMediaPlayer::MediaStatus convertMediaStatus(
+			const OMX_MediaProcessor::OMX_MediaStatus& status) const;
 
-   bool m_ownStream;
-   QMediaPlayer::MediaStatus m_mediaStatus;
-   QStack<QMediaPlayer::State> m_stateStack;
-   QStack<QMediaPlayer::MediaStatus> m_mediaStatusStack;
+	bool m_ownStream;
 
    bool m_seekToStartPending;
    qint64 m_pendingSeekPosition;
    QMediaContent m_currentResource;
 
    OMX_EGLBufferProviderSh m_texProvider;
-   OMX_MediaProcessor*     m_mediaProcessor;
-
-   bool                  m_sceneGraphInitialized;
-
-   QMediaPlayer* m_mediaPlayer;
-   QQuickItem*   m_quickItem;
+	OMX_MediaProcessor*     m_mediaProcessor;
 
    OpenMAXILVideoRendererControl* m_renderer;
 };
@@ -151,7 +140,7 @@ private:
 |    OpenMAXILPlayerControl::convertState
 +-----------------------------------------------------------------------------*/
 inline
-QMediaPlayer::State OpenMAXILPlayerControl::convertState(OMX_MediaProcessor::OMX_MediaProcessorState state) const
+QMediaPlayer::State OpenMAXILPlayerControl::convertState(const OMX_MediaProcessor::OMX_MediaProcessorState& state) const
 {
    switch (state) {
    case OMX_MediaProcessor::STATE_STOPPED:
@@ -167,6 +156,15 @@ QMediaPlayer::State OpenMAXILPlayerControl::convertState(OMX_MediaProcessor::OMX
    }
 
    return QMediaPlayer::StoppedState;
+}
+
+/*------------------------------------------------------------------------------
+|    OpenMAXILPlayerControl::convertMediaStatus
++-----------------------------------------------------------------------------*/
+inline
+QMediaPlayer::MediaStatus OpenMAXILPlayerControl::convertMediaStatus(const OMX_MediaProcessor::OMX_MediaStatus& status) const
+{
+	return (QMediaPlayer::MediaStatus)m_mediaProcessor->mediaStatus();
 }
 
 QT_END_NAMESPACE

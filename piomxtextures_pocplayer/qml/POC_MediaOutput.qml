@@ -88,8 +88,8 @@ Item {
 		 console.log("Setting media source...");
         mediaPlayer.source = videoUri;
 
-		 console.log("Sending play command...");
-        mediaPlayer.play();
+		 //console.log("Sending play command...");
+        //mediaPlayer.play();
     }
 
     /**
@@ -107,7 +107,7 @@ Item {
     function showAudio(audioUri) {
         state = "VIDEO";
         mediaPlayer.source = audioUri;
-        mediaPlayer.play();
+        //mediaPlayer.play();
     }
 
     /**

@@ -80,6 +80,7 @@ const QStringList& POC_Utils::getSupportedVideoExtensions()
       supported.append("mp4");
       supported.append("mov");
       supported.append("mkv");
+      supported.append("ts");
 
       // TODO: Add the other supported extensions.
    }

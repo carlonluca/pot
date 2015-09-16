@@ -79,14 +79,14 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    , m_pendingSeekPosition(-1)
 	, m_texProvider(make_shared<OMX_EGLBufferProvider>())
 	, m_mediaProcessor(new OMX_MediaProcessor(m_texProvider))
-   , m_sceneGraphInitialized(false)
-   , m_quickItem(NULL)
    , m_renderer(NULL)
 {
    logi_debug_func;
 
    connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
            this, SLOT(onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
+	connect(m_mediaProcessor, SIGNAL(mediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus)),
+			  this, SLOT(onMediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus)));
    connect(m_mediaProcessor, SIGNAL(metadataChanged(QVariantMap)),
            this, SIGNAL(metaDataChanged(QVariantMap)));
 }
@@ -100,26 +100,6 @@ OpenMAXILPlayerControl::~OpenMAXILPlayerControl()
 
    delete m_mediaProcessor;
    m_mediaProcessor = NULL;
-}
-
-/*------------------------------------------------------------------------------
-|    OpenMAXILPlayerControl::setMediaPlayer
-+-----------------------------------------------------------------------------*/
-void OpenMAXILPlayerControl::setMediaPlayer(QMediaPlayer* mediaPlayer)
-{
-   logi_debug_func;
-
-   m_quickItem = dynamic_cast<QQuickItem*>(mediaPlayer->parent());
-   if (!m_quickItem) {
-      LOG_ERROR(LOG_TAG, "Failed to get declarative media player.");
-      return;
-   }
-
-   connect(mediaPlayer, SIGNAL(itemSceneChanged()), this, SLOT(onItemSceneChanged()));
-
-   // Immediately set if already available.
-   if (m_quickItem->window())
-      onItemSceneChanged();
 }
 
 /*------------------------------------------------------------------------------
@@ -158,22 +138,11 @@ void OpenMAXILPlayerControl::onStateChanged(OMX_MediaProcessor::OMX_MediaProcess
 }
 
 /*------------------------------------------------------------------------------
-|    OpenMAXILPlayerControl::onItemSceneChanged
+|    OpenMAXILPlayerControl::onMediaStatusChanged
 +-----------------------------------------------------------------------------*/
-void OpenMAXILPlayerControl::onItemSceneChanged()
+void OpenMAXILPlayerControl::onMediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus status)
 {
-   QQuickWindow* window = m_quickItem->window();
-   if (!window)
-      return;
-
-#if 0
-   assert(m_renderer);
-   connect(window, SIGNAL(frameSwapped()),
-           m_renderer, SLOT(onUpdateTriggered()));
-   connect(m_texProvider.get(), SIGNAL(texturesReady()),
-           m_renderer, SLOT(onUpdateTriggered()));
-   requestUpdate();
-#endif
+	emit mediaStatusChanged(convertMediaStatus(status));
 }
 
 /*------------------------------------------------------------------------------
@@ -294,7 +263,7 @@ bool OpenMAXILPlayerControl::isSeekable() const
 {
    log_debug_func;
 
-   // TODO: Implement.
+	// TODO: Implement.
    return false;
 }
 
@@ -303,10 +272,7 @@ bool OpenMAXILPlayerControl::isSeekable() const
 +-----------------------------------------------------------------------------*/
 QMediaPlayer::MediaStatus OpenMAXILPlayerControl::mediaStatus() const
 {
-   log_debug_func;
-
-   // TODO: Implement.
-   return QMediaPlayer::UnknownMediaStatus;
+	return convertMediaStatus(m_mediaProcessor->mediaStatus());
 }
 
 /*------------------------------------------------------------------------------

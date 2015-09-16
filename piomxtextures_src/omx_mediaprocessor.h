@@ -87,7 +87,20 @@ public:
         STATE_PLAYING
     };
 
+	 enum OMX_MediaStatus {
+		 MEDIA_STATUS_UNKNOWN,
+		 MEDIA_STATUS_NO_MEDIA,
+		 MEDIA_STATUS_LOADING,
+		 MEDIA_STATUS_LOADED,
+		 MEDIA_STATUS_STALLED,
+		 MEDIA_STATUS_BUFFERING,
+		 MEDIA_STATUS_BUFFERED,
+		 MEDIA_STATUS_END_OF_MEDIA,
+		 MEDIA_STATUS_INVALID_MEDIA
+	 };
+
 	 static const char* STATE_STR[];
+	 static const char* M_STATUS[];
 
     enum OMX_MediaProcessorError {
         ERROR_CANT_OPEN_FILE,
@@ -97,7 +110,7 @@ public:
     OMX_MediaProcessor(OMX_EGLBufferProviderSh provider);
     virtual ~OMX_MediaProcessor();
 
-    bool setFilename(QString filename);
+	 bool setFilename(const QString& filename);
     QString filename();
     QStringList streams();
 
@@ -115,6 +128,7 @@ public:
 #endif
 
     OMX_MediaProcessorState state();
+	 OMX_MediaStatus mediaStatus();
 
     void setVolume(long volume, bool linear);
     long volume(bool linear);
@@ -138,10 +152,12 @@ signals:
     void playbackCompleted();
     void errorOccurred(OMX_MediaProcessor::OMX_MediaProcessorError error);
     void stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
+	 void mediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus status);
 
 private slots:
     void init();
-    bool setFilenameInt(QString filename);
+	 bool setFilenameInt(const QString& filename);
+	 bool setFilenameWrapper(const QString& filename);
     bool playInt();
     bool stopInt();
     bool pauseInt();
@@ -151,9 +167,9 @@ private slots:
 
 private:
     void setState(OMX_MediaProcessorState state);
+	 void setMediaStatus(OMX_MediaStatus status);
     void setSpeed(int iSpeed);
-    void flushStreams(double pts);
-    bool checkCurrentThread(const char* ms);
+	 void flushStreams(double pts);
     void convertMetaData();
 
     OMX_QThread* m_thread;
@@ -164,6 +180,7 @@ private:
     AVPacket* pkt;
 
     volatile OMX_MediaProcessorState m_state;
+	 volatile OMX_MediaStatus m_mediaStatus;
 
     QMutex m_sendCmd;
 
@@ -238,12 +255,32 @@ inline OMX_MediaProcessor::OMX_MediaProcessorState OMX_MediaProcessor::state() {
 }
 
 /*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::mediaStatus
++-----------------------------------------------------------------------------*/
+inline OMX_MediaProcessor::OMX_MediaStatus OMX_MediaProcessor::mediaStatus() {
+	return m_mediaStatus;
+}
+
+/*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::setState
 +-----------------------------------------------------------------------------*/
 inline void OMX_MediaProcessor::setState(OMX_MediaProcessorState state) {
 	log_verbose("State changing from %s to %s...", STATE_STR[m_state], STATE_STR[state]);
+	if (m_state == state)
+		return;
    m_state = state;
    emit stateChanged(state);
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::setMediaStatus
++-----------------------------------------------------------------------------*/
+inline void OMX_MediaProcessor::setMediaStatus(OMX_MediaStatus status) {
+	if (m_mediaStatus == status)
+		 return;
+	log_verbose("Media status changing from %s to %s...", M_STATUS[m_mediaStatus], M_STATUS[status]);
+	m_mediaStatus = status;
+	emit mediaStatusChanged(status);
 }
 
 /*------------------------------------------------------------------------------

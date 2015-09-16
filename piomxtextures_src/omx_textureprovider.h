@@ -105,14 +105,39 @@ public:
 	bool registerFilledBuffer(OMX_BUFFERHEADERTYPE* buffer);
 
    QList<OMX_TextureData*> getBuffers() {
-		QMutexLocker locker1(&m_mutex);
+		QMutexLocker locker(&m_mutex);
       return m_available;
    }
 
    int getBufferCount() {
-		QMutexLocker locker1(&m_mutex);
+		QMutexLocker locker(&m_mutex);
       return m_available.size();
    }
+
+	void flush() {
+		QMutexLocker locker(&m_mutex);
+
+#if 0
+		foreach (OMX_TextureData* data, m_filledQueue)
+			m_emptyQueue.push_back(data);
+		if (m_currentDecoder)
+			m_emptyQueue.push_back(m_currentDecoder);
+		if (m_currentRenderer)
+			m_emptyQueue.push_back(m_currentRenderer);
+
+		m_filledQueue.clear();
+		m_currentDecoder = NULL;
+
+		assert(m_emptyQueue.size() == m_available.size());
+#endif
+
+		m_emptyQueue.clear();
+		m_filledQueue.clear();
+		m_currentDecoder = NULL;
+		m_currentRenderer = NULL;
+
+		m_emptyQueue.append(m_available);
+	}
 
 public slots:
 	void free();
@@ -363,10 +388,8 @@ bool OMX_EGLBufferProvider::registerFilledBuffer(OMX_BUFFERHEADERTYPE* buffer)
 {
 	QMutexLocker locker(&m_mutex);
 
-	if (UNLIKELY(m_currentDecoder == NULL)) {
-		log_warn("Can't register a filled buffer. None is being filled.");
-		return false;
-	}
+	if (UNLIKELY(m_currentDecoder == NULL))
+		return true;
 
 	m_filledQueue.enqueue(m_currentDecoder);
 	m_currentDecoder = NULL;

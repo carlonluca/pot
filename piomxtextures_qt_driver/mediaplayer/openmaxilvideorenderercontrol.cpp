@@ -228,11 +228,13 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
 
    GLuint t = m_mediaProcessor->m_provider->getNextTexture();
 
+	// It seems that in some cases the fillBufferDone arrives even after
+	// completely flushing the pipeline. This presents frames to be shown
+	// when the player is not actually playing content.
+	if (m_mediaProcessor->state() != OMX_MediaProcessor::STATE_PLAYING)
+		return;
    m_buffer->setHandle(t);
-   m_surface->present(*m_frame);
-
-   //assert(m_control);
-   //m_control->requestUpdate();
+	m_surface->present(*m_frame);
 }
 
 /*------------------------------------------------------------------------------
