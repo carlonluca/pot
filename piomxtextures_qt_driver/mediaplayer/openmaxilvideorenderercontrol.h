@@ -59,6 +59,11 @@ public slots:
    void onUpdateTriggered();
    void onMediaPlayerStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState);
 
+#ifdef OGL_CONTEXT_FROM_SURFACE
+protected:
+	bool eventFilter(QObject*, QEvent*);
+#endif // OGL_CONTEXT_FROM_SURFACE
+
 private:
    OpenMAXILPlayerControl* m_control;
    OMX_MediaProcessor* m_mediaProcessor;

@@ -29,6 +29,9 @@
 #include <QVideoSurfaceFormat>
 #include <QTimer>
 #include <QMutex>
+#ifdef OGL_CONTEXT_FROM_SURFACE
+#include <QVariant>
+#endif // OGL_CONTEXT_FROM_SURFACE
 
 #include "openmaxilplayercontrol.h"
 
@@ -134,7 +137,20 @@ void OpenMAXILVideoRendererControl::setSurface(QAbstractVideoSurface* surface)
    if (m_surface && m_surface->isActive())
       m_surface->stop();
    m_surface = surface;
+#ifdef OGL_CONTEXT_FROM_SURFACE
+	m_surface->installEventFilter(this);
+#endif // OGL_CONTEXT_FROM_SURFACE
 }
+
+#ifdef OGL_CONTEXT_FROM_SURFACE
+bool OpenMAXILVideoRendererControl::eventFilter(QObject * o, QEvent * e)
+{
+	if (e->type() != QEvent::DynamicPropertyChange)
+		return false;
+	log_debug("GL: %p.", o->property("GLContext").value<QOpenGLContext*>());
+	return false;
+}
+#endif // OGL_CONTEXT_FROM_SURFACE
 
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoRendererControl::surface

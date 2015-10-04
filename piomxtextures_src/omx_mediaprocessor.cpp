@@ -462,6 +462,7 @@ bool OMX_MediaProcessor::playInt()
 	}
 	m_mutexPending.unlock();
 
+	setState(STATE_PLAYING);
 	log_verbose("Play command issued.");
 	return true;
 }
