@@ -10,6 +10,7 @@ library.
 In tools/POCPlayer there is a sample player used to test the backend.
 
 For more information on the project refer to http://goo.gl/KphzdD.<br/>
-For some build instructions: http://goo.gl/9TZPxn.
+For some build instructions: http://goo.gl/9TZPxn.<br/>
+For some info on how to use: http://goo.gl/TuiSyS.
 
 For a demo: https://www.youtube.com/watch?v=SeJxQN-W2uA.
