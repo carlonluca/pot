@@ -117,6 +117,9 @@ DEFINES += ENABLE_IMPROVED_BUFFERING
 # This enables logs coming from omxplayer core.
 #DEFINES += ENABLE_OMXPLAYER_LOGS
 
+# Define this to enable watchdog.
+#DEFINES += OMX_LOCK_WATCHDOG
+
 # For omxplayer.
 QMAKE_CXXFLAGS += -std=c++11 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS             \
    -DTARGET_POSIX -D_LINUX -fPIC -DPIC -D_REENTRANT -D_LARGEFILE64_SOURCE               \
@@ -173,7 +176,9 @@ SOURCES += \
     $$SRC/omx_textureprovider.cpp \
     $$SRC/omx_playeraudio.cpp \
     $$SRC/omx_reader.cpp \
-    $$SRC/ilclient/*
+    $$SRC/ilclient/* \
+    $$SRC/omx_staticconf.cpp \
+    $$SRC/omx_watchdog.cpp
 
 # This is the PiOmxTextures implementation of the logging class
 # in omxplayer.
@@ -245,7 +250,9 @@ HEADERS  += \
     $$SRC/omx_playeraudio.h \
     $$SRC/omx_reader.h \
     $$SRC/ilclient/* \
-	 $$PWD/omx_logging.h
+    $$SRC/omx_logging.h \
+    $$SRC/omx_staticconf.h \
+    $$SRC/omx_watchdog.h
 
 HEADERS += \
     $$SRC/omxplayer_lib/Unicode.h \

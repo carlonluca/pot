@@ -1,9 +1,9 @@
 /*
  * Project: PiOmxTextures
  * Author:  Luca Carlon
- * Date:    07.20.2013
+ * Date:    10.22.2015
  *
- * Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
+ * Copyright (c) 2015 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -21,70 +21,83 @@
  * along with PiOmxTextures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
-#include <Qt>
+#include <QFile>
 
-#include <cmath>
+#include "OMXCore.h"
 
-#include "omx_playeraudio.h"
-#include "lc_logging.h"
-
-using namespace std;
+#include "omx_watchdog.h"
+#include "omx_logging.h"
 
 /*------------------------------------------------------------------------------
-|    OMX_PlayerAudio::OMX_PlayerAudio
+|    definitions
 +-----------------------------------------------------------------------------*/
-OMX_PlayerAudio::OMX_PlayerAudio() : OMXPlayerAudio()
+#define IPC_FILE_ABS_PATH "/tmp/omx_lock"
+
+#ifdef OMX_LOCK_WATCHDOG
+/*------------------------------------------------------------------------------
+|    OMX_WatchDog::OMX_WatchDog
++-----------------------------------------------------------------------------*/
+OMX_Watchdog::OMX_Watchdog(QObject* parent) : QObject(parent)
 {
-   // Do nothing.
+	moveToThread(&m_thread);
+
+	// Note that the even timer must be in a separate thread as we MUST ensure
+	// its own thread does not lock.
+	m_timer.moveToThread(&m_thread);
+	m_timer.setSingleShot(false);
+	m_timer.setInterval(1000);
+
+	m_thread.start();
+
+	connect(&m_timer, SIGNAL(timeout()),
+			  this, SLOT(testOmx()));
+
+#if 0
+	QFile f(IPC_FILE_ABS_PATH);
+	f.remove();
+#endif
 }
 
 /*------------------------------------------------------------------------------
-|    OMX_PlayerAudio::~OMX_PlayerAudio
+|    OMX_WatchDog::startWatchDog
 +-----------------------------------------------------------------------------*/
-OMX_PlayerAudio::~OMX_PlayerAudio()
+void OMX_Watchdog::startWatchdog()
 {
-   // Do nothing.
+	QMetaObject::invokeMethod(&m_timer, "start");
 }
 
 /*------------------------------------------------------------------------------
-|    OMX_PlayerAudio::SetMuted
+|    OMX_WatchDog::stopWatchDog
 +-----------------------------------------------------------------------------*/
-void OMX_PlayerAudio::SetMuted(bool mute)
+void OMX_Watchdog::stopWatchdog()
 {
-	m_mute = mute;
-
-	if (m_decoder)
-		m_decoder->SetMute(m_mute);
+	QMetaObject::invokeMethod(&m_timer, "stop");
 }
 
 /*------------------------------------------------------------------------------
-|    OMX_PlayerAudio::GetMuted
+|    OMX_WatchDog::testOmx
 +-----------------------------------------------------------------------------*/
-bool OMX_PlayerAudio::GetMuted()
+void OMX_Watchdog::testOmx()
 {
-	return m_mute;
-}
+	if (!COMXCoreComponent::testOmx())
+		return;
 
-/*------------------------------------------------------------------------------
-|    OMX_PlayerAudio::SetCurrentVolume
-+-----------------------------------------------------------------------------*/
-/**
- * @brief OMX_PlayerAudio::SetCurrentVolume
- * @param volume
- * @param linear
- */
-void OMX_PlayerAudio::SetCurrentVolume(double volume, bool linear)
-{
-	OMXPlayerAudio::SetVolume((float)volume);
-}
+	log_verbose("Touching IPC file...");
+	QFile f(IPC_FILE_ABS_PATH);
+	if (!f.open(QIODevice::WriteOnly)) {
+		log_warn("Cannot touch file %s.", IPC_FILE_ABS_PATH);
+		return;
+	}
 
-/*------------------------------------------------------------------------------
-|    OMX_PlayerAudio::GetCurrentVolume
-+-----------------------------------------------------------------------------*/
-double OMX_PlayerAudio::GetCurrentVolume(bool linear)
-{
-	return OMXPlayerAudio::GetVolume();
+	if (!f.exists()) {
+		log_warn("Could not create file %s.", IPC_FILE_ABS_PATH);
+		return;
+	}
+
+	f.flush();
 }
+#endif // OMX_LOCK_WATCHDOG

@@ -205,6 +205,12 @@ void OpenMAXILVideoRendererControl::onTexturesReady()
             QVideoFrame::Format_RGB565,
             QAbstractVideoBuffer::GLTextureHandle
             );
+
+	// This is needed to force an update of the surface format int the
+	// following refresh.
+	if (m_surface)
+		if (m_surface->isActive())
+			m_surface->stop();
 }
 
 /*------------------------------------------------------------------------------

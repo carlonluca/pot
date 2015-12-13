@@ -37,8 +37,52 @@
 #include "XMemUtils.h"
 #endif
 
+#include <omx_logging.h>
+
 //#define OMX_DEBUG_EVENTS
 //#define OMX_DEBUG_EVENTHANDLER
+
+#ifdef OMX_THREAD_UNSAFE
+#define log_lock log_disabled
+
+// lcarlon: temporary implementation.
+QMutex COMXCoreComponent::m_mxOmx(QMutex::Recursive);
+
+/*------------------------------------------------------------------------------
+|    COMXCoreComponent::testOmx
++-----------------------------------------------------------------------------*/
+bool COMXCoreComponent::testOmx()
+{
+	// Try to lock and timeout in 1s.
+	log_debug("Testing OpenMAX health...");
+	const bool alive = m_mxOmx.tryLock(1000);
+	if (alive)
+		m_mxOmx.unlock();
+
+	if (alive)
+		return log_debug("OpenMAX seems healthy :-)");
+	return log_warn("OpenMAX seems dead ;-(");
+}
+
+/*------------------------------------------------------------------------------
+|    lock_mutex
++-----------------------------------------------------------------------------*/
+inline void lock_mutex(QMutex* m)
+{
+	log_lock("Waiting for lock %p...", m);
+	m->lock();
+	log_lock("Got lock %p...", m);
+}
+
+/*------------------------------------------------------------------------------
+|    unlock_mutex
++-----------------------------------------------------------------------------*/
+inline void unlock_mutex(QMutex* m)
+{
+	log_lock("Releasing lock %p...", m);
+	m->unlock();
+}
+#endif // OMX_THREAD_UNSAFE
 
 ////////////////////////////////////////////////////////////////////////////////////////////
 #define CLASSNAME "COMXCoreComponent"
@@ -366,12 +410,32 @@ OMX_ERRORTYPE COMXCoreComponent::EmptyThisBuffer(OMX_BUFFERHEADERTYPE *omx_buffe
   if(!m_handle || !omx_buffer)
     return OMX_ErrorUndefined;
 
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  lock_mutex(&m_mxOmx);
+
+//#define SIMULATE_OMX_LOCK
+#ifdef SIMULATE_OMX_LOCK
+  static int count = 0;
+  count++;
+  if (count >= 500) {
+	  while (true)
+		  OMXClock::OMXSleep(10000);
+  }
+#endif // SIMULATE_OMX_LOCK
+#endif // OMX_THREAD_UNSAFE
+
   omx_err = OMX_EmptyThisBuffer(m_handle, omx_buffer);
   if (omx_err != OMX_ErrorNone)
   {
     CLog::Log(LOGERROR, "COMXCoreComponent::EmptyThisBuffer component(%s) - failed with result(0x%x)\n", 
         m_componentName.c_str(), omx_err);
   }
+
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  unlock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
 
   return omx_err;
 }
@@ -386,12 +450,22 @@ OMX_ERRORTYPE COMXCoreComponent::FillThisBuffer(OMX_BUFFERHEADERTYPE *omx_buffer
   if(!m_handle || !omx_buffer)
     return OMX_ErrorUndefined;
 
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  lock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
+
   omx_err = OMX_FillThisBuffer(m_handle, omx_buffer);
   if (omx_err != OMX_ErrorNone)
   {
     CLog::Log(LOGERROR, "COMXCoreComponent::FillThisBuffer component(%s) - failed with result(0x%x)\n", 
         m_componentName.c_str(), omx_err);
   }
+
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  unlock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
 
   return omx_err;
 }
@@ -426,6 +500,10 @@ void COMXCoreComponent::FlushInput()
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
 
+#ifdef OMX_THREAD_UNSAFE
+  lock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
+
   omx_err = OMX_SendCommand(m_handle, OMX_CommandFlush, m_input_port, NULL);
 
   if(omx_err != OMX_ErrorNone)
@@ -439,6 +517,10 @@ void COMXCoreComponent::FlushInput()
     CLog::Log(LOGERROR, "COMXCoreComponent::FlushInput - %s WaitForCommand omx_err(0x%08x)",
               m_componentName.c_str(), (int)omx_err);
   }
+
+#ifdef OMX_THREAD_UNSAFE
+  unlock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
 }
 
 void COMXCoreComponent::FlushOutput()
@@ -447,6 +529,10 @@ void COMXCoreComponent::FlushOutput()
     return;
 
   OMX_ERRORTYPE omx_err = OMX_ErrorNone;
+
+#ifdef OMX_THREAD_UNSAFE
+  lock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
 
   omx_err = OMX_SendCommand(m_handle, OMX_CommandFlush, m_output_port, NULL);
 
@@ -461,6 +547,10 @@ void COMXCoreComponent::FlushOutput()
     CLog::Log(LOGERROR, "COMXCoreComponent::FlushOutput - %s WaitForCommand omx_err(0x%08x)",
               m_componentName.c_str(), (int)omx_err);
   }
+
+#ifdef OMX_THREAD_UNSAFE
+  unlock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
 }
 
 // timeout in milliseconds
@@ -1189,10 +1279,18 @@ OMX_ERRORTYPE COMXCoreComponent::SetConfig(OMX_INDEXTYPE configIndex, OMX_PTR co
   return omx_err;
 }
 
-OMX_ERRORTYPE COMXCoreComponent::GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR configStruct) const
+OMX_ERRORTYPE COMXCoreComponent::GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR configStruct)
+#ifndef OMX_THREAD_UNSAFE
+	const
+#endif // OMX_THREAD_UNSAFE
 {
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  QMutexLocker locker(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
+
   if(!m_handle)
-    return OMX_ErrorUndefined;
+	 return OMX_ErrorUndefined;
 
   OMX_ERRORTYPE omx_err;
 

@@ -297,7 +297,8 @@ if [ "$1" == "pi1" ]; then
 --enable-decoder=opus \
 --cross-prefix=arm-linux-gnueabihf- \
 --prefix=$PWD/ffmpeg_compiled \
---disable-symver
+--disable-symver \
+--pkg-config=pkg-config
 else
 ./configure \
 --sysroot=$RPI_SYSROOT \
@@ -525,7 +526,8 @@ else
 --enable-decoder=opus \
 --cross-prefix=arm-linux-gnueabihf- \
 --prefix=$PWD/ffmpeg_compiled \
---disable-symver
+--disable-symver \
+--pkg-config=pkg-config
 fi
 
 echo "Building..."

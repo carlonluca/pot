@@ -41,7 +41,7 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 
-#include "lc_logging.h"
+#include "omx_logging.h"
 #include "omx_videosurfaceelement.h"
 #include "omx_textureprovider.h"
 // ===
@@ -80,8 +80,14 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
     OMX_EGLBufferProvider* provider = videoDecoder->m_provider.get();
     assert(provider->registerFilledBuffer(pBuffer));
 
-    // Get next empty buffer.
-	 OMX_TextureData* empty = provider->getNextEmptyBuffer();
+	// Get next empty buffer. It is possible none is returned when the provider
+	// was cleaned up.
+	OMX_TextureData* empty = provider->getNextEmptyBuffer();
+	if (!empty) {
+		log_warn("Couldn't get an empty buffer.");
+		return OMX_ErrorNone;
+	}
+
     return OMX_FillThisBuffer(handle, empty->m_omxBuffer);
 }
 
@@ -314,9 +320,12 @@ bool COMXVideo::PortSettingsChanged()
     }
     else
     {
-      image_filter.nNumParams = 1;
+		image_filter.nNumParams = 4;
       image_filter.nParams[0] = 3;
-      if (!advanced_deinterlace)
+		image_filter.nParams[1] = 0;                                  // Default frame interval.
+		image_filter.nParams[2] = OMX_StaticConf::getHalfFramerate(); // Half frame rate.
+		image_filter.nParams[3] = OMX_StaticConf::getInterlaceQpu();  // Use QPUs.
+		if (!advanced_deinterlace)
         image_filter.eImageFilter = OMX_ImageFilterDeInterlaceFast;
       else
         image_filter.eImageFilter = OMX_ImageFilterDeInterlaceAdvanced;
@@ -441,7 +450,7 @@ bool COMXVideo::Open(OMXClock *clock, const OMXVideoConfig &config)
   // re-use an existing one. For instance seek and restart may want to simply close and reopen
   // the video player without generating a new texture.
   QSize videoSize(m_config.hints.width, m_config.hints.height);
-  m_provider->instantiateTextures(videoSize, 4);
+  m_provider->instantiateTextures(videoSize);
 
   if(!m_config.hints.width || !m_config.hints.height)
     return false;
@@ -943,7 +952,7 @@ bool COMXVideo::SetVideoEGL()
 {
    // Query output buffer requirements for renderer and provide the native display
    // the renderer will use.
-   LOG_DEBUG(LOG_TAG, "%s", Q_FUNC_INFO);
+	log_verbose_func;
 
    OMX_PARAM_PORTDEFINITIONTYPE portdef;
    portdef.nSize = sizeof(OMX_PARAM_PORTDEFINITIONTYPE);
@@ -953,7 +962,7 @@ bool COMXVideo::SetVideoEGL()
    if (omx_err != OMX_ErrorNone)
       CLog::Log(LOGERROR, "Failed to get port definition for renderer output port.");
 
-   portdef.nBufferCountActual = 4;
+   portdef.nBufferCountActual = TEXTURE_COUNT;
    portdef.format.video.pNativeWindow = get_egl_display();
    omx_err = m_omx_render.SetParameter(OMX_IndexParamPortDefinition, &portdef);
    if (omx_err != OMX_ErrorNone)

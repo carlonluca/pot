@@ -55,15 +55,15 @@
 |    definitions
 +-----------------------------------------------------------------------------*/
 //#define DEBUG_PLAYBIN
-#define DEBUG_PLAYER_CONTROL
+//#define DEBUG_PLAYER_CONTROL
 
 #ifndef DEBUG_PLAYER_CONTROL
 #ifdef LOG_DEBUG
 #undef LOG_DEBUG
-#define LOG_DEBUG(...) {(void)0}
+#define LOG_DEBUG(...) {(void)0;}
 #endif // LOG_DEBUG
 #else
-#include <lc_logging.h>
+#include <omx_logging.h>
 #endif // DEBUG_PLAYER_CONTROL
 
 

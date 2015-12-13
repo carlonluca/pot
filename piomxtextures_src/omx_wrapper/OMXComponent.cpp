@@ -14,7 +14,7 @@
 
 #include "interface/vcos/vcos.h"
 
-#include "lc_logging.h"
+#include "omx_logging.h"
 
 #define TIMEOUT_MS 10000
 

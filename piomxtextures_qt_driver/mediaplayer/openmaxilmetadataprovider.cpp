@@ -24,9 +24,9 @@
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
-#include <lc_logging.h>
+#include <QDate>
 
-#include "QtCore/QDate"
+#include "omx_logging.h"
 
 #include "qmediametadata.h"
 #include "openmaxilmetadataprovider.h"

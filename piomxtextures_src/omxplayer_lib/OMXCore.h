@@ -33,6 +33,12 @@
 
 #include <semaphore.h>
 
+//#define OMX_THREAD_UNSAFE
+
+#ifdef OMX_THREAD_UNSAFE
+#include <QMutex>
+#endif // OMX_THREAD_UNSAFE
+
 ////////////////////////////////////////////////////////////////////////////////////////////
 // debug spew defines
 #if 0
@@ -101,7 +107,12 @@ public:
   OMX_ERRORTYPE SetParameter(OMX_INDEXTYPE paramIndex, OMX_PTR paramStruct);
   OMX_ERRORTYPE GetParameter(OMX_INDEXTYPE paramIndex, OMX_PTR paramStruct) const;
   OMX_ERRORTYPE SetConfig(OMX_INDEXTYPE configIndex, OMX_PTR configStruct);
-  OMX_ERRORTYPE GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR configStruct) const;
+  OMX_ERRORTYPE GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR configStruct)
+#ifdef OMX_THREAD_UNSAFE
+	;
+#else
+	const;
+#endif // OMX_THREAD_UNSAFE
   OMX_ERRORTYPE SendCommand(OMX_COMMANDTYPE cmd, OMX_U32 cmdParam, OMX_PTR cmdParamData);
   OMX_ERRORTYPE EnablePort(unsigned int port, bool wait = true);
   OMX_ERRORTYPE DisablePort(unsigned int port, bool wait = true);
@@ -163,6 +174,10 @@ public:
   void SetCustomDecoderFillBufferDoneHandler(OMX_ERRORTYPE (*p)(OMX_HANDLETYPE, OMX_PTR, OMX_BUFFERHEADERTYPE*)){ CustomDecoderFillBufferDoneHandler = p;};
   void SetCustomDecoderEmptyBufferDoneHandler(OMX_ERRORTYPE (*p)(OMX_HANDLETYPE, OMX_PTR, OMX_BUFFERHEADERTYPE*)){ CustomDecoderEmptyBufferDoneHandler = p;};
 
+#ifdef OMX_THREAD_UNSAFE
+  static bool testOmx();
+#endif // OMX_THREAD_UNSAFE
+
 private:
   OMX_HANDLETYPE m_handle;
   unsigned int   m_input_port;
@@ -207,6 +222,10 @@ private:
   bool          m_flush_input;
   bool          m_flush_output;
   bool          m_resource_error;
+
+#ifdef OMX_THREAD_UNSAFE
+  static QMutex m_mxOmx;
+#endif // OMX_THREAD_UNSAFE
 
   // lcarlon: keep during merges.
   // lcarlon: this is needed as an hack.

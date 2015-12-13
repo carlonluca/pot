@@ -33,13 +33,14 @@
 #include <cstring>
 #include <mutex>
 
-#include "lc_logging.h"
-
 #include "omx_mediaprocessor.h"
 #include "omx_textureprovider.h"
 #include "omx_playeraudio.h"
 #include "omx_reader.h"
 #include "omx_globals.h"
+#ifdef OMX_LOCK_WATCHDOG
+#include "omx_watchdog.h"
+#endif // OMX_LOCK_WATCHDOG
 
 // omxplayer lib.
 #include "omxplayer_lib/linux/RBP.h"
@@ -109,7 +110,7 @@ static int get_mem_gpu(void)
 	return gpu_mem;
 }
 
-std::once_flag flag1;
+static std::once_flag flag1;
 
 /*------------------------------------------------------------------------------
 |    print_build_once
@@ -121,6 +122,20 @@ static void print_build_once()
 	});
 }
 
+#ifdef OMX_LOCK_WATCHDOG
+/*------------------------------------------------------------------------------
+|    start_watchdog_once
++-----------------------------------------------------------------------------*/
+static void start_watchdog_once()
+{
+	std::call_once(flag2, []() {
+		log_info("Starting watchdog...");
+		static OMX_Watchdog watchDog;
+		watchDog.startWatchdog();
+	});
+}
+#endif // OMX_LOCK_WATCHDOG
+
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::OMX_MediaProcessor
 +-----------------------------------------------------------------------------*/
@@ -131,9 +146,9 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 	m_state(STATE_INACTIVE),
 	m_mediaStatus(MEDIA_STATUS_NO_MEDIA),
 	m_sendCmd(QMutex::Recursive),
-	#ifdef ENABLE_SUBTITLES
+#ifdef ENABLE_SUBTITLES
 	m_has_subtitle(false),
-	#endif
+#endif
 	m_av_clock(new OMXClock),
 	m_player_video(new OMXPlayerVideo(provider)),
 	m_player_audio(new OMX_PlayerAudio),
@@ -148,19 +163,22 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 	m_pendingPause(false),
 	m_subtitle_index(0),
 	m_audio_index(0),
-	m_incr(0),
+	m_incrMs(0),
 	m_audioConfig(new OMXAudioConfig()),
 	m_videoConfig(new OMXVideoConfig()),
 	m_playspeedCurrent(playspeed_normal),
 	m_seekFlush(false),
 	m_packetAfterSeek(false),
 	startpts(0),
-	m_loop(false),
 	m_muted(false),
-	m_loop_from(0.0f),
+	m_volume(1.0),
 	m_fps(0.0f)
 {
 	print_build_once();
+
+#ifdef OMX_LOCK_WATCHDOG
+	start_watchdog_once();
+#endif // OMX_LOCK_WATCHDOG
 
 	qRegisterMetaType<OMX_MediaProcessor::OMX_MediaProcessorError>(
 				"OMX_MediaProcessor::OMX_MediaProcessorError");
@@ -247,6 +265,7 @@ bool OMX_MediaProcessor::setFilename(const QString& filename)
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::setFilenameWrapper(const QString& filename)
 {
+	stopInt();
 	setMediaStatus(MEDIA_STATUS_LOADING);
 
 	if (!setFilenameInt(filename)) {
@@ -313,8 +332,9 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 #ifdef ENABLE_SUBTITLES
 	m_has_subtitle  = m_omx_reader->SubtitleStreamCount();
 #endif
-	m_loop          = m_loop && m_omx_reader->CanSeek();
-	m_incr          = 0;
+	m_incrMs          = 0;
+	m_packetAfterSeek = false;
+	m_seekFlush       = false;
 
 	LOG_VERBOSE(LOG_TAG, "Initializing OMX clock...");
 	if (!m_av_clock->OMXInitialize())
@@ -404,7 +424,7 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 		if (!m_player_audio->Open(m_av_clock, *m_audioConfig, m_omx_reader))
 			return false;
 		if (m_has_audio)
-			m_player_audio->SetVolume(pow(10, 0 / 2000.0));
+			m_player_audio->SetCurrentVolume(m_volume, true);
 	}
 
 	setState(STATE_STOPPED);
@@ -574,21 +594,21 @@ bool OMX_MediaProcessor::pauseInt()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::seek(qint64 position)
 {
+	QMutexLocker locker(&m_sendCmd);
+
 	LOG_VERBOSE(LOG_TAG, "Seek %lldms.", position);
 	if (!m_av_clock)
 		return false;
 
 	// Get current position in ms.
-	qint64 current  = m_av_clock->OMXMediaTime(false)*1E-3;
-	qint64 currentS = qRound64(current/1000.0d);
+	qint64 currentMs  = m_av_clock->OMXMediaTime(false)*1E-3;
 
 	// position is in ms. Translate to seconds.
-	int seconds = qRound64(position/1000.0d);
-	int increment = seconds - currentS;
-	if (!increment)
+	int incrementMs = position - currentMs;
+	if (!incrementMs)
 		return true;
 
-	m_incr = increment;
+	m_incrMs = incrementMs;
 
 	return true;
 }
@@ -598,8 +618,11 @@ bool OMX_MediaProcessor::seek(qint64 position)
 +-----------------------------------------------------------------------------*/
 qint64 OMX_MediaProcessor::streamPosition()
 {
+	QMutexLocker locker(&m_sendCmd);
 	if (!m_av_clock)
 		return -1;
+	if (m_state == OMX_MediaProcessor::STATE_STOPPED)
+		return 0;
 	return m_av_clock->OMXMediaTime(false)*1E-3;
 }
 
@@ -608,7 +631,15 @@ qint64 OMX_MediaProcessor::streamPosition()
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::setVolume(long volume, bool linear)
 {
-	m_player_audio->SetCurrentVolume(volume, linear);
+	QMutexLocker locker(&m_sendCmd);
+
+#define VOL_MAX 2
+#define VOL_MIN 0
+
+	m_volume = volume/100.0*(VOL_MAX - VOL_MIN);
+
+	log_debug("setVolume %f", m_volume);
+	m_player_audio->SetCurrentVolume(m_volume, linear);
 }
 
 /*------------------------------------------------------------------------------
@@ -616,7 +647,10 @@ void OMX_MediaProcessor::setVolume(long volume, bool linear)
 +-----------------------------------------------------------------------------*/
 long OMX_MediaProcessor::volume(bool linear)
 {
-	return m_player_audio->GetCurrentVolume(linear);
+	QMutexLocker locker(&m_sendCmd);
+	//return m_player_audio->GetCurrentVolume(linear)/(VOL_MAX - VOL_MIN)*100;
+
+	return m_volume;
 }
 
 /*------------------------------------------------------------------------------
@@ -624,6 +658,7 @@ long OMX_MediaProcessor::volume(bool linear)
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::setMute(bool muted)
 {
+	QMutexLocker locker(&m_sendCmd);
 	m_muted = muted;
 
 	if (LIKELY(m_player_audio != NULL))
@@ -635,6 +670,7 @@ void OMX_MediaProcessor::setMute(bool muted)
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::muted()
 {
+	QMutexLocker locker(&m_sendCmd);
 	return m_muted;
 }
 
@@ -712,17 +748,18 @@ void OMX_MediaProcessor::mediaDecoding()
 			continue;
 		}
 
-		if (UNLIKELY(m_seekFlush || m_incr != 0)) {
+		if (UNLIKELY(m_seekFlush || m_incrMs != 0)) {
 			double seek_pos = 0;
 			double pts      = m_av_clock->OMXMediaTime();
+			double ptsMs    = DVD_TIME_TO_MSEC(pts);
 
 			//seek_pos        = (pts / DVD_TIME_BASE) + m_incr;
-			seek_pos = (pts ? pts / DVD_TIME_BASE : last_seek_pos) + m_incr;
+			seek_pos = (ptsMs ? ptsMs : last_seek_pos) + m_incrMs;
 			last_seek_pos = seek_pos;
 
-			seek_pos        *= 1000.0;
+			//seek_pos        *= 1000.0;
 
-			if(m_omx_reader->SeekTime((int)seek_pos, m_incr < 0.0f, &startpts))
+			if(m_omx_reader->SeekTime((int)seek_pos, m_incrMs < 0.0f, &startpts))
 			{
 				unsigned t = (unsigned)(startpts*1e-6);
 				//auto dur = m_omx_reader->GetStreamLength() / 1000;
@@ -737,11 +774,11 @@ void OMX_MediaProcessor::mediaDecoding()
 				break;
 
 			if (m_has_video && !m_player_video->Reset()) {
-				m_incr = 0;
+				m_incrMs = 0;
 				break;
 			}
 
-			m_incr = 0;
+			m_incrMs = 0;
 
 #ifdef ENABLE_PAUSE_FOR_BUFFERING
 			m_av_clock->OMXPause();
@@ -764,9 +801,10 @@ void OMX_MediaProcessor::mediaDecoding()
 			double pts          = 0;
 
 			pts      = m_av_clock->OMXMediaTime();
-			seek_pos = (pts/DVD_TIME_BASE);
+			//seek_pos = (pts/DVD_TIME_BASE);
+			seek_pos = DVD_TIME_TO_MSEC(pts);
 
-			seek_pos *= 1000.0;
+			//seek_pos *= 1000.0;
 
 #if 1
 			if (m_omx_reader->SeekTime((int)seek_pos, m_av_clock->OMXPlaySpeed() < 0, &startpts))
@@ -912,12 +950,6 @@ void OMX_MediaProcessor::mediaDecoding()
 				continue;
 			}
 
-			if (m_loop)
-			{
-				m_incr = m_loop_from - (m_av_clock->OMXMediaTime() ? m_av_clock->OMXMediaTime() / DVD_TIME_BASE : last_seek_pos);
-				continue;
-			}
-
 			setMediaStatus(MEDIA_STATUS_END_OF_MEDIA);
 			break;
 		}
@@ -968,7 +1000,8 @@ void OMX_MediaProcessor::mediaDecoding()
 	m_av_clock->OMXStop();
 	m_av_clock->OMXStateIdle();
 
-	m_incr = m_loop_from - (m_av_clock->OMXMediaTime() ? m_av_clock->OMXMediaTime() / DVD_TIME_BASE : last_seek_pos);
+	const double mediaTime = m_av_clock->OMXMediaTime();
+	m_incrMs = -(mediaTime ? DVD_TIME_TO_MSEC(mediaTime) : last_seek_pos);
 	m_seekFlush = true;
 
 	flushStreams(DVD_NOPTS_VALUE);
@@ -1013,8 +1046,10 @@ void OMX_MediaProcessor::flushStreams(double pts)
 	m_av_clock->OMXStop();
 	m_av_clock->OMXPause();
 
-	if (m_has_video)
+	if (m_has_video) {
 		m_player_video->Flush();
+		m_provider->flush();
+	}
 
 	if (m_has_audio)
 		m_player_audio->Flush();

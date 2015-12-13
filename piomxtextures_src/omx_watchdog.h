@@ -1,7 +1,7 @@
 /*
  * Project: PiOmxTextures
  * Author:  Luca Carlon
- * Date:    05.07.2015
+ * Date:    10.22.2015
  *
  * Copyright (c) 2015 Luca Carlon. All rights reserved.
  *
@@ -21,49 +21,34 @@
  * along with PiOmxTextures.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef OMX_LOGGING_H
-#define OMX_LOGGING_H
+#ifndef OMX_WATCHDOG_H
+#define OMX_WATCHDOG_H
 
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
-#include <QString>
-
-#define BUILD_LOG_LEVEL_INFORMATION
-#include <lc_logging.h>
-
-using namespace std;
+#include <QTimer>
+#include <QThread>
 
 /*------------------------------------------------------------------------------
-|    definitions
+|    OMX_WatchDog class
 +-----------------------------------------------------------------------------*/
-#define ENABLE_DTOR_LOGS
-#ifdef ENABLE_DTOR_LOGS
-#define log_dtor(f, ...) \
-	log_formatted(LC_LOG_ATTR_BLINK, LC_LOG_COL_WHITE, f, ##__VA_ARGS__)
-#else
-#define log_dtor(...)
-#endif // ENABLE_DTOR_LOGS
+#ifdef OMX_LOCK_WATCHDOG
+class OMX_Watchdog : public QObject
+{
+	Q_OBJECT
+public:
+	OMX_Watchdog(QObject* parent = 0);
+	virtual ~OMX_Watchdog() {}
 
-#define log_dtor_func \
-   log_dtor("%s", __PRETTY_FUNCTION__)
+public slots:
+	void startWatchdog();
+	void stopWatchdog();
+	void testOmx();
 
-#ifdef ENABLE_LOG_DEBUG
-#define logi_debug(f, ...)               \
-   {                                     \
-      QString p = QString::asprintf("[%p] ", this);  \
-      QString l = p + f;                  \
-      log_debug(l.toLocal8Bit().constData(), __VA_ARGS__); \
-   }
-#define logi_debug_func                                 \
-   {                                                    \
-      QString p = QString::asprintf("[%p] %s", this, Q_FUNC_INFO);  \
-      log_debug(p.toLocal8Bit().constData());                             \
-   }
-
-#else
-#define logi_debug
-#define logi_debug_func
-#endif
-
-#endif // OMX_LOGGING_H
+private:
+	QTimer m_timer;
+	QThread m_thread;
+};
+#endif // OMX_LOCK_WATCHDOG
+#endif // OMX_WATCHDOG_H

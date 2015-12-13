@@ -1,0 +1,25 @@
+ 7661  svn export http://source.icu-project.org/repos/icu/icu/tags/release-55-1
+ 7662  mkdir build_icu_linux
+ 7663  cd build_icu_linux/
+ 7664  sh $ICU_SOURCES/source/runConfigureICU Linux --prefix=$PWD/icu_build
+ 7665  make -j10
+ 7666  make install
+ 7667  cd ..
+ 7668  mkdir build_icu_rpi
+ 7669  cd build_icu_rpi/
+ 7670  ls -lh
+ 7671  export CPPFLAGS="-O3 -fno-short-wchar -DU_USING_ICU_NAMESPACE=1 -fno-short-enums -pipe -march=armv6j -mtune=arm1176jzf-s -mfpu=vfp -mfloat-abi=hard"
+ 7672  export CFLAGS=CPPFLAGS
+ 7673  export PATH=/opt/rpi/gcc-linaro-arm-linux-gnueabihf-raspbian/bin:$PATH
+ 7674  $ICU_SOURCES/source/configure --with-cross-build=~/project/pi/icu/build_icu_rpi/build_icu_linux --enable-shared --host=arm-linux-gnueabihf --prefix=$PWD/icu_build
+ 7675  cat config.log 
+ 7676  export CFLAGS=$CPPFLAGS
+ 7677  $ICU_SOURCES/source/configure --with-cross-build=~/project/pi/icu/build_icu_rpi/build_icu_linux --enable-shared --host=arm-linux-gnueabihf --prefix=$PWD/icu_build
+ 7678  $ICU_SOURCES/source/configure --with-cross-build=/home/luca/project/pi/icu/build_icu_rpi/build_icu_linux --enable-shared --host=arm-linux-gnueabihf --prefix=$PWD/icu_build
+ 7679  $ICU_SOURCES/source/configure --with-cross-build=/home/luca/project/pi/icu/build_icu_linux --enable-shared --host=arm-linux-gnueabihf --prefix=$PWD/icu_build
+ 7680  make -j8
+ 7681  make install
+ 7682  cd icu_build/
+ 7683  grep -R ucol_open_55 *
+ 7684  ls -lh
+ 7685  rsync -chavzP --stats * pi@192.168.1.243:/home/pi/qtdeps

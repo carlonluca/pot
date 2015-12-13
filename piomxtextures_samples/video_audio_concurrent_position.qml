@@ -26,51 +26,55 @@ import QtQml 2.2
 import QtMultimedia 5.0
 
 Rectangle {
-	property string uri1
-	property string uri2
-	property string uri3
+	property var videoUris: []
+	property var audioUris: []
+	property int videoIndex: 0
+	property int audioIndex: 0
 
 	color: "red"
 
 	Component.onCompleted: {
 		var arguments = Qt.application.arguments;
-		if (arguments.length < 5) {
+		if (arguments.length < 6) {
 			console.log("Too few arguments.");
 			Qt.quit();
 		}
 
-		uri1 = arguments[2];
-		uri2 = arguments[3];
-		uri3 = arguments[4];
+		videoUris.push(arguments[2]);
+		videoUris.push(arguments[3]);
+		audioUris.push(arguments[4]);
+		audioUris.push(arguments[5]);
+
+		nextVideo(video1);
+		nextVideo(video2);
+		nextAudio(audio);
 	}
 
 	Video {
 		id: video1
 		width: 500
 		height: 450
-		x: 100
-		y: 400
-		source: uri1
-		autoPlay: true
-		onStopped: {video1.seek(0); video1.play();}
+		x: parent.width/3 - width/2
+		y: parent.height/2 - height/2
+		autoPlay: false
+		onStopped: nextVideo(video1)
 	}
 
 	Video {
 		id: video2
-		x: 900
-		y: 400
 		width: 500
 		height: 450
-		source: uri2
-		autoPlay: true
-		onStopped: {video2.seek(0); video2.play();}
+		x: parent.width/3*2 - width/2
+		y: parent.height/2 - height/2
+		autoPlay: false
+		onStopped: nextVideo(video2)
 	}
 
 	Audio {
 		id: audio
 		source: uri3
-		autoPlay: true
-		onStopped: {audio.seek(0); audio.play();}
+		autoPlay: false
+		onStopped: nextAudio(audio)
 	}
 
 	Timer {
@@ -81,5 +85,24 @@ Rectangle {
 			console.log("Position video2: " + video2.position + ".");
 			console.log("Position audio: " + audio.position + ".");
 		}
+	}
+
+	Timer {
+		interval: 5000
+		running: true; repeat: true
+		onTriggered: {
+			console.log("Switching audio...");
+			audio.stop();
+		}
+	}
+
+	function nextVideo(element) {
+		element.source = videoUris[videoIndex++%2];
+		element.play();
+	}
+
+	function nextAudio(element) {
+		element.source = audioUris[audioIndex++%2];
+		element.play();
 	}
 }

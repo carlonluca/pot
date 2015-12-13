@@ -38,6 +38,7 @@
 #include "utils/SingleLock.h"
 
 #include "omx_textureprovider.h"
+#include "omx_staticconf.h"
 
 using namespace std;
 
@@ -76,20 +77,10 @@ public:
 
   OMXVideoConfig()
   {
-    EDEINTERLACEMODE mode = VS_DEINTERLACEMODE_OFF;
-    QByteArray ba = qgetenv("INTERLACE_MODE");
-
-    bool convOk;
-    int im = ba.toInt(&convOk);
-    if (convOk && im < 3 && im >= 0)
-       mode = (EDEINTERLACEMODE)im;
-
-    log_verbose("Using deinterlace mode: %d.", mode);
-
     use_thread = true;
     dst_rect.SetRect(0, 0, 0, 0);
     display_aspect = 0.0f;
-    deinterlace = mode; // lcarlon: keep this off
+	 deinterlace = (EDEINTERLACEMODE)OMX_StaticConf::getInterlaceMode();
     anaglyph = OMX_ImageFilterAnaglyphNone;
     hdmi_clock_sync = false;
     allow_mvc = false;

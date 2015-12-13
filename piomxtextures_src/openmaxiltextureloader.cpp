@@ -49,8 +49,9 @@ extern "C" {
 }
 
 #include <OMXCore.h>
-#include <lc_logging.h>
 #include "omxtunnel.h"
+
+#include "omx_logging.h"
 
 /*----------------------------------------------------------------------
 |    definitions

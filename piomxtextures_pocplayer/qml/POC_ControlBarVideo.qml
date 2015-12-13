@@ -40,8 +40,9 @@ POC_ControlBar {
             Layout.fillWidth: true
             maximumValue:             1.0
             minimumValue:             0.0
-            stepSize:                 0.01
-            value: videoOutputSurface.position/videoOutputSurface.duration;
+				stepSize:                 0.0001
+				value:
+					mediaPlayer.position/mediaPlayer.duration;
             updateValueWhileDragging: false
 
             // NOTE: Remember to avoid seeking on value changed. That will result in

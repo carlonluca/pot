@@ -27,15 +27,15 @@
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
-#include <QtCore/qobject.h>
-#include <QtCore/qstack.h>
-#include <QtCore/qsemaphore.h>
-#include <QtCore/qmutex.h>
+#include <QObject>
+#include <QStack>
+#include <QSemaphore>
+#include <QMutex>
 #include <QQuickItem>
-
-#include <qmediacontent.h>
-#include <qmediaplayer.h>
-#include <qmediaplayercontrol.h>
+#include <QMediaContent>
+#include <QMediaPlayer>
+#include <QMediaPlayerControl>
+#include <QTimer>
 
 #include <limits.h>
 
@@ -125,9 +125,10 @@ private:
 			const OMX_MediaProcessor::OMX_MediaStatus& status) const;
 
 	bool m_ownStream;
-
    bool m_seekToStartPending;
+
    qint64 m_pendingSeekPosition;
+
    QMediaContent m_currentResource;
 
    OMX_EGLBufferProviderSh m_texProvider;

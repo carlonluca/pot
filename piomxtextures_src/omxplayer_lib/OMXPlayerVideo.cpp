@@ -34,7 +34,7 @@
 #include "linux/XMemUtils.h"
 
 // lcarlon: keep during merges.
-#include "lc_logging.h"
+#include "omx_logging.h"
 #include "omx_textureprovider.h"
 #include "omx_videosurfaceelement.h"
 

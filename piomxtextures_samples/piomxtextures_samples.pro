@@ -30,4 +30,5 @@ OTHER_FILES += video_*
 DISTFILES += \
     audio_simple.qml \
     video_concurrent.qml \
-    video_loop.qml
+    video_loop.qml \
+    video_loop_position.qml

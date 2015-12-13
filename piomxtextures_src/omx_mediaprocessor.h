@@ -38,8 +38,7 @@
 #include <stdexcept>
 #include <memory>
 
-#include <lc_logging.h>
-
+#include "omx_logging.h"
 #include "omx_qthread.h"
 #include "omx_textureprovider.h"
 
@@ -211,7 +210,7 @@ private:
     QMutex m_mutexPending;
     QWaitCondition m_waitPendingCommand;
 
-    volatile long m_incr;
+    volatile long m_incrMs;
 
     OMXAudioConfig* m_audioConfig;
     OMXVideoConfig* m_videoConfig;
@@ -223,9 +222,8 @@ private:
 
     QVariantMap m_metadata;
 
-    bool m_loop;
 	 bool m_muted;
-    double m_loop_from;
+	 double m_volume;
     float m_fps;
 
     // QtConcurrent uses a thread pool which on Pi1 counts only

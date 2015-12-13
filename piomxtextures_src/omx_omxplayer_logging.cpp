@@ -51,7 +51,7 @@
 #include "stat_utf8.h"
 #include "utils/StdString.h"
 
-#include "lc_logging.h"
+#include "omx_logging.h"
 
 /*------------------------------------------------------------------------------
 |    definitions
