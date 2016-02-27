@@ -29,6 +29,7 @@
 #include <QVideoSurfaceFormat>
 #include <QTimer>
 #include <QMutex>
+#include <QDateTime>
 #ifdef OGL_CONTEXT_FROM_SURFACE
 #include <QVariant>
 #endif // OGL_CONTEXT_FROM_SURFACE
@@ -36,6 +37,37 @@
 #include "openmaxilplayercontrol.h"
 
 #include "omx_logging.h"
+
+/*------------------------------------------------------------------------------
+|    definitions
++-----------------------------------------------------------------------------*/
+//#define OMX_RENDER_WATCHDOG
+#define OMX_RENDER_WATCHDOG_FILE "/tmp/omx_render_signal"
+
+#ifdef OMX_RENDER_WATCHDOG
+/*------------------------------------------------------------------------------
+|    handleWatchdogFile
++-----------------------------------------------------------------------------*/
+inline void handleWatchdogFile()
+{
+	static QFile f(OMX_RENDER_WATCHDOG_FILE);
+	static QDateTime lastTouch = QDateTime::currentDateTime();
+
+	const QDateTime current = QDateTime::currentDateTime();
+	if (current.toMSecsSinceEpoch() - lastTouch.toMSecsSinceEpoch() < 1000)
+		return;
+
+	if (!f.open(QIODevice::WriteOnly)) {
+		log_warn("Failed to touch " OMX_RENDER_WATCHDOG_FILE ".");
+		return;
+	}
+
+	lastTouch = current;
+
+	f.close();
+}
+
+#endif // OMX_RENDER_WATCHDOG
 
 /*------------------------------------------------------------------------------
 |    OpenMAXILVideoBuffer class
@@ -191,7 +223,7 @@ void OpenMAXILVideoRendererControl::onTexturesReady()
    // Just take one random texture to determine the size. Do not place
    // any texture yet in the scene as I can't guarantee it is filled
    // already with valid data.
-   m_buffer = new OpenMAXILVideoBuffer(
+	m_buffer = new OpenMAXILVideoBuffer(
             QAbstractVideoBuffer::GLTextureHandle,
             0
             );
@@ -244,11 +276,10 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
       return;
    if (UNLIKELY(!m_surface || !m_frame || !m_surfaceFormat))
       return;
-
    if (UNLIKELY(!m_surface->isActive() && !m_surface->start(*m_surfaceFormat)))
       log_warn("Failed to start surface.");
 
-   GLuint t = m_mediaProcessor->m_provider->getNextTexture();
+   const GLuint t = m_mediaProcessor->m_provider->getNextTexture();
 
 	// It seems that in some cases the fillBufferDone arrives even after
 	// completely flushing the pipeline. This presents frames to be shown
@@ -257,6 +288,10 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
 		return;
    m_buffer->setHandle(t);
 	m_surface->present(*m_frame);
+
+#ifdef OMX_RENDER_WATCHDOG
+	handleWatchdogFile();
+#endif // OMX_RENDER_WATCHDOG
 }
 
 /*------------------------------------------------------------------------------

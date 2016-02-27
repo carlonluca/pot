@@ -26,12 +26,12 @@ import "POC_StringUtils.js" as POC_StringUtils
 
 // The duration text.
 Text {
-    id:   textPosition
-    text: formatText();
+	id:   textPosition
+	text: formatText();
 
-    function formatText() {
-        var position = POC_StringUtils.secondsToHHMMSS(parent.source.position/1000);
-        var duration = POC_StringUtils.secondsToHHMMSS(parent.source.duration/1000);
-        return position + "/" + duration;
-    }
+	function formatText() {
+		var position = POC_StringUtils.secondsToHHMMSS(parent.source.position/1000);
+		var duration = POC_StringUtils.secondsToHHMMSS(parent.source.duration/1000);
+		return position + "/" + duration;
+	}
 }

@@ -76,19 +76,19 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    : QMediaPlayerControl(parent)
    , m_ownStream(false)
    , m_seekToStartPending(false)
-   , m_pendingSeekPosition(-1)
+	, m_pendingSeekPosition(-1)
 	, m_texProvider(make_shared<OMX_EGLBufferProvider>())
 	, m_mediaProcessor(new OMX_MediaProcessor(m_texProvider))
    , m_renderer(NULL)
 {
-   logi_debug_func;
+	logi_debug_func;
 
    connect(m_mediaProcessor, SIGNAL(stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)),
            this, SLOT(onStateChanged(OMX_MediaProcessor::OMX_MediaProcessorState)));
 	connect(m_mediaProcessor, SIGNAL(mediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus)),
 			  this, SLOT(onMediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus)));
    connect(m_mediaProcessor, SIGNAL(metadataChanged(QVariantMap)),
-           this, SIGNAL(metaDataChanged(QVariantMap)));
+			  this, SIGNAL(metaDataChanged(QVariantMap)));
 }
 
 /*------------------------------------------------------------------------------

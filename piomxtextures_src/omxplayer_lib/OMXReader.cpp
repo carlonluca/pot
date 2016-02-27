@@ -28,6 +28,8 @@
 #include "OMXReader.h"
 #include "OMXClock.h"
 
+#include "omx_logging.h"
+
 #include <stdio.h>
 #include <unistd.h>
 
@@ -159,6 +161,10 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
   unsigned int  flags     = READ_TRUNCATED | READ_BITRATE | READ_CHUNKED;
 
   m_pFormatContext     = m_dllAvFormat.avformat_alloc_context();
+  if (!m_pFormatContext) {
+     log_err("Failed to create format context.");
+     return false;
+  }
 
   // set the interrupt callback, appeared in libavformat 53.15.0
   m_pFormatContext->interrupt_callback = int_cb;
@@ -226,6 +232,11 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
 
     buffer = (unsigned char*)m_dllAvUtil.av_malloc(FFMPEG_FILE_BUFFER_SIZE);
     m_ioContext = m_dllAvFormat.avio_alloc_context(buffer, FFMPEG_FILE_BUFFER_SIZE, 0, m_pFile, dvd_file_read, NULL, dvd_file_seek);
+    if (!m_ioContext) {
+       log_err("Failed to create avio context.");
+       return false;
+    }
+
     m_ioContext->max_packet_size = 6144;
     if(m_ioContext->max_packet_size)
       m_ioContext->max_packet_size *= FFMPEG_FILE_BUFFER_SIZE / m_ioContext->max_packet_size;
@@ -243,6 +254,11 @@ bool OMXReader::Open(std::string filename, bool dump_format, bool live /* =false
     }
 
     m_pFormatContext->pb = m_ioContext;
+    if (!m_pFormatContext->internal) {
+       log_err("AVFormat internal null.");
+       abort();
+    }
+
     result = m_dllAvFormat.avformat_open_input(&m_pFormatContext, m_filename.c_str(), iformat, NULL);
     if(result < 0)
     {

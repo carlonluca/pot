@@ -127,7 +127,7 @@ private:
 	bool m_ownStream;
    bool m_seekToStartPending;
 
-   qint64 m_pendingSeekPosition;
+	qint64 m_pendingSeekPosition;
 
    QMediaContent m_currentResource;
 

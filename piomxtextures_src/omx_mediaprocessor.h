@@ -68,6 +68,27 @@ class OMXVideoConfig;
 class OMXAudioConfig;
 
 /*------------------------------------------------------------------------------
+|    OMX_MediaProcessorHelper class
++-----------------------------------------------------------------------------*/
+class OMX_MediaProcessorHelper : public QObject
+{
+	Q_OBJECT
+public:
+	OMX_MediaProcessorHelper(OMX_EGLBufferProviderSh provider, QThread* t) {
+		moveToThread(t);
+		m_provider = provider;
+	}
+
+	virtual ~OMX_MediaProcessorHelper() {}
+
+public slots:
+	void onFreeRequest();
+
+private:
+	OMX_EGLBufferProviderSh m_provider;
+};
+
+/*------------------------------------------------------------------------------
 |    OMX_MediaProcessor class
 +-----------------------------------------------------------------------------*/
 /**
@@ -171,7 +192,7 @@ private:
 	 void flushStreams(double pts);
     void convertMetaData();
 
-    OMX_QThread* m_thread;
+    QThread* m_thread;
     QString m_filename;
 
     AVFormatContext* fmt_ctx;
@@ -263,9 +284,10 @@ inline OMX_MediaProcessor::OMX_MediaStatus OMX_MediaProcessor::mediaStatus() {
 |    OMX_MediaProcessor::setState
 +-----------------------------------------------------------------------------*/
 inline void OMX_MediaProcessor::setState(OMX_MediaProcessorState state) {
-	log_verbose("State changing from %s to %s...", STATE_STR[m_state], STATE_STR[state]);
 	if (m_state == state)
 		return;
+
+	log_verbose("State changing from %s to %s...", STATE_STR[m_state], STATE_STR[state]);
    m_state = state;
    emit stateChanged(state);
 }
@@ -276,6 +298,7 @@ inline void OMX_MediaProcessor::setState(OMX_MediaProcessorState state) {
 inline void OMX_MediaProcessor::setMediaStatus(OMX_MediaStatus status) {
 	if (m_mediaStatus == status)
 		 return;
+
 	log_verbose("Media status changing from %s to %s...", M_STATUS[m_mediaStatus], M_STATUS[status]);
 	m_mediaStatus = status;
 	emit mediaStatusChanged(status);

@@ -40,6 +40,13 @@
 #include "omx_logging.h"
 
 /*------------------------------------------------------------------------------
+|    definitions
++-----------------------------------------------------------------------------*/
+#ifdef DEBUG_TDATA_LEAKS
+int OMX_TextureData::count = 0;
+#endif // DEBUG_TDATA_LEAKS
+
+/*------------------------------------------------------------------------------
 |    check_gl_error
 +-----------------------------------------------------------------------------*/
 void check_gl_error() {
@@ -87,7 +94,10 @@ OMX_TextureData::OMX_TextureData() :
    m_eglImage(NULL),
    m_textureSize(QSize(0, 0))
 {
-   // Do nothing.
+#ifdef DEBUG_TDATA_LEAKS
+   count++;
+   log_debug("Currently %d texture data around.", count);
+#endif // DEBUG_TDATA_LEAKS
 }
 
 /*------------------------------------------------------------------------------
@@ -100,7 +110,10 @@ OMX_TextureData::OMX_TextureData(const OMX_TextureData& textureData) :
    m_textureSize(textureData.m_textureSize),
    m_omxBuffer(textureData.m_omxBuffer)
 {
-   // Do nothing.
+#ifdef DEBUG_TDATA_LEAKS
+   count++;
+   log_debug("Currently %d texture data around.", count);
+#endif // DEBUG_TDATA_LEAKS
 }
 
 /*------------------------------------------------------------------------------
@@ -108,6 +121,11 @@ OMX_TextureData::OMX_TextureData(const OMX_TextureData& textureData) :
 +-----------------------------------------------------------------------------*/
 OMX_TextureData::~OMX_TextureData()
 {
+#ifdef DEBUG_TDATA_LEAKS
+   count--;
+   log_debug("Currently %d texture data around.", count);
+#endif // DEBUG_TDATA_LEAKS
+
    if (m_textureData || m_textureId || m_eglImage)
       log_warn("Loosing pointers to GPU data.");
 }
@@ -122,7 +140,7 @@ void OMX_TextureData::freeData()
 
    // Destroy texture, EGL image and free the buffer.
    if (m_eglImage) {
-      log_verbose("Freeing KHR image...");
+      log_verbose("Freeing KHR image %p...", m_eglImage);
       if (eglDestroyImageKHR(eglDisplay, m_eglImage) != EGL_TRUE) {
          LOG_ERROR(LOG_TAG, "Failed to destroy EGLImageKHR: %s.", get_egl_errstr());
       }
@@ -131,7 +149,7 @@ void OMX_TextureData::freeData()
    }
 
    if (m_textureId) {
-      log_verbose("Freeing texture...");
+      log_verbose("Freeing texture %d...", m_textureId);
       glDeleteTextures(1, &m_textureId);
 
       check_gl_error();

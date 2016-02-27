@@ -97,6 +97,8 @@ const char* OMX_MediaProcessor::M_STATUS[] = {
 
 #define INVOKE(...) \
 	QMetaObject::invokeMethod(this, __VA_ARGS__)
+#define INVOKE_CONN \
+	Qt::QueuedConnection
 
 /*------------------------------------------------------------------------------
 |    get_mem_gpu
@@ -137,12 +139,26 @@ static void start_watchdog_once()
 #endif // OMX_LOCK_WATCHDOG
 
 /*------------------------------------------------------------------------------
+|    OMX_MediaProcessorHelper::onFreeRequest
++-----------------------------------------------------------------------------*/
+void OMX_MediaProcessorHelper::onFreeRequest()
+{
+	m_provider->free();
+	m_provider->deinit();
+}
+
+/*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::OMX_MediaProcessor
 +-----------------------------------------------------------------------------*/
 OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 	QObject(),
 	m_provider(provider),
-	m_thread(new OMX_QThread),
+#define THREADED_GL
+#ifdef THREADED_GL
+	m_thread(new QThread),
+#else
+	m_thread(QOpenGLContext::globalShareContext()->thread()),
+#endif
 	m_state(STATE_INACTIVE),
 	m_mediaStatus(MEDIA_STATUS_NO_MEDIA),
 	m_sendCmd(QMutex::Recursive),
@@ -204,7 +220,7 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 	moveToThread(m_thread);
 	m_thread->start();
 
-	INVOKE("init");
+	INVOKE("init", INVOKE_CONN);
 }
 
 /*------------------------------------------------------------------------------
@@ -213,16 +229,21 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 void OMX_MediaProcessor::init()
 {
 	log_info("Initializing GPU context in media processor...");
-	m_provider->init();
+
+	const OMX_MediaProcessorHelper* helper = new OMX_MediaProcessorHelper(m_provider, m_thread);
 
 	connect(this, SIGNAL(destroyed(QObject*)),
-			  m_provider.get(), SLOT(free()));
+			  helper, SLOT(onFreeRequest()));
 	connect(this, SIGNAL(destroyed(QObject*)),
-			  m_provider.get(), SLOT(deinit()));
-	connect(this, SIGNAL(destroyed(QObject*)),
-			  m_thread, SLOT(quit()));
-	connect(m_thread, SIGNAL(finished()),
-			  m_thread, SLOT(deleteLater()));
+			  helper, SLOT(deleteLater()));
+	if (m_thread != QOpenGLContext::globalShareContext()->thread()) {
+		connect(this, SIGNAL(destroyed(QObject*)),
+				  m_thread, SLOT(quit()));
+		connect(m_thread, SIGNAL(finished()),
+				  m_thread, SLOT(deleteLater()));
+	}
+
+	m_provider->init();
 }
 
 /*------------------------------------------------------------------------------
@@ -257,7 +278,7 @@ QStringList OMX_MediaProcessor::streams()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::setFilename(const QString& filename)
 {
-	return INVOKE("setFilenameWrapper", Q_ARG(QString, filename));
+	return INVOKE("setFilenameWrapper", INVOKE_CONN, Q_ARG(QString, filename));
 }
 
 /*------------------------------------------------------------------------------
@@ -492,7 +513,7 @@ bool OMX_MediaProcessor::playInt()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::play()
 {
-	return INVOKE("playInt");
+	return INVOKE("playInt", INVOKE_CONN);
 }
 
 /*------------------------------------------------------------------------------
@@ -500,7 +521,7 @@ bool OMX_MediaProcessor::play()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::stop()
 {
-	return INVOKE("stopInt");
+	return INVOKE("stopInt", INVOKE_CONN);
 }
 
 /*------------------------------------------------------------------------------
@@ -544,7 +565,7 @@ bool OMX_MediaProcessor::stopInt()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::pause()
 {
-	return INVOKE("pauseInt");
+	return INVOKE("pauseInt", INVOKE_CONN);
 }
 
 /*------------------------------------------------------------------------------
@@ -680,8 +701,8 @@ bool OMX_MediaProcessor::muted()
 void OMX_MediaProcessor::mediaDecoding()
 {
 	// See description in the qmakefile.
-	//#define ENABLE_PROFILE_MAIN_LOOP
-	//#define ENABLE_PAUSE_FOR_BUFFERING
+//#define ENABLE_PROFILE_MAIN_LOOP
+//#define ENABLE_PAUSE_FOR_BUFFERING
 
 	LOG_VERBOSE(LOG_TAG, "Decoding thread started.");
 	emit playbackStarted();
@@ -928,8 +949,29 @@ void OMX_MediaProcessor::mediaDecoding()
 		if (!m_omx_pkt)
 			m_omx_pkt = m_omx_reader->Read();
 
-		if (m_omx_pkt)
+		if (m_omx_pkt) {
 			sendEos = false;
+
+//#define DUMP_FFMPEG_PACKETS
+#ifdef DUMP_FFMPEG_PACKETS
+			OMXPacket* p = m_omx_pkt;
+			QFile f("demuxed.txt");
+			if (!f.open(QIODevice::WriteOnly | QIODevice::Append))
+				log_warn("Failed to open file for writing frames.");
+			else {
+				QTextStream s(&f);
+				s << p->pts << ", "
+				  << p->dts << ", "
+				  << p->now << ", "
+				  << p->duration << ", "
+				  << p->size << ", "
+				  << QByteArray::fromRawData((const char*)p->data, p->size) << ", "
+				  << p->stream_index << ", "
+				  << p->codec_type << ".";
+			}
+			f.close();
+#endif
+		}
 
 		if (UNLIKELY(m_omx_reader->IsEof() && !m_omx_pkt)) {
 			// demuxer EOF, but may have not played out data yet

@@ -1,5 +1,22 @@
 Changelog
 
+Version 5.2.0
+=============
+1. Bump ffmpeg to 2.8.5.
+2. Fixed leaks when video processor is destroyed.
+
+Version 5.1.0
+=============
+
+Version 5.0.0
+=============
+
+Version 4.5.0
+=============
+
+Version 4.4.0
+=============
+
 Version 4.3.0
 =============
 1. Updated for Qt 5.4.0.

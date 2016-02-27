@@ -71,14 +71,18 @@
 // lcarlon: needed callback for OMX componenent.
 OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData, OMX_BUFFERHEADERTYPE* pBuffer)
 {
-    (void)pAppData;
+	(void)pAppData;
 
-    if (UNLIKELY(pBuffer->nFlags & OMX_BUFFERFLAG_EOS))
-       log_verbose("EOS in FillBufferDone cb.");
+	if (UNLIKELY(pBuffer->nFlags & OMX_BUFFERFLAG_EOS))
+		log_verbose("EOS in FillBufferDone cb.");
 
-    COMXVideo* videoDecoder = static_cast<COMXVideo*>(pBuffer->pAppPrivate);
-    OMX_EGLBufferProvider* provider = videoDecoder->m_provider.get();
-    assert(provider->registerFilledBuffer(pBuffer));
+#if 0
+	log_debug("Registering filled buffer...");
+#endif
+
+	COMXVideo* videoDecoder = static_cast<COMXVideo*>(pBuffer->pAppPrivate);
+	OMX_EGLBufferProvider* provider = videoDecoder->m_provider.get();
+	provider->registerFilledBuffer(pBuffer);
 
 	// Get next empty buffer. It is possible none is returned when the provider
 	// was cleaned up.
@@ -88,7 +92,7 @@ OMX_ERRORTYPE fill_buffer_done_callback(OMX_HANDLETYPE handle, OMX_PTR pAppData,
 		return OMX_ErrorNone;
 	}
 
-    return OMX_FillThisBuffer(handle, empty->m_omxBuffer);
+	return OMX_FillThisBuffer(handle, empty->m_omxBuffer);
 }
 
 COMXVideo::COMXVideo(OMX_EGLBufferProviderSh provider) : m_video_codec_name("")

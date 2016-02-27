@@ -55,6 +55,7 @@ class QQuickItem;
 
 #define TEXTURE_COUNT (OMX_StaticConf::getTextureCount())
 //#define DEBUG_TEXTURE_PROVIDER
+#define DEBUG_TDATA_LEAKS
 
 /*------------------------------------------------------------------------------
 |    OMX_TextureData class
@@ -74,6 +75,10 @@ public:
    EGLImageKHR m_eglImage;
    QSize       m_textureSize;
    OMX_BUFFERHEADERTYPE* m_omxBuffer;
+
+#ifdef DEBUG_TDATA_LEAKS
+   static int count;
+#endif // DEBUG_TDATA_LEAKS
 };
 
 /*------------------------------------------------------------------------------
@@ -90,6 +95,7 @@ public:
 	 , m_currentRenderer(NULL)
     , m_mutex(QMutex::Recursive)
     , m_initialized(false)
+    , m_threadId(0)
     , m_oglContext(NULL)
     , m_eglContext(NULL)
     , m_eglSurface(NULL)
@@ -162,6 +168,7 @@ private:
 	OMX_TextureData* m_currentRenderer;
    QMutex m_mutex;
    bool m_initialized;
+   Qt::HANDLE m_threadId;
 
    // The context to be used to create buffers and textures.
    QOpenGLContext* m_oglContext;
@@ -210,6 +217,14 @@ bool OMX_EGLBufferProvider::init()
    QMutexLocker locker(&m_mutex);
    if (m_initialized)
       return true;
+
+   m_threadId = QThread::currentThreadId();
+
+   // Get global strictures.
+   m_eglDisplay = get_egl_display();
+   if (!m_eglDisplay)
+      return false;
+
    if (QOpenGLContext::currentContext()) {
       log_info("Using old sync OGL architecture.");
       m_oglContext = QOpenGLContext::currentContext();
@@ -219,20 +234,11 @@ bool OMX_EGLBufferProvider::init()
    }
 
    log_info("Initializing buffer provider...");
-
    QOpenGLContext* sharedOglContext = QOpenGLContext::globalShareContext();
-   if (!sharedOglContext)
-      return log_err("Failed to get shared OGL context. Please enable it with the proper attr.");
-
-   log_verbose("Creating a new OpenGL context in thread %p.", QThread::currentThreadId());
-   m_oglContext = new QOpenGLContext();
-   m_oglContext->setShareContext(sharedOglContext);
-   m_oglContext->makeCurrent(sharedOglContext->surface());
-
-   // Get global strictures.
-   m_eglDisplay = get_egl_display();
-   if (!m_eglDisplay)
-      return false;
+	if (!sharedOglContext) {
+		log_err("Failed to get shared OGL context. Please enable it with the proper attr.");
+		abort();
+	}
 
    EGLContext eglGlobalContext = get_global_egl_context();
    if (!eglGlobalContext)
@@ -262,11 +268,19 @@ bool OMX_EGLBufferProvider::init()
    // Create new EGL context.
    m_eglContext = eglCreateContext(m_eglDisplay, eglConfig, eglGlobalContext, NULL);
    if (!m_eglContext)
-      return log_err("Failed to create new EGL context.");
+      return log_err("Failed to create new EGL context: %d.", eglGetError());
 
    m_eglSurface = eglCreatePbufferSurface(m_eglDisplay, eglConfig, NULL);
-   if (eglMakeCurrent(m_eglDisplay, m_eglSurface, m_eglSurface, m_eglContext) != EGL_TRUE)
+   if (m_eglSurface == EGL_NO_SURFACE)
+      return log_err("Failed to create pbuffer surface: %d.", eglGetError());
+
+   if (eglMakeCurrent(m_eglDisplay, m_eglSurface, m_eglSurface, m_eglContext) == EGL_FALSE)
       return log_err("Failed to make current EGL ctx.");
+
+   log_verbose("Creating a new OpenGL context in thread %p.", QThread::currentThreadId());
+   m_oglContext = new QOpenGLContext();
+   m_oglContext->setShareContext(sharedOglContext);
+   m_oglContext->makeCurrent(sharedOglContext->surface());
 
    return (m_initialized = true);
 }
@@ -321,21 +335,24 @@ inline OMX_TextureData* OMX_EGLBufferProvider::instantiateTexture(const QSize& s
    EGLint attr[] = {EGL_GL_TEXTURE_LEVEL_KHR, 0, EGL_NONE};
 
    GLuint textureId;
+
+   log_verbose("Creating OGL texture...");
    glGenTextures(1, &textureId);
    glBindTexture(GL_TEXTURE_2D, textureId);
+   log_verbose("OGL texture %d created...", textureId);
 
    // It seems that only 4byte pixels is supported here.
    //GLubyte* pixel = new GLubyte[size.width()*size.height()*2];
    //memset(pixel, 0, size.width()*size.height()*2);
-   GLubyte* pixel = NULL;
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width(), size.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, pixel);
+   //GLubyte* pixel = NULL;
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, size.width(), size.height(), 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
 
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 
-   log_info("Creating EGLImageKHR...");
+   log_verbose("Creating EGLImageKHR...");
    EGLImageKHR eglImage = eglCreateImageKHR(
             m_eglDisplay,
             m_eglContext,
@@ -354,7 +371,7 @@ inline OMX_TextureData* OMX_EGLBufferProvider::instantiateTexture(const QSize& s
    log_verbose("Creating OMX_TextureData...");
    OMX_TextureData* textureData = new OMX_TextureData;
    textureData->m_textureId   = textureId;
-   textureData->m_textureData = pixel;
+   textureData->m_textureData = NULL;
    textureData->m_eglImage    = eglImage;
    textureData->m_textureSize = size;
 
@@ -448,17 +465,28 @@ OMX_TextureData* OMX_EGLBufferProvider::getNextEmptyBuffer()
 inline void OMX_EGLBufferProvider::free()
 {
 	QMutexLocker locker(&m_mutex);
+
+   if (eglMakeCurrent(m_eglDisplay, m_eglSurface, m_eglSurface, m_eglContext) == EGL_FALSE) {
+      log_err("Failed to make current EGL ctx.");
+      return;
+   }
+
+	log_debug("Freeing textures in thread: %p.", QThread::currentThreadId());
 	foreach (OMX_TextureData* data, m_available)
 		data->freeData();
 
 	m_currentDecoder = NULL;
 	m_currentRenderer = NULL;
 
+	m_semEmpty.release(TEXTURE_COUNT - m_semEmpty.available());
+
+	// qDeleteAll only calls delete, does not remove the object from
+	// the container.
+	qDeleteAll(m_available);
+
 	m_filledQueue.clear();
 	m_emptyQueue.clear();
 	m_available.clear();
-
-   m_semEmpty.release(TEXTURE_COUNT - m_semEmpty.available());
 
    emit texturesFreed();
 }
@@ -471,24 +499,42 @@ inline void OMX_EGLBufferProvider::deinit()
    QMutexLocker locker(&m_mutex);
    if (!m_initialized)
       return;
+   if (m_threadId != QThread::currentThreadId()) {
+      log_err("Internal error. Deinit of texture provide in thrad %p instead of %p.",
+              QThread::currentThreadId(), m_threadId);
+      return;
+   }
+
+   log_debug("Deinit context in thread: %p.", QThread::currentThreadId());
+   EGLBoolean ret = EGL_TRUE;
 
    // Free EGL surface.
-   log_verbose("Destroying EGL surface...");
-   EGLBoolean ret = eglDestroySurface(m_eglDisplay, m_eglSurface);
-   if (ret != EGL_TRUE)
-      log_warn("Failed to destroy EGL surface: %u.", ret);
-   m_eglSurface = NULL;
+   if (m_eglSurface) {
+      log_verbose("Destroying EGL surface...");
+      ret = eglDestroySurface(m_eglDisplay, m_eglSurface);
+      if (ret != EGL_TRUE)
+         log_warn("Failed to destroy EGL surface: %u.", ret);
+      m_eglSurface = NULL;
+   }
+
+   if (eglMakeCurrent(m_eglDisplay, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT) == EGL_FALSE)
+      log_err("Failed to make current EGL ctx.");
 
    // Free EGL context.
-   log_verbose("Destroying EGL aux context...");
-   ret = eglDestroyContext(m_eglDisplay, m_eglContext);
-   if (ret != EGL_TRUE)
-      log_warn("Failed to destroy EGL aux context: %u.", ret);
+   if (m_eglContext) {
+      log_verbose("Destroying EGL aux context...");
+      ret = eglDestroyContext(m_eglDisplay, m_eglContext);
+      if (ret != EGL_TRUE)
+         log_warn("Failed to destroy EGL aux context: %u.", ret);
+   }
 
    // Destroy OGL context.
-   log_verbose("Destroying OGL aux context...");
-   delete m_oglContext;
+   if (m_oglContext && m_oglContext != QOpenGLContext::globalShareContext()) {
+      log_verbose("Destroying OGL aux context...");
+      delete m_oglContext;
+   }
 
+   m_threadId = 0;
    m_initialized = false;
 }
 
