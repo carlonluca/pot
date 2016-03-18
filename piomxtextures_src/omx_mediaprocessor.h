@@ -173,6 +173,7 @@ signals:
     void errorOccurred(OMX_MediaProcessor::OMX_MediaProcessorError error);
     void stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
 	 void mediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus status);
+	 void streamLengthChanged(qint64 length);
 
 private slots:
     void init();
@@ -227,6 +228,7 @@ private:
 
     int m_subtitle_index;
     int m_audio_index;
+	 int m_streamLength;
 
     QMutex m_mutexPending;
     QWaitCondition m_waitPendingCommand;

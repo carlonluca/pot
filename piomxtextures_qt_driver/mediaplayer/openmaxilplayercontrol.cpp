@@ -89,6 +89,8 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
 			  this, SLOT(onMediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus)));
    connect(m_mediaProcessor, SIGNAL(metadataChanged(QVariantMap)),
 			  this, SIGNAL(metaDataChanged(QVariantMap)));
+	connect(m_mediaProcessor, SIGNAL(streamLengthChanged(qint64)),
+			  this, SIGNAL(durationChanged(qint64)));
 }
 
 /*------------------------------------------------------------------------------

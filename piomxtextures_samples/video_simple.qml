@@ -45,7 +45,7 @@ Rectangle {
 			Qt.quit();
 		}
 
-		uri = arguments[2];
+		uri = arguments[1];
 	}
 
 	Video {

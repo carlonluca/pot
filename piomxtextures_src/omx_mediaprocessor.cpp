@@ -179,6 +179,7 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 	m_pendingPause(false),
 	m_subtitle_index(0),
 	m_audio_index(0),
+	m_streamLength(0),
 	m_incrMs(0),
 	m_audioConfig(new OMXAudioConfig()),
 	m_videoConfig(new OMXVideoConfig()),
@@ -449,6 +450,15 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 	}
 
 	setState(STATE_STOPPED);
+
+	const qint64 streamLength = this->streamLength();
+	log_debug("New stream length: %lld.", streamLength);
+
+	if (m_streamLength != streamLength) {
+		m_streamLength = streamLength;
+		emit streamLengthChanged(streamLength);
+	}
+
 	return true;
 }
 
@@ -654,7 +664,7 @@ void OMX_MediaProcessor::setVolume(long volume, bool linear)
 {
 	QMutexLocker locker(&m_sendCmd);
 
-#define VOL_MAX 2
+#define VOL_MAX 1
 #define VOL_MIN 0
 
 	m_volume = volume/100.0*(VOL_MAX - VOL_MIN);
