@@ -1,5 +1,10 @@
 Changelog
 
+Version 5.2.1
+=============
+1. Added duration changed signal.
+2. Bump to ffmpeg 2.8.6.
+
 Version 5.2.0
 =============
 1. Bump ffmpeg to 2.8.5.

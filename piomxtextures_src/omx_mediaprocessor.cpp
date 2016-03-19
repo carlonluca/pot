@@ -1118,9 +1118,6 @@ void OMX_MediaProcessor::flushStreams(double pts)
 		m_omx_reader->FreePacket(m_omx_pkt);
 		m_omx_pkt = NULL;
 	}
-
-	if (pts != DVD_NOPTS_VALUE)
-		m_av_clock->OMXMediaTime(pts);
 }
 
 /*------------------------------------------------------------------------------

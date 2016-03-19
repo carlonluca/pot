@@ -27,10 +27,10 @@
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
-#include "QtMultimedia/qvideorenderercontrol.h"
-#include "QtMultimedia/qvideoframe.h"
-#include "QtMultimedia/qvideosurfaceformat.h"
-#include "QtMultimedia/qmediaplayer.h"
+#include <QVideoRendererControl>
+#include <QVideoFrame>
+#include <QVideoSurfaceFormat>
+#include <QMediaPlayer>
 
 #include <omx_textureprovider.h>
 #include <omx_mediaprocessor.h>
@@ -63,6 +63,9 @@ public slots:
 protected:
 	bool eventFilter(QObject*, QEvent*);
 #endif // OGL_CONTEXT_FROM_SURFACE
+
+signals:
+	void frameReady(const QVideoFrame& frame);
 
 private:
    OpenMAXILPlayerControl* m_control;

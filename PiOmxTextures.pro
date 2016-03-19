@@ -26,8 +26,9 @@ CONFIG += qt no_private_qt_headers_warning
 TEMPLATE = subdirs
 
 SUBDIRS = \
-   piomxtextures_lib \
-   piomxtextures_qt_driver \
-   piomxtextures_app \
+	piomxtextures_lib \
+	piomxtextures_qt_driver \
+	piomxtextures_app \
 	piomxtextures_pocplayer \
-	piomxtextures_samples
+	piomxtextures_samples \
+	piomxtextures_qmlutils

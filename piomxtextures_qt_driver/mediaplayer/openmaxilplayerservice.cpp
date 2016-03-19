@@ -37,6 +37,7 @@
 #include "openmaxilavailabilitycontrol.h"
 #include "openmaxilvideorenderercontrol.h"
 #include "openmaxilstreamscontrol.h"
+#include "openmaxilvideoprobe.h"
 
 #include "omx_logging.h"
 
@@ -62,7 +63,12 @@ OpenMAXILPlayerService::OpenMAXILPlayerService(QObject *parent):
     m_streamsControl      = new OpenMAXILStreamsControl(this);
     m_availabilityControl = new OpenMAXILAvailabilityControl(this);
     m_videoRenderer       = new OpenMAXILVideoRendererControl(m_control, this);
+	 m_videoProbe          = new OpenMAXILVideoProbe(this);
+
     m_control->setVideoRenderer(m_videoRenderer);
+
+	 connect(m_videoRenderer, SIGNAL(frameReady(QVideoFrame)),
+				m_videoProbe, SIGNAL(videoFrameProbed(QVideoFrame)));
 }
 
 /*------------------------------------------------------------------------------
@@ -82,6 +88,9 @@ QMediaControl *OpenMAXILPlayerService::requestControl(const char *name)
 
     if (qstrcmp(name, QMetaDataReaderControl_iid) == 0)
         return m_metaData;
+
+	 if (qstrcmp(name, QMediaVideoProbeControl_iid) == 0)
+		 return m_videoProbe;
 
 #if 0
     if (qstrcmp(name, QMediaStreamsControl_iid) == 0)

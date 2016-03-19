@@ -289,6 +289,8 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
    m_buffer->setHandle(t);
 	m_surface->present(*m_frame);
 
+	emit frameReady(*m_frame);
+
 #ifdef OMX_RENDER_WATCHDOG
 	handleWatchdogFile();
 #endif // OMX_RENDER_WATCHDOG

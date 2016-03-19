@@ -34,16 +34,12 @@ class QMediaPlayerControl;
 class QMediaPlaylist;
 class QMediaPlaylistNavigator;
 
-class QGstreamerMetaData;
 class OpenMAXILPlayerControl;
-class QGstreamerPlayerSession;
 class OpenMAXILMetaDataProvider;
 class OpenMAXILStreamsControl;
-class QGstreamerVideoRenderer;
-class QGstreamerVideoOverlay;
-class QGstreamerVideoWidgetControl;
 class OpenMAXILAvailabilityControl;
 class OpenMAXILVideoRendererControl;
+class OpenMAXILVideoProbe;
 
 class OpenMAXILPlayerService : public QMediaService
 {
@@ -60,6 +56,7 @@ private:
     OpenMAXILMetaDataProvider *m_metaData;
     OpenMAXILStreamsControl *m_streamsControl;
     OpenMAXILAvailabilityControl *m_availabilityControl;
+	 OpenMAXILVideoProbe* m_videoProbe;
 
     QMediaControl *m_videoOutput;
 #if 0

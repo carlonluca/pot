@@ -53,7 +53,8 @@ HEADERS += \
     $$PWD/openmaxilmetadataprovider.h \
     $$PWD/openmaxilavailabilitycontrol.h \
     $$PWD/openmaxilplayerserviceplugin.h \
-    $$PWD/openmaxilvideorenderercontrol.h
+    $$PWD/openmaxilvideorenderercontrol.h \
+    openmaxilvideoprobe.h
 
 SOURCES += \
     $$PWD/openmaxilplayercontrol.cpp \
@@ -62,7 +63,8 @@ SOURCES += \
     $$PWD/openmaxilmetadataprovider.cpp \
     $$PWD/openmaxilavailabilitycontrol.cpp \
     $$PWD/openmaxilplayerserviceplugin.cpp \
-    $$PWD/openmaxilvideorenderercontrol.cpp
+    $$PWD/openmaxilvideorenderercontrol.cpp \
+    openmaxilvideoprobe.cpp
 
 OTHER_FILES += \
     mediaplayer.json
