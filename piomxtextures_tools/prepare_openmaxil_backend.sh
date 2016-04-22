@@ -22,7 +22,10 @@ fi
 
 echo "This script will automatically download and build the dependencies..."
 
-if [ ! -d ../3rdparty/ffmpeg/lib ] || [ ! -d ../3rdparty/ffmpeg/include ]; then
+if [ ! -d ../3rdparty/ffmpeg/ffmpeg_pi1/lib ] && [ ! -d ../3rdparty/ffmpeg/ffmpeg_pi2/lib ]; then
+   echo "It seems you did not compile ffmpeg. Please run compile_ffmpeg.sh first."
+   exit
+elif [ ! -d ../3rdparty/ffmpeg/ffmpeg_pi1/include ] && [ ! -d ../3rdparty/ffmpeg/ffmpeg_pi2/include ]; then
    echo "It seems you did not compile ffmpeg. Please run compile_ffmpeg.sh first."
    exit
 fi
