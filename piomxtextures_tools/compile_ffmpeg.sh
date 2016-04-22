@@ -536,7 +536,7 @@ make -j$(grep -c "^processor" /proc/cpuinfo)
 make install
 
 echo "Cleaning up..."
-mv ffmpeg_compiled/include ../ffmpeg_$1
-mv ffmpeg_compiled/lib ../ffmpeg_$1
+mv ffmpeg_compiled/include ../
+mv ffmpeg_compiled/lib ../
 
 echo "Done! Bye bye! ;-)"
