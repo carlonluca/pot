@@ -47,6 +47,10 @@ public:
 
 signals:
 	void sourceChanged();
+    void videoFrameDecoded();
+
+private slots:
+    void onVideoFrameProbed(const QVideoFrame& frame);
 
 private:
 	QObject* m_source;
