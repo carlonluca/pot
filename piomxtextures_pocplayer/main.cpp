@@ -78,6 +78,7 @@ bool show_media(QQuickView* view, QString mediaLocation)
 	QObject* rootObject  = dynamic_cast<QObject*>(view->rootObject());
 	QObject* mediaOutput = rootObject->findChild<QObject*>("mediaOutput");
    QMetaObject::invokeMethod(mediaOutput, "showUrlMedia", Q_ARG(QVariant, uri.toString()));
+   QMetaObject::invokeMethod(mediaOutput, "play");
 
 	return true;
 }

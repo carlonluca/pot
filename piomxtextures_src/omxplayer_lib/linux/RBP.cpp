@@ -24,6 +24,9 @@
 
 #define CLASSNAME "CRBP"
 
+int CRBP::m_refcount = 0;
+QMutex CRBP::m_mutex;
+
 CRBP::CRBP()
 {
   m_initialized = false;
@@ -38,17 +41,29 @@ CRBP::~CRBP()
 
 bool CRBP::Initialize()
 {
+  QMutexLocker l(&m_mutex);
+  if (m_refcount > 0)
+	  return true;
+
   m_initialized = m_DllBcmHost->Load();
   if(!m_initialized)
     return false;
 
+  log_info("bcm_host_init");
   m_DllBcmHost->bcm_host_init();
+  m_refcount++;
 
   return true;
 }
 
 void CRBP::Deinitialize()
 {
+  QMutexLocker l(&m_mutex);
+  m_refcount--;
+  if (m_refcount > 0)
+	  return;
+
+  log_info("bcm_host_deinit");
   m_DllBcmHost->bcm_host_deinit();
 
   if(m_initialized)

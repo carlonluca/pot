@@ -31,4 +31,5 @@ DISTFILES += \
     audio_simple.qml \
     video_concurrent.qml \
     video_loop.qml \
-    video_loop_position.qml
+    video_loop_position.qml \
+    webkit_simple.qml

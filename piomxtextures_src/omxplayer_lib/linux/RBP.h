@@ -42,6 +42,10 @@
 #define HAVE_VMCS_CONFIG
 #endif
 
+#include <QMutex>
+
+#include "omx_logging.h"
+
 #include "DllBCM.h"
 
 class CRBP
@@ -56,6 +60,9 @@ public:
 private:
   DllBcmHost *m_DllBcmHost;
   bool       m_initialized;
+
+  static int m_refcount;
+  static QMutex m_mutex;
 };
 
 extern CRBP g_RBP;

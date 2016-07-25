@@ -21,7 +21,7 @@
 # along with PiOmxTextures. If not, see <http://www.gnu.org/licenses/>.
 #
 
-QT += core core-private gui gui-private opengl quick quick-private
+QT += core core-private gui gui-private opengl quick quick-private multimedia
 
 SRC=$$PWD
 SRC_WRAPPER=$$SRC/omx_wrapper

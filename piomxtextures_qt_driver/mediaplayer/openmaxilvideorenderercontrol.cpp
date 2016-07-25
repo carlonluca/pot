@@ -234,7 +234,7 @@ void OpenMAXILVideoRendererControl::onTexturesReady()
             );
    m_surfaceFormat = new QVideoSurfaceFormat(
             texture->m_textureSize,
-            QVideoFrame::Format_RGB565,
+				QVideoFrame::Format_ARGB32,
             QAbstractVideoBuffer::GLTextureHandle
             );
 
@@ -276,8 +276,15 @@ void OpenMAXILVideoRendererControl::onUpdateTriggered()
       return;
    if (UNLIKELY(!m_surface || !m_frame || !m_surfaceFormat))
       return;
-   if (UNLIKELY(!m_surface->isActive() && !m_surface->start(*m_surfaceFormat)))
-      log_warn("Failed to start surface.");
+	if (UNLIKELY(!m_surface->isActive() && !m_surface->start(*m_surfaceFormat))) {
+		log_warn("Failed to start surface: %d.", m_surface->error());
+		QList<QVideoFrame::PixelFormat> fs = m_surface->supportedPixelFormats(QAbstractVideoBuffer::GLTextureHandle);
+		foreach (QVideoFrame::PixelFormat f, fs) {
+			log_warn("Supported format: %d.", f);
+		}
+
+		return;
+	}
 
    const GLuint t = m_mediaProcessor->m_provider->getNextTexture();
 

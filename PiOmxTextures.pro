@@ -31,4 +31,21 @@ SUBDIRS = \
 	piomxtextures_app \
 	piomxtextures_pocplayer \
 	piomxtextures_samples \
-	piomxtextures_qmlutils
+	piomxtextures_qmlutils \
+	piomxtextures_pocplayer_widget
+
+qtHaveModule(webkit) {
+message("Building wk1 sample...")
+SUBDIRS += piomxtextures_browser_wk
+SUBDIRS += piomxtextures_pocplayer_yt
+}
+
+qtHaveModule(webenginewidgets) {
+#message("Building we sample based on widgets...")
+#SUBDIRS += piomxtextures_browser_we_widget
+}
+
+qtHaveModule(webengine) {
+message("Building we sample based on QML...")
+SUBDIRS += piomxtextures_browser_we
+}

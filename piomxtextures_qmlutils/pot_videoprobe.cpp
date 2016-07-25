@@ -36,9 +36,6 @@ POT_VideoProbe::POT_VideoProbe(QObject* parent) :
 	QVideoProbe(parent)
 {
 	// Do nothing.
-
-    connect(this, SIGNAL(videoFrameProbed(QVideoFrame)),
-            this, SLOT(onVideoFrameProbed(QVideoFrame)));
 }
 
 /*------------------------------------------------------------------------------
@@ -69,12 +66,4 @@ void POT_VideoProbe::setSource(QObject* source)
 	}
 
 	emit sourceChanged();
-}
-
-/*------------------------------------------------------------------------------
-|    POT_VideoProbe::onVideoFrameProbed
-+-----------------------------------------------------------------------------*/
-void POT_VideoProbe::onVideoFrameProbed(const QVideoFrame &frame)
-{
-    emit videoFrameDecoded();
 }

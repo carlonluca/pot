@@ -33,6 +33,7 @@
 #include <QWaitCondition>
 #include <QVariantMap>
 #include <QThreadPool>
+#include <QMediaTimeRange>
 
 #include <GLES2/gl2.h>
 #include <stdexcept>
@@ -138,6 +139,7 @@ public:
 
     bool hasAudio();
     bool hasVideo();
+	 bool isSeekable();
 
     qint64 streamLength();
 
@@ -167,13 +169,15 @@ public slots:
     bool seek(qint64 position);
 
 signals:
+	 void streamLengthChanged(qint64 length);
     void metadataChanged(const QVariantMap metadata);
     void playbackStarted();
     void playbackCompleted();
     void errorOccurred(OMX_MediaProcessor::OMX_MediaProcessorError error);
     void stateChanged(OMX_MediaProcessor::OMX_MediaProcessorState state);
 	 void mediaStatusChanged(OMX_MediaProcessor::OMX_MediaStatus status);
-	 void streamLengthChanged(qint64 length);
+	 void bufferStatusChanged(int percentage);
+	 void availablePlaybackRangesChanged(QMediaTimeRange ranges);
 
 private slots:
     void init();
@@ -193,8 +197,8 @@ private:
 	 void flushStreams(double pts);
     void convertMetaData();
 
-    QThread* m_thread;
-    QString m_filename;
+    OMX_QThread* m_thread;
+    QString m_sourceUrl;
 
     AVFormatContext* fmt_ctx;
     AVStream* streamVideo;

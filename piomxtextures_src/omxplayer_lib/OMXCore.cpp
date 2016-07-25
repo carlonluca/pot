@@ -46,7 +46,7 @@
 #define log_lock log_disabled
 
 // lcarlon: temporary implementation.
-QMutex COMXCoreComponent::m_mxOmx(QMutex::Recursive);
+QSemaphore COMXCoreComponent::m_mxOmx(2);
 
 /*------------------------------------------------------------------------------
 |    COMXCoreComponent::testOmx
@@ -55,32 +55,44 @@ bool COMXCoreComponent::testOmx()
 {
 	// Try to lock and timeout in 1s.
 	log_debug("Testing OpenMAX health...");
-	const bool alive = m_mxOmx.tryLock(1000);
+	const bool alive = m_mxOmx.tryAcquire();
 	if (alive)
-		m_mxOmx.unlock();
+		m_mxOmx.release();
 
-	if (alive)
-		return log_debug("OpenMAX seems healthy :-)");
+	if (alive) {
+		log_debug("OpenMAX seems healthy :-)");
+		return true;
+	}
+
 	return log_warn("OpenMAX seems dead ;-(");
 }
+
+#include <QElapsedTimer>
+//static QElapsedTimer g_elapsedLock;
 
 /*------------------------------------------------------------------------------
 |    lock_mutex
 +-----------------------------------------------------------------------------*/
-inline void lock_mutex(QMutex* m)
+inline void lock_mutex(QSemaphore* m)
 {
 	log_lock("Waiting for lock %p...", m);
-	m->lock();
+	m->acquire();
 	log_lock("Got lock %p...", m);
+
+	//g_elapsedLock.start();
 }
 
 /*------------------------------------------------------------------------------
 |    unlock_mutex
 +-----------------------------------------------------------------------------*/
-inline void unlock_mutex(QMutex* m)
+inline void unlock_mutex(QSemaphore* m)
 {
 	log_lock("Releasing lock %p...", m);
-	m->unlock();
+	m->release();
+
+	//log_warn("Elpsed: %lld.", g_elapsedLock.elapsed());
+	//if (g_elapsedLock.elapsed() > 30)
+	//	log_stacktrace(LC_LOG_INFO, 100);
 }
 #endif // OMX_THREAD_UNSAFE
 
@@ -875,7 +887,8 @@ OMX_ERRORTYPE COMXCoreComponent::FreeInputBuffers()
   WaitForInputDone(1000);
 
   pthread_mutex_lock(&m_omx_input_mutex);
-  assert(m_omx_input_buffers.size() == m_omx_input_avaliable.size());
+  if (m_omx_input_buffers.size() != m_omx_input_avaliable.size())
+	  log_err("m_omx_input_buffers.size() != m_omx_input_avaliable.size()");
 
   m_omx_input_buffers.clear();
 
@@ -1284,15 +1297,15 @@ OMX_ERRORTYPE COMXCoreComponent::GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR co
 	const
 #endif // OMX_THREAD_UNSAFE
 {
-#ifdef OMX_THREAD_UNSAFE
-  // lcarlon
-  QMutexLocker locker(&m_mxOmx);
-#endif // OMX_THREAD_UNSAFE
-
   if(!m_handle)
 	 return OMX_ErrorUndefined;
 
   OMX_ERRORTYPE omx_err;
+
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  lock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
 
   omx_err = OMX_GetConfig(m_handle, configIndex, configStruct);
   if(omx_err != OMX_ErrorNone) 
@@ -1300,6 +1313,12 @@ OMX_ERRORTYPE COMXCoreComponent::GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR co
     CLog::Log(LOGERROR, "COMXCoreComponent::GetConfig - %s failed with omx_err(0x%x)\n", 
               m_componentName.c_str(), omx_err);
   }
+
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  unlock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
+
   return omx_err;
 }
 

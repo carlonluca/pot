@@ -108,6 +108,12 @@ Rectangle {
 		onUrlSelected: mediaOutput.showUrlMedia(url)
 	}
 
+	AnimatedImage {
+		anchors.centerIn: parent
+		source: "qrc:/img/loader.gif"
+		visible: mediaPlayer.status === MediaPlayer.Buffering
+	}
+
 	// These are shortcuts for common functionalities.
 	Keys.onPressed: {
 		console.log("Main interface is processing the key...");

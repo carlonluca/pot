@@ -40,6 +40,8 @@
 #include <QtQuick/qquickview.h>
 #include <QtQuick/qquickitem.h>
 
+#include <QDataStream>
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -91,6 +93,10 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
 			  this, SIGNAL(metaDataChanged(QVariantMap)));
 	connect(m_mediaProcessor, SIGNAL(streamLengthChanged(qint64)),
 			  this, SIGNAL(durationChanged(qint64)));
+	connect(m_mediaProcessor, SIGNAL(bufferStatusChanged(int)),
+			  this, SIGNAL(bufferStatusChanged(int)));
+	connect(m_mediaProcessor, SIGNAL(availablePlaybackRangesChanged(QMediaTimeRange)),
+			  this, SIGNAL(availablePlaybackRangesChanged(QMediaTimeRange)));
 }
 
 /*------------------------------------------------------------------------------
@@ -100,7 +106,7 @@ OpenMAXILPlayerControl::~OpenMAXILPlayerControl()
 {
 	log_dtor_func;
 
-   delete m_mediaProcessor;
+	m_mediaProcessor->deleteLater();
    m_mediaProcessor = NULL;
 }
 
@@ -111,6 +117,9 @@ void OpenMAXILPlayerControl::play()
 {
    logi_debug_func;
    m_mediaProcessor->play();
+
+	// FIXME: This should be removed.
+	emit availablePlaybackRangesChanged(QMediaTimeRange(0, duration()));
 }
 
 /*------------------------------------------------------------------------------
@@ -224,7 +233,7 @@ QMediaTimeRange OpenMAXILPlayerControl::availablePlaybackRanges() const
    log_debug_func;
 
    // TODO: Implement.
-   return QMediaTimeRange();
+	return QMediaTimeRange(0, duration());
 }
 
 /*------------------------------------------------------------------------------
@@ -235,7 +244,7 @@ int OpenMAXILPlayerControl::bufferStatus() const
    log_debug_func;
 
    // TODO: Implement.
-   return 0;
+	return 100;
 }
 
 /*------------------------------------------------------------------------------
@@ -265,8 +274,7 @@ bool OpenMAXILPlayerControl::isSeekable() const
 {
    log_debug_func;
 
-	// TODO: Implement.
-   return false;
+	return m_mediaProcessor->isSeekable();
 }
 
 /*------------------------------------------------------------------------------
@@ -293,6 +301,7 @@ qreal OpenMAXILPlayerControl::playbackRate() const
 void OpenMAXILPlayerControl::setPlaybackRate(qreal rate)
 {
    log_debug_func;
+	log_debug("Playback rate: %f.", rate);
 
    // TODO: Implement.
 }

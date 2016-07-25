@@ -28,7 +28,7 @@ DEFINES += VERSION=\\\"$$VERSION\\\"
 
 QT += quick qml multimedia
 CONFIG += qt plugin
-CONFIG += -std=c++11
+QMAKE_CXXFLAGS += -std=c++11
 
 INCLUDEPATH += \
 	$$_PRO_FILE_PWD_/../3rdparty/LightLogger \

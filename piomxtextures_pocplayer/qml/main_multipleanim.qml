@@ -34,7 +34,7 @@ Rectangle {
 
 	Video {
 		id: video1
-		x: 0; y: 0; z: 1; width: parent.width; height: parent.height
+		x: 0; y: 0; z: 0.5; width: parent.width; height: parent.height
 		opacity: 1
 		fillMode: VideoOutput.Stretch
 		onStopped: play()
@@ -70,7 +70,7 @@ Rectangle {
 				logger.debug("Moving 1...");
 
 				videoFront.z = 0;
-				videoBack.z = 1;
+				videoBack.z = 0.5;
 
 				videoFront.opacity = 1.0;
 				videoBack.opacity = 1.0;

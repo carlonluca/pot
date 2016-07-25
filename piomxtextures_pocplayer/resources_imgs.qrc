@@ -18,5 +18,6 @@
         <file>img/2_720p.jpg</file>
         <file>img/3_720p.jpg</file>
         <file>img/4_720p.jpg</file>
+        <file>img/loader.gif</file>
     </qresource>
 </RCC>

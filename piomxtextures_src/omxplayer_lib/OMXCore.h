@@ -33,10 +33,10 @@
 
 #include <semaphore.h>
 
-//#define OMX_THREAD_UNSAFE
+#define OMX_THREAD_UNSAFE
 
 #ifdef OMX_THREAD_UNSAFE
-#include <QMutex>
+#include <QSemaphore>
 #endif // OMX_THREAD_UNSAFE
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -224,7 +224,7 @@ private:
   bool          m_resource_error;
 
 #ifdef OMX_THREAD_UNSAFE
-  static QMutex m_mxOmx;
+  static QSemaphore m_mxOmx;
 #endif // OMX_THREAD_UNSAFE
 
   // lcarlon: keep during merges.

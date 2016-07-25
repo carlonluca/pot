@@ -24,203 +24,205 @@
 import QtQuick 2.0
 
 Item {
-    signal controlBarDismissed()
+	signal controlBarDismissed()
 
-    property var currentOutput: videoOutput
+	property var currentOutput: videoOutput
 
-    width:  parent.width
-    height: parent.height
-    state:  "VIDEO"
+	width:  parent.width
+	height: parent.height
+	state:  "VIDEO"
 
-    // The video output component.
-    POC_VideoOutput {
-        id:        videoOutput
-        sourceUrl: mediaPlayer
+	// The video output component.
+	POC_VideoOutput {
+		id:        videoOutput
+		sourceUrl: mediaPlayer
 
-        onControlBarDismissed: parent.controlBarDismissed()
-    }
+		onControlBarDismissed: parent.controlBarDismissed()
+	}
 
-    // The image output.
-    POC_ImageOutput {
-        id: imageOutput
-        opacity: 0.0
-        enabled: false
+	// The image output.
+	POC_ImageOutput {
+		id: imageOutput
+		opacity: 0.0
+		enabled: false
 
-        onControlBarDismissed: parent.controlBarDismissed()
-    }
+		onControlBarDismissed: parent.controlBarDismissed()
+	}
 
-    /**
-      * Determines the type of media and plays it using the passed path.
-      */
-	 function showLocalMedia(mediaUri) {
-        showUrlMedia(mediaUri);
-    }
+	function play() {
+		mediaPlayer.play()
+	}
 
-    /**
-      * Determines the type of media and plays it.
-      */
-    function showUrlMedia(mediaUri) {
-        if (utils.isSupportedAudio(mediaUri))
-            showAudio(mediaUri);
-        else if (utils.isSupportedImage(mediaUri))
-            showImage(mediaUri);
-        else if (utils.isSupportedVideo(mediaUri))
-            showVideo(mediaUri);
-        else
-            // TODO: Implement dialog here.
-            console.log("Can't handle this media, sorry.");
-    }
+	/**
+	 * Determines the type of media and plays it using the passed path.
+	 */
+	function showLocalMedia(mediaUri) {
+		showUrlMedia(mediaUri);
+	}
 
-    /**
-      * Shows and give focus to the control bar of the currently visible output
-      * component.
-      */
-    function showControlBar() {
-        currentOutput.showControlBar();
-    }
+	/**
+		* Determines the type of media and plays it.
+		*/
+	function showUrlMedia(mediaUri) {
+		if (utils.isSupportedAudio(mediaUri))
+			showAudio(mediaUri);
+		else if (utils.isSupportedImage(mediaUri))
+			showImage(mediaUri);
+		else if (utils.isSupportedVideo(mediaUri))
+			showVideo(mediaUri);
+		else {
+			console.log("Unrecognized media: assuming video.");
+			showVideo(mediaUri);
+		}
+	}
 
-    /**
-      * Shows a video on the media output.
-      */
-    function showVideo(videoUri) {
-        state = "VIDEO";
+	/**
+		* Shows and give focus to the control bar of the currently visible output
+		* component.
+		*/
+	function showControlBar() {
+		currentOutput.showControlBar();
+	}
 
-		 console.log("Setting media source...");
-        mediaPlayer.source = videoUri;
+	/**
+		* Shows a video on the media output.
+		*/
+	function showVideo(videoUri) {
+		state = "VIDEO";
 
-		 //console.log("Sending play command...");
-        //mediaPlayer.play();
-    }
+		console.log("Setting media source...");
+		mediaPlayer.source = videoUri;
+	}
 
-    /**
-      * Shows an image on the media output.
-      */
-    function showImage(imageUri) {
-        mediaPlayer.stop();
-        state = "IMAGE";
-        imageOutput.showImage(imageUri);
-    }
+	/**
+		* Shows an image on the media output.
+		*/
+	function showImage(imageUri) {
+		mediaPlayer.stop();
+		state = "IMAGE";
+		imageOutput.showImage(imageUri);
+	}
 
-    /**
-      * Starts to play the audio.
-      */
-    function showAudio(audioUri) {
-        state = "VIDEO";
-        mediaPlayer.source = audioUri;
-        //mediaPlayer.play();
-    }
+	/**
+		* Starts to play the audio.
+		*/
+	function showAudio(audioUri) {
+		state = "VIDEO";
+		mediaPlayer.source = audioUri;
+		mediaPlayer.play();
+	}
 
-    /**
-      * Method used to "go on" to next media or inside the media.
-      */
-    function goOnMedia() {
-        currentOutput.goOnMedia();
-    }
+	/**
+		* Method used to "go on" to next media or inside the media.
+		*/
+	function goOnMedia() {
+		currentOutput.goOnMedia();
+	}
 
-    /**
-      * Method to "go back" to prev media or inside the media.
-      */
-    function goBackMedia() {
-        currentOutput.goBackMedia();
-    }
+	/**
+		* Method to "go back" to prev media or inside the media.
+		*/
+	function goBackMedia() {
+		currentOutput.goBackMedia();
+	}
 
-    /**
-      * Method to rotate the output surface.
-      */
-    function rotateClock() {
-        currentOutput.rotateClock();
-    }
+	/**
+		* Method to rotate the output surface.
+		*/
+	function rotateClock() {
+		currentOutput.rotateClock();
+	}
 
-    /**
-      * Method to rotate the output surface.
-      */
-    function rotateCounter() {
-        currentOutput.rotateCounter();
-    }
+	/**
+		* Method to rotate the output surface.
+		*/
+	function rotateCounter() {
+		currentOutput.rotateCounter();
+	}
 
-    onStateChanged: {
-        // Disable previous output surface.
-        currentOutput.enabled = false;
+	onStateChanged: {
+		// Disable previous output surface.
+		currentOutput.enabled = false;
 
-        // Switch.
-        switch (state) {
-        case "VIDEO":
-            currentOutput = videoOutput;
-            break;
-        case "IMAGE":
-            currentOutput = imageOutput;
-            break;
-        default:
-            console.log("Unknown media output status!");
-            break;
-        }
+		// Switch.
+		switch (state) {
+		case "VIDEO":
+			currentOutput = videoOutput;
+			break;
+		case "IMAGE":
+			currentOutput = imageOutput;
+			break;
+		default:
+			console.log("Unknown media output status!");
+			break;
+		}
 
-        // Enable the new one.
-        currentOutput.enabled = true;
-    }
+		// Enable the new one.
+		currentOutput.enabled = true;
+	}
 
-    states: [
-        State {
-            name: "VIDEO"
-            PropertyChanges {
-                target: videoOutput
-                opacity: 1.0
-            }
-            PropertyChanges {
-                target: imageOutput
-                opacity: 0.0
-            }
-        },
-        State {
-            name: "IMAGE"
-            PropertyChanges {
-                target:  videoOutput
-                opacity: 0.0
-            }
-            PropertyChanges {
-                target:  imageOutput
-                opacity: 1.0
-            }
-        }
-    ]
+	states: [
+		State {
+			name: "VIDEO"
+			PropertyChanges {
+				target: videoOutput
+				opacity: 1.0
+			}
+			PropertyChanges {
+				target: imageOutput
+				opacity: 0.0
+			}
+		},
+		State {
+			name: "IMAGE"
+			PropertyChanges {
+				target:  videoOutput
+				opacity: 0.0
+			}
+			PropertyChanges {
+				target:  imageOutput
+				opacity: 1.0
+			}
+		}
+	]
 
-    transitions: [
-        Transition {
-            from: "VIDEO"
-            to:   "IMAGE"
+	transitions: [
+		Transition {
+			from: "VIDEO"
+			to:   "IMAGE"
 
-            NumberAnimation {
-                target:      videoOutput
-                property:    "opacity"
-                duration:    1000
-                easing.type: Easing.InOutQuad
-            }
+			NumberAnimation {
+				target:      videoOutput
+				property:    "opacity"
+				duration:    1000
+				easing.type: Easing.InOutQuad
+			}
 
-            NumberAnimation {
-                target:      imageOutput
-                property:    "opacity"
-                duration:    1000
-                easing.type: Easing.InOutQuad
-            }
-        },
+			NumberAnimation {
+				target:      imageOutput
+				property:    "opacity"
+				duration:    1000
+				easing.type: Easing.InOutQuad
+			}
+		},
 
-        Transition {
-            from: "IMAGE"
-            to:   "VIDEO"
+		Transition {
+			from: "IMAGE"
+			to:   "VIDEO"
 
-            NumberAnimation {
-                target:      videoOutput
-                property:    "opacity"
-                duration:    1000
-                easing.type: Easing.InOutQuad
-            }
+			NumberAnimation {
+				target:      videoOutput
+				property:    "opacity"
+				duration:    1000
+				easing.type: Easing.InOutQuad
+			}
 
-            NumberAnimation {
-                target:      imageOutput
-                property:    "opacity"
-                duration:    1000
-                easing.type: Easing.InOutQuad
-            }
-        }
-    ]
+			NumberAnimation {
+				target:      imageOutput
+				property:    "opacity"
+				duration:    1000
+				easing.type: Easing.InOutQuad
+			}
+		}
+	]
 }
