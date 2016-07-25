@@ -61,7 +61,7 @@ fi
 
 cd 3rdparty/ffmpeg
 rm -rf ffmpeg_src
-git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -bn2.8.6 --depth=1
+git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -b release/3.1 --depth=1
 cd ffmpeg_src;
 
 export PATH="$COMPILER_PATH":$PATH
@@ -110,7 +110,6 @@ if [ "$1" == "pi1" ]; then
 --disable-decoder=h264_crystalhd \
 --disable-decoder=h264_vdpau \
 --disable-decoder=libstagefright_h264 \
---disable-decoder=vc1_crystalhd \
 --disable-decoder=wmv3_crystalhd \
 --disable-decoder=wmv3_vdpau \
 --disable-decoder=mpeg1_vdpau \
@@ -120,11 +119,9 @@ if [ "$1" == "pi1" ]; then
 --disable-decoder=mpeg_vdpau \
 --disable-decoder=mpeg_xvmc \
 --disable-decoder=msmpeg4_crystalhd \
---disable-decoder=vc1_vdpau \
 --enable-decoder=mpegvideo \
 --enable-decoder=mpeg1video \
 --enable-decoder=mpeg2video \
---disable-decoder=mvc1 \
 --disable-decoder=mvc2 \
 --disable-decoder=h261 \
 --disable-decoder=h263 \
@@ -187,7 +184,6 @@ if [ "$1" == "pi1" ]; then
 --disable-decoder=ffvhuff \
 --disable-decoder=rv30 \
 --disable-decoder=rv40 \
---enable-decoder=vc1 \
 --enable-decoder=wmv3 \
 --disable-decoder=loco \
 --disable-decoder=wnv1 \
@@ -261,7 +257,6 @@ if [ "$1" == "pi1" ]; then
 --disable-decoder=jv \
 --disable-decoder=dfa \
 --disable-decoder=wmv3image \
---disable-decoder=vc1image \
 --disable-decoder=utvideo \
 --disable-decoder=bmv_video \
 --disable-decoder=vble \
@@ -339,7 +334,6 @@ else
 --disable-decoder=h264_crystalhd \
 --disable-decoder=h264_vdpau \
 --disable-decoder=libstagefright_h264 \
---disable-decoder=vc1_crystalhd \
 --disable-decoder=wmv3_crystalhd \
 --disable-decoder=wmv3_vdpau \
 --disable-decoder=mpeg1_vdpau \
@@ -349,11 +343,9 @@ else
 --disable-decoder=mpeg_vdpau \
 --disable-decoder=mpeg_xvmc \
 --disable-decoder=msmpeg4_crystalhd \
---disable-decoder=vc1_vdpau \
 --enable-decoder=mpegvideo \
 --enable-decoder=mpeg1video \
 --enable-decoder=mpeg2video \
---disable-decoder=mvc1 \
 --disable-decoder=mvc2 \
 --disable-decoder=h261 \
 --disable-decoder=h263 \
@@ -416,7 +408,6 @@ else
 --disable-decoder=ffvhuff \
 --disable-decoder=rv30 \
 --disable-decoder=rv40 \
---enable-decoder=vc1 \
 --enable-decoder=wmv3 \
 --disable-decoder=loco \
 --disable-decoder=wnv1 \
@@ -490,7 +481,6 @@ else
 --disable-decoder=jv \
 --disable-decoder=dfa \
 --disable-decoder=wmv3image \
---disable-decoder=vc1image \
 --disable-decoder=utvideo \
 --disable-decoder=bmv_video \
 --disable-decoder=vble \
@@ -524,6 +514,7 @@ else
 --disable-decoder=idf \
 --disable-decoder=hevc \
 --enable-decoder=opus \
+--disable-decoder=vc1 --disable-demuxer=vc1 --disable-muxer=vc1 --disable-parser=vc1 \
 --cross-prefix=arm-linux-gnueabihf- \
 --prefix=$PWD/ffmpeg_compiled \
 --disable-symver \

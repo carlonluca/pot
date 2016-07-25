@@ -47,7 +47,7 @@ linux-rasp-pi2-g++ {
 	FFMPEG_BUILD_DIR = ffmpeg_pi2
 }
 
-LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
+LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvchostif -lvcos -lrt -lv4l2
 INCLUDEPATH += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/include
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
@@ -167,7 +167,6 @@ SOURCES += \
 #    omx_texturedelement.cpp \
 #    omx_videoprocessor.cpp \     # [1]
     $$SRC/omx_camerasurfaceelement.cpp \
-    $$SRC/omx_audioprocessor.cpp \
     $$SRC/omx_mediaprocessor.cpp \
 #    omx_videograph.cpp \         # [1]
     $$SRC_WRAPPER/OMX_Core.cpp \
@@ -232,7 +231,6 @@ HEADERS  += \
     $$SRC/omx_camerasurfaceelement.h \
     $$SRC/omx_texture.h \
     $$SRC/omx_qthread.h \
-    $$SRC/omx_audioprocessor.h \
     $$SRC/omx_globals.h \
     $$SRC/omx_mediaprocessor.h \
 #    omx_videograph.h \         # [1]

@@ -39,7 +39,6 @@ extern "C" {
 #include "omx_videosurfaceelement.h"
 #include "omx_camerasurfaceelement.h"
 #include "omx_mediaprocessorelement.h"
-#include "omx_audioprocessor.h"
 #include "omx_mediaprocessor.h"
 #include "lc_logging.h"
 

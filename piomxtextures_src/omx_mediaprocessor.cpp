@@ -226,7 +226,7 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 	moveToThread(m_thread);
 	m_thread->start();
 
-	setVolume(1, true);
+	setVolume(100, true);
 	INVOKE("init", INVOKE_CONN);
 }
 
@@ -428,10 +428,10 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 	m_omx_reader->GetHints(OMXSTREAM_AUDIO, m_audioConfig->hints);
 
 #if 0
-	if ((m_hints_audio.codec == CODEC_ID_AC3 || m_hints_audio.codec == CODEC_ID_EAC3) &&
+	if ((m_hints_audio.codec == AV_CODEC_ID_AC3 || m_hints_audio.codec == AV_CODEC_ID_EAC3) &&
 		 m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eAC3, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
 		m_passthrough = false;
-	if (m_hints_audio.codec == CODEC_ID_DTS &&
+	if (m_hints_audio.codec == AV_CODEC_ID_DTS &&
 		 m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eDTS, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
 		m_passthrough = false;
 #endif
@@ -688,6 +688,8 @@ qint64 OMX_MediaProcessor::streamPosition()
 void OMX_MediaProcessor::setVolume(long volume, bool linear)
 {
 	QMutexLocker locker(&m_sendCmd);
+
+	// volume is supposed to be in percentage here.
 
 #define VOL_MAX 1
 #define VOL_MIN 0

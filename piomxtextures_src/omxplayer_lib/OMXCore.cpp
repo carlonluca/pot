@@ -1298,7 +1298,7 @@ OMX_ERRORTYPE COMXCoreComponent::GetConfig(OMX_INDEXTYPE configIndex, OMX_PTR co
 #endif // OMX_THREAD_UNSAFE
 {
   if(!m_handle)
-	 return OMX_ErrorUndefined;
+    return OMX_ErrorUndefined;
 
   OMX_ERRORTYPE omx_err;
 

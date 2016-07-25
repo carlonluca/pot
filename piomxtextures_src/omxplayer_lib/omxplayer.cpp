@@ -23,7 +23,6 @@
 #include <stdint.h>
 #include <termios.h>
 #include <sys/mman.h>
-#include <linux/fb.h>
 #include <sys/ioctl.h>
 #include <getopt.h>
 #include <string.h>
@@ -452,9 +451,10 @@ static int get_mem_gpu(void)
    return gpu_mem;
 }
 
-static void blank_background(bool enable)
+static void blank_background(uint32_t rgba)
 {
-  if (!enable)
+  // if alpha is fully transparent then background has no effect
+  if (!(rgba & 0xff000000))
     return;
   // we create a 1x1 black pixel image that is added to display just behind video
   DISPMANX_DISPLAY_HANDLE_T   display;
@@ -463,8 +463,7 @@ static void blank_background(bool enable)
   DISPMANX_ELEMENT_HANDLE_T   element;
   int             ret;
   uint32_t vc_image_ptr;
-  VC_IMAGE_TYPE_T type = VC_IMAGE_RGB565;
-  uint16_t image = 0x0000; // black
+  VC_IMAGE_TYPE_T type = VC_IMAGE_ARGB8888;
   int             layer = m_config_video.layer - 1;
 
   VC_RECT_T dst_rect, src_rect;
@@ -477,7 +476,7 @@ static void blank_background(bool enable)
 
   vc_dispmanx_rect_set( &dst_rect, 0, 0, 1, 1);
 
-  ret = vc_dispmanx_resource_write_data( resource, type, sizeof(image), &image, &dst_rect );
+  ret = vc_dispmanx_resource_write_data( resource, type, sizeof(rgba), &rgba, &dst_rect );
   assert(ret == 0);
 
   vc_dispmanx_rect_set( &src_rect, 0, 0, 1<<16, 1<<16);
@@ -516,8 +515,7 @@ int main(int argc, char *argv[])
   FORMAT_3D_T           m_3d                  = CONF_FLAGS_FORMAT_NONE;
   bool                  m_refresh             = false;
   double                startpts              = 0;
-  CRect                 SrcRect               = {0,0,0,0};
-  bool                  m_blank_background    = false;
+  uint32_t              m_blank_background    = 0;
   bool sentStarted = false;
   float m_threshold      = -1.0f; // amount of audio/video required to come out of buffering
   float m_timeout        = 10.0f; // amount of time file/network operation can stall for before timing out
@@ -528,6 +526,8 @@ int main(int argc, char *argv[])
   bool idle = false;
   std::string            m_cookie              = "";
   std::string            m_user_agent          = "";
+  std::string            m_lavfdopts           = "";
+  std::string            m_avdict              = "";
 
   const int font_opt        = 0x100;
   const int italic_font_opt = 0x201;
@@ -562,8 +562,13 @@ int main(int argc, char *argv[])
   const int native_deinterlace_opt = 0x20e;
   const int display_opt     = 0x20f;
   const int alpha_opt       = 0x210;
+  const int advanced_opt    = 0x211;
+  const int aspect_mode_opt = 0x212;
+  const int crop_opt        = 0x213;
   const int http_cookie_opt = 0x300;
   const int http_user_agent_opt = 0x301;
+  const int lavfdopts_opt   = 0x400;
+  const int avdict_opt      = 0x401;
 
   struct option longopts[] = {
     { "info",         no_argument,        NULL,          'i' },
@@ -581,6 +586,7 @@ int main(int argc, char *argv[])
     { "nodeinterlace",no_argument,        NULL,          no_deinterlace_opt },
     { "nativedeinterlace",no_argument,    NULL,          native_deinterlace_opt },
     { "anaglyph",     required_argument,  NULL,          anaglyph_opt },
+    { "advanced",     optional_argument,  NULL,          advanced_opt },
     { "hw",           no_argument,        NULL,          'w' },
     { "3d",           required_argument,  NULL,          '3' },
     { "allow-mvc",    no_argument,        NULL,          'M' },
@@ -590,7 +596,7 @@ int main(int argc, char *argv[])
     { "genlog",       no_argument,        NULL,          'g' },
     { "sid",          required_argument,  NULL,          't' },
     { "pos",          required_argument,  NULL,          'l' },    
-    { "blank",        no_argument,        NULL,          'b' },
+    { "blank",        optional_argument,  NULL,          'b' },
     { "font",         required_argument,  NULL,          font_opt },
     { "italic-font",  required_argument,  NULL,          italic_font_opt },
     { "font-size",    required_argument,  NULL,          font_size_opt },
@@ -599,6 +605,8 @@ int main(int argc, char *argv[])
     { "subtitles",    required_argument,  NULL,          subtitles_opt },
     { "lines",        required_argument,  NULL,          lines_opt },
     { "win",          required_argument,  NULL,          pos_opt },
+    { "crop",         required_argument,  NULL,          crop_opt },
+    { "aspect-mode",  required_argument,  NULL,          aspect_mode_opt },
     { "audio_fifo",   required_argument,  NULL,          audio_fifo_opt },
     { "video_fifo",   required_argument,  NULL,          video_fifo_opt },
     { "audio_queue",  required_argument,  NULL,          audio_queue_opt },
@@ -621,6 +629,8 @@ int main(int argc, char *argv[])
     { "display",      required_argument,  NULL,          display_opt },
     { "cookie",       required_argument,  NULL,          http_cookie_opt },
     { "user-agent",   required_argument,  NULL,          http_user_agent_opt },
+    { "lavfdopts",    required_argument,  NULL,          lavfdopts_opt },
+    { "avdict",       required_argument,  NULL,          avdict_opt },
     { 0, 0, 0, 0 }
   };
 
@@ -636,7 +646,7 @@ int main(int argc, char *argv[])
   //Build default keymap just in case the --key-config option isn't used
   map<int,int> keymap = KeyConfig::buildDefaultKeymap();
 
-  while ((c = getopt_long(argc, argv, "wiIhvkn:l:o:cslbpd3:Myzt:rg", longopts, NULL)) != -1)
+  while ((c = getopt_long(argc, argv, "wiIhvkn:l:o:cslb::pd3:Myzt:rg", longopts, NULL)) != -1)
   {
     switch (c) 
     {
@@ -683,6 +693,9 @@ int main(int argc, char *argv[])
       case anaglyph_opt:
         m_config_video.anaglyph = (OMX_IMAGEFILTERANAGLYPHTYPE)atoi(optarg);
         break;
+      case advanced_opt:
+        m_config_video.advanced_hd_deinterlace = optarg ? (atoi(optarg) ? true : false): true;
+        break;
       case 'w':
         m_config_audio.hwdecode = true;
         break;
@@ -696,8 +709,8 @@ int main(int argc, char *argv[])
         m_config_audio.device = optarg;
         if(m_config_audio.device != "local" && m_config_audio.device != "hdmi" && m_config_audio.device != "both")
         {
-          print_usage();
-          return 0;
+          printf("Bad argument for -%c: Output device must be `local', `hdmi' or `both'\n", c);
+          return EXIT_FAILURE;
         }
         m_config_audio.device = "omx:" + m_config_audio.device;
         break;
@@ -770,6 +783,22 @@ int main(int argc, char *argv[])
         sscanf(optarg, "%f %f %f %f", &m_config_video.dst_rect.x1, &m_config_video.dst_rect.y1, &m_config_video.dst_rect.x2, &m_config_video.dst_rect.y2) == 4 ||
         sscanf(optarg, "%f,%f,%f,%f", &m_config_video.dst_rect.x1, &m_config_video.dst_rect.y1, &m_config_video.dst_rect.x2, &m_config_video.dst_rect.y2);
         break;
+      case crop_opt:
+        sscanf(optarg, "%f %f %f %f", &m_config_video.src_rect.x1, &m_config_video.src_rect.y1, &m_config_video.src_rect.x2, &m_config_video.src_rect.y2) == 4 ||
+        sscanf(optarg, "%f,%f,%f,%f", &m_config_video.src_rect.x1, &m_config_video.src_rect.y1, &m_config_video.src_rect.x2, &m_config_video.src_rect.y2);
+        break;
+      case aspect_mode_opt:
+        if (optarg) {
+          if (!strcasecmp(optarg, "letterbox"))
+            m_config_video.aspectMode = 1;
+          else if (!strcasecmp(optarg, "fill"))
+            m_config_video.aspectMode = 2;
+          else if (!strcasecmp(optarg, "stretch"))
+            m_config_video.aspectMode = 3;
+          else
+            m_config_video.aspectMode = 0;
+        }
+        break;
       case vol_opt:
 	m_Volume = atoi(optarg);
         break;
@@ -821,8 +850,9 @@ int main(int argc, char *argv[])
           }
         if (i == sizeof layouts/sizeof *layouts)
         {
+          printf("Wrong layout specified: %s\n", optarg);
           print_usage();
-          return 0;
+          return EXIT_FAILURE;
         }
         break;
       }
@@ -835,7 +865,7 @@ int main(int argc, char *argv[])
         m_loop = true;
         break;
       case 'b':
-        m_blank_background = true;
+        m_blank_background = optarg ? strtoul(optarg, NULL, 0) : 0xff000000;
         break;
       case key_config_opt:
         keymap = KeyConfig::parseConfigFile(optarg);
@@ -855,25 +885,31 @@ int main(int argc, char *argv[])
       case http_user_agent_opt:
         m_user_agent = optarg;
         break;    
+      case lavfdopts_opt:
+        m_lavfdopts = optarg;
+        break;
+      case avdict_opt:
+        m_avdict = optarg;
+        break;
       case 0:
         break;
       case 'h':
         print_usage();
-        return 0;
+        return EXIT_SUCCESS;
         break;
       case 'v':
         print_version();
-        return 0;
+        return EXIT_SUCCESS;
         break;
       case 'k':
         print_keybindings();
-        return 0;
+        return EXIT_SUCCESS;
         break;
       case ':':
-        return 0;
+        return EXIT_FAILURE;
         break;
       default:
-        return 0;
+        return EXIT_FAILURE;
         break;
     }
   }
@@ -895,25 +931,25 @@ int main(int argc, char *argv[])
   if(!filename_is_URL && !IsPipe(m_filename) && !Exists(m_filename))
   {
     PrintFileNotFound(m_filename);
-    return 0;
+    return EXIT_FAILURE;
   }
 
   if(m_asked_for_font && !Exists(m_font_path))
   {
     PrintFileNotFound(m_font_path);
-    return 0;
+    return EXIT_FAILURE;
   }
 
   if(m_asked_for_italic_font && !Exists(m_italic_font_path))
   {
     PrintFileNotFound(m_italic_font_path);
-    return 0;
+    return EXIT_FAILURE;
   }
 
   if(m_has_external_subtitles && !Exists(m_external_subtitles_path))
   {
     PrintFileNotFound(m_external_subtitles_path);
-    return 0;
+    return EXIT_FAILURE;
   }
 
   if(!m_has_external_subtitles && !filename_is_URL)
@@ -974,7 +1010,7 @@ int main(int argc, char *argv[])
     m_keyboard->setDbusName(m_dbus_name);
   }
 
-  if(!m_omx_reader.Open(m_filename.c_str(), m_dump_format, m_config_audio.is_live, m_timeout, m_cookie.c_str(), m_user_agent.c_str()))
+  if(!m_omx_reader.Open(m_filename.c_str(), m_dump_format, m_config_audio.is_live, m_timeout, m_cookie.c_str(), m_user_agent.c_str(), m_lavfdopts.c_str(), m_avdict.c_str()))
     goto do_exit;
 
   if (m_dump_format_exit)
@@ -1098,10 +1134,10 @@ int main(int argc, char *argv[])
       m_config_audio.device = "omx:local";
   }
 
-  if ((m_config_audio.hints.codec == CODEC_ID_AC3 || m_config_audio.hints.codec == CODEC_ID_EAC3) &&
+  if ((m_config_audio.hints.codec == AV_CODEC_ID_AC3 || m_config_audio.hints.codec == AV_CODEC_ID_EAC3) &&
       m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eAC3, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
     m_config_audio.passthrough = false;
-  if (m_config_audio.hints.codec == CODEC_ID_DTS &&
+  if (m_config_audio.hints.codec == AV_CODEC_ID_DTS &&
       m_BcmHost.vc_tv_hdmi_audio_supported(EDID_AudioFormat_eDTS, 2, EDID_AudioSampleRate_e44KHz, EDID_AudioSampleSize_16bit ) != 0)
     m_config_audio.passthrough = false;
 
@@ -1139,7 +1175,7 @@ int main(int argc, char *argv[])
 
      if (update) {
        OMXControlResult result = control_err
-                               ? (OMXControlResult)m_keyboard->getEvent()
+                               ? (OMXControlResult)(m_keyboard ? m_keyboard->getEvent() : KeyConfig::ACTION_BLANK)
                                : m_omxcontrol.getEvent();
        double oldPos, newPos;
 
@@ -1378,7 +1414,21 @@ int main(int argc, char *argv[])
       case KeyConfig::ACTION_SET_ALPHA:
           m_player_video.SetAlpha(result.getArg());
           break;
+      case KeyConfig::ACTION_PLAY:
+        m_Pause=false;
+        if(m_has_subtitle)
+        {
+          m_player_subtitles.Resume();
+        }
+        break;
       case KeyConfig::ACTION_PAUSE:
+        m_Pause=true;
+        if(m_has_subtitle)
+        {
+          m_player_subtitles.Pause();
+        }
+        break;
+      case KeyConfig::ACTION_PLAYPAUSE:
         m_Pause = !m_Pause;
         if (m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_NORMAL && m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_PAUSE)
         {
@@ -1410,7 +1460,11 @@ int main(int argc, char *argv[])
         break;
       case KeyConfig::ACTION_MOVE_VIDEO:
         sscanf(result.getWinArg(), "%f %f %f %f", &m_config_video.dst_rect.x1, &m_config_video.dst_rect.y1, &m_config_video.dst_rect.x2, &m_config_video.dst_rect.y2);
-        m_player_video.SetVideoRect(SrcRect,m_config_video.dst_rect);
+        m_player_video.SetVideoRect(m_config_video.src_rect, m_config_video.dst_rect);
+        break;
+      case KeyConfig::ACTION_CROP_VIDEO:
+        sscanf(result.getWinArg(), "%f %f %f %f", &m_config_video.src_rect.x1, &m_config_video.src_rect.y1, &m_config_video.src_rect.x2, &m_config_video.src_rect.y2);
+        m_player_video.SetVideoRect(m_config_video.src_rect, m_config_video.dst_rect);
         break;
       case KeyConfig::ACTION_HIDE_VIDEO:
         // set alpha to minimum
@@ -1419,6 +1473,19 @@ int main(int argc, char *argv[])
       case KeyConfig::ACTION_UNHIDE_VIDEO:
         // set alpha to maximum
         m_player_video.SetAlpha(255);
+        break;
+      case KeyConfig::ACTION_SET_ASPECT_MODE:
+        if (result.getWinArg()) {
+          if (!strcasecmp(result.getWinArg(), "letterbox"))
+            m_config_video.aspectMode = 1;
+          else if (!strcasecmp(result.getWinArg(), "fill"))
+            m_config_video.aspectMode = 2;
+          else if (!strcasecmp(result.getWinArg(), "stretch"))
+            m_config_video.aspectMode = 3;
+          else
+            m_config_video.aspectMode = 0;
+          m_player_video.SetVideoRect(m_config_video.aspectMode);
+        }
         break;
       case KeyConfig::ACTION_DECREASE_VOLUME:
         m_Volume -= 300;
@@ -1783,8 +1850,12 @@ do_exit:
 
   printf("have a nice day ;)\n");
 
-  // normal exit status on user quit or playback end
-  if (m_stop || m_send_eos)
-    return 0;
-  return 1;
+  // exit status success on playback end
+  if (m_send_eos)
+    return EXIT_SUCCESS;
+  // exit status OMXPlayer defined value on user quit
+  if (m_stop)
+    return 3;
+  // exit status failure on other cases
+  return EXIT_FAILURE;
 }

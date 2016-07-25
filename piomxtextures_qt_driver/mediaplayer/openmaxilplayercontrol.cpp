@@ -321,6 +321,7 @@ void OpenMAXILPlayerControl::setPosition(qint64 position)
 +-----------------------------------------------------------------------------*/
 void OpenMAXILPlayerControl::setVolume(int volume)
 {
+	// volume is in [0, 100] here.
 	log_debug("Setting volume to: %d.", volume);
 	m_mediaProcessor->setVolume(volume, true);
 }
