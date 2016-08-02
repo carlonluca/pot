@@ -514,6 +514,8 @@ else
 --disable-decoder=idf \
 --disable-decoder=hevc \
 --enable-decoder=opus \
+--enable-librtmp \
+--enable-libx264 \
 --disable-decoder=vc1 --disable-demuxer=vc1 --disable-muxer=vc1 --disable-parser=vc1 \
 --cross-prefix=arm-linux-gnueabihf- \
 --prefix=$PWD/ffmpeg_compiled \
