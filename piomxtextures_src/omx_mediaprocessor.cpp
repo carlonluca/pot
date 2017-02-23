@@ -120,7 +120,7 @@ static std::once_flag flag1;
 static void print_build_once()
 {
 	std::call_once(flag1, []() {
-		log_info("POT build %s %s.", __DATE__, __TIME__);
+      log_info("POT build %s %s, version %s.", __DATE__, __TIME__, POT_VERSION);
 	});
 }
 

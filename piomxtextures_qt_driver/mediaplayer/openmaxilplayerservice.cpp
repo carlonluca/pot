@@ -41,9 +41,9 @@
 
 #include "omx_logging.h"
 
-#include <private/qmediaplaylistnavigator_p.h>
+//#include <private/qmediaplaylistnavigator_p.h>
 #include <qmediaplaylist.h>
-#include <private/qmediaresourceset_p.h>
+//#include <private/qmediaresourceset_p.h>
 
 QT_BEGIN_NAMESPACE
 

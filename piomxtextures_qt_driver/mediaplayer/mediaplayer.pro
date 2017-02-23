@@ -22,25 +22,25 @@
 #
 
 TARGET = openmaxilmediaplayer
+TEMPLATE = lib
+
+QT += quick network
 
 PLUGIN_TYPE = mediaservice
 PLUGIN_CLASS_NAME = OpenMAXILPlayerServicePlugin
-load(qt_plugin)
 
-QT += quick
+#QT     += multimedia-private network
+#CONFIG += no_private_qt_headers_warning
 
-QT     += multimedia-private network
-CONFIG += no_private_qt_headers_warning
+#qtHaveModule(widgets) {
+#    QT += widgets multimediawidgets-private
+#    DEFINES += HAVE_WIDGETS
+#}
 
-qtHaveModule(widgets) {
-    QT += widgets multimediawidgets-private
-    DEFINES += HAVE_WIDGETS
-}
-
-config_xvideo:qtHaveModule(widgets) {
+#config_xvideo:qtHaveModule(widgets) {
 #    DEFINES += HAVE_XVIDEO
 #    LIBS += -lXv -lX11 -lXext
-}
+#}
 
 include($$_PRO_FILE_PWD_/../../piomxtextures_src/piomxtextures_src.pri)
 
@@ -54,7 +54,7 @@ HEADERS += \
     $$PWD/openmaxilavailabilitycontrol.h \
     $$PWD/openmaxilplayerserviceplugin.h \
     $$PWD/openmaxilvideorenderercontrol.h \
-    openmaxilvideoprobe.h
+    $$PWD/openmaxilvideoprobe.h
 
 SOURCES += \
     $$PWD/openmaxilplayercontrol.cpp \
@@ -64,7 +64,6 @@ SOURCES += \
     $$PWD/openmaxilavailabilitycontrol.cpp \
     $$PWD/openmaxilplayerserviceplugin.cpp \
     $$PWD/openmaxilvideorenderercontrol.cpp \
-    openmaxilvideoprobe.cpp
+    $$PWD/openmaxilvideoprobe.cpp
 
-OTHER_FILES += \
-    mediaplayer.json
+OTHER_FILES += mediaplayer.json

@@ -1,5 +1,18 @@
 Changelog
 
+Version 5.4.0-beta1
+===================
+1. Bump to ffmpeg 3.1.
+2. Bump to Qt 5.7.0.
+
+Version 5.3.0-beta1
+===================
+1. Implemented webkit support.
+2. Implemented buffering.
+
+Version 5.2.2
+=============
+
 Version 5.2.1
 =============
 1. Added duration changed signal.

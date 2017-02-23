@@ -26,9 +26,9 @@
 +-----------------------------------------------------------------------------*/
 #include "openmaxilplayercontrol.h"
 
-#include <private/qmediaplaylistnavigator_p.h>
-#include <private/qmediaresourcepolicy_p.h>
-#include <private/qmediaresourceset_p.h>
+//#include <private/qmediaplaylistnavigator_p.h>
+//#include <private/qmediaresourcepolicy_p.h>
+//#include <private/qmediaresourceset_p.h>
 
 #include <QtCore/qdir.h>
 #include <QtCore/qsocketnotifier.h>
@@ -78,8 +78,8 @@ OpenMAXILPlayerControl::OpenMAXILPlayerControl(QObject *parent)
    : QMediaPlayerControl(parent)
    , m_ownStream(false)
    , m_seekToStartPending(false)
-	, m_pendingSeekPosition(-1)
-	, m_texProvider(make_shared<OMX_EGLBufferProvider>())
+   , m_pendingSeekPosition(-1)
+   , m_texProvider(make_shared<OMX_EGLBufferProvider>())
 	, m_mediaProcessor(new OMX_MediaProcessor(m_texProvider))
    , m_renderer(NULL)
 {

@@ -61,7 +61,7 @@ fi
 
 cd 3rdparty/ffmpeg
 rm -rf ffmpeg_src
-git clone git://source.ffmpeg.org/ffmpeg ffmpeg_src -b release/3.1 --depth=1
+git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg_src -b n3.2.1 --depth=1
 cd ffmpeg_src;
 
 export PATH="$COMPILER_PATH":$PATH

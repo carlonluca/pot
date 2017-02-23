@@ -29,6 +29,7 @@
 +-----------------------------------------------------------------------------*/
 #include <QThread>
 
+#include "omx_logging.h"
 
 /*------------------------------------------------------------------------------
 |    OMX_VideoProcessorThread class
@@ -38,6 +39,10 @@ class OMX_QThread : public QThread
 public:
     OMX_QThread(QObject* parent = 0) : QThread(parent) {
         // Do nothing.
+    }
+
+    ~OMX_QThread() {
+        log_dtor_func;
     }
 
     inline Qt::HANDLE getThreadId() {
