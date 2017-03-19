@@ -24,12 +24,27 @@ if [ $# -ne 1 ]; then
    exit
 fi
 
+export PATH="$COMPILER_PATH":$PATH
+export PKG_CONFIG_PATH="$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
+
+pkg-config smbclient --cflags --libs
+pkg-config libssh --cflags --libs
+
 # Set CFLAGS.
 if [ "$1" == "pi1" ]; then
+	FFMPEG_ARCH=arm
 	ECFLAGS="-mfpu=vfp -mfloat-abi=hard -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog"
 elif [ "$1" == "pi2" ]; then
+	FFMPEG_ARCH=armv7-a
 	ECFLAGS="-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard \
 		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog"
+elif [ "$1" == "pi3" ]; then
+	FFMPEG_ARCH=armv8-a
+	#SMBCLIENT=`pkg-config smbclient --cflags --libs`
+	SSH="-Wl,-rpath,$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf -Wl,-rpath,$RPI_SYSROOT/lib/arm-linux-gnueabihf"
+	ECFLAGS="-march=armv8-a -mtune=cortex-a53 -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hard \
+		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog $SSH"
+	ELDFLAGS="$SSH"
 else
 	echo "Please choose either pi1 or pi2."
 	exit 1
@@ -61,11 +76,8 @@ fi
 
 cd 3rdparty/ffmpeg
 rm -rf ffmpeg_src
-git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg_src -b n3.2.1 --depth=1
+git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg_src -b n3.2.4 --depth=1
 cd ffmpeg_src;
-
-export PATH="$COMPILER_PATH":$PATH
-export PKG_CONFIG_PATH="$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
 
 echo "Configuring..."
 echo "Prefix to $PWD..."
@@ -76,7 +88,7 @@ if [ "$1" == "pi1" ]; then
 --enable-cross-compile \
 --enable-shared \
 --enable-static \
---arch=arm \
+--arch=$FFMPEG_ARCH \
 --cpu=arm1176jzf-s \
 --target-os=linux \
 --disable-hwaccels \
@@ -297,11 +309,13 @@ if [ "$1" == "pi1" ]; then
 else
 ./configure \
 --sysroot=$RPI_SYSROOT \
+--enable-rpath \
+--extra-ldflags="$ELDFLAGS" \
 --extra-cflags="$ECFLAGS" \
 --enable-cross-compile \
 --enable-shared \
 --enable-static \
---arch=armv7-a \
+--arch=$FFMPEG_ARCH \
 --target-os=linux \
 --disable-hwaccels \
 --enable-parsers \
@@ -316,7 +330,7 @@ else
 --enable-gpl \
 --enable-version3 \
 --enable-protocols \
---enable-libsmbclient \
+--disable-libsmbclient \
 --enable-libssh \
 --enable-nonfree \
 --enable-openssl \

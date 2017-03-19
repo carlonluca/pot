@@ -23,7 +23,7 @@
 
 QT += core core-private gui gui-private opengl quick quick-private multimedia
 
-DEFINES += POT_VERSION=\\\"5.5.0\\\"
+DEFINES += POT_VERSION=\\\"5.6.0\\\"
 
 SRC=$$PWD
 SRC_WRAPPER=$$SRC/omx_wrapper
@@ -37,7 +37,7 @@ INCLUDEPATH += \
    $$PWD/../3rdparty/LightLogger
 INCLUDEPATH += \
    $$PWD/../3rdparty/LightLogger \
-	$$PWD/../3rdparty/LightSmartPtr
+   $$PWD/../3rdparty/LightSmartPtr
 
 linux-rasp-pi-g++ {
 	message("Building for RPi1...");
@@ -51,7 +51,7 @@ linux-rasp-pi2-g++ {
 
 linux-rpi3-g++|linux-rasp-pi3-g++ {
 	message("Building for RPi3...");
-	FFMPEG_BUILD_DIR = ffmpeg_pi2
+        FFMPEG_BUILD_DIR = ffmpeg_pi3
 }
 
 LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvchostif -lvcos -lrt -lv4l2
