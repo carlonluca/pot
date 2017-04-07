@@ -331,7 +331,7 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 
 	LOG_VERBOSE(LOG_TAG, "Opening %s...", qPrintable(filename));
 	if (filename.isEmpty() || filename.isNull() || filename.size() <= 0) {
-		log_err("Empty media URL.");
+      log_verbose("Empty media URL.");
 		m_sourceUrl = QString();
 		return false;
 	}
@@ -1231,6 +1231,8 @@ void OMX_MediaProcessor::closeAll()
 		m_av_clock->OMXDeinitialize();
 
 	vc_tv_show_info(0);
+
+   m_provider->free();
 
 	LOG_INFORMATION(LOG_TAG, "Cleanup done.");
 }

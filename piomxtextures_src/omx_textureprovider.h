@@ -471,7 +471,7 @@ inline void OMX_EGLBufferProvider::free()
       return;
    }
 
-	log_debug("Freeing textures in thread: %p.", QThread::currentThreadId());
+   log_info("Freeing textures in thread: %p.", QThread::currentThreadId());
 	foreach (OMX_TextureData* data, m_available)
 		data->freeData();
 
@@ -510,7 +510,7 @@ inline void OMX_EGLBufferProvider::deinit()
 
    // Free EGL surface.
    if (m_eglSurface) {
-      log_verbose("Destroying EGL surface...");
+      log_info("Destroying EGL surface...");
       ret = eglDestroySurface(m_eglDisplay, m_eglSurface);
       if (ret != EGL_TRUE)
          log_warn("Failed to destroy EGL surface: %u.", ret);
@@ -522,7 +522,7 @@ inline void OMX_EGLBufferProvider::deinit()
 
    // Free EGL context.
    if (m_eglContext) {
-      log_verbose("Destroying EGL aux context...");
+      log_info("Destroying EGL aux context...");
       ret = eglDestroyContext(m_eglDisplay, m_eglContext);
       if (ret != EGL_TRUE)
          log_warn("Failed to destroy EGL aux context: %u.", ret);
@@ -530,7 +530,7 @@ inline void OMX_EGLBufferProvider::deinit()
 
    // Destroy OGL context.
    if (m_oglContext && m_oglContext != QOpenGLContext::globalShareContext()) {
-      log_verbose("Destroying OGL aux context...");
+      log_info("Destroying OGL aux context...");
       delete m_oglContext;
    }
 
