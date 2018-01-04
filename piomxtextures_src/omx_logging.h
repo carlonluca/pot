@@ -33,6 +33,7 @@
 #include <lc_logging.h>
 
 using namespace std;
+using namespace lightlogger;
 
 /*------------------------------------------------------------------------------
 |    definitions

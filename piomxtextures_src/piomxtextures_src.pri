@@ -3,7 +3,7 @@
 # Author:  Luca Carlon
 # Date:    12.03.2012
 #
-# Copyright (c) 2012, 2013 Luca Carlon. All rights reserved.
+# Copyright (c) 2012-2017 Luca Carlon. All rights reserved.
 #
 # This file is part of PiOmxTextures.
 #
@@ -23,7 +23,7 @@
 
 QT += core core-private gui gui-private opengl quick quick-private multimedia
 
-DEFINES += POT_VERSION=\\\"5.6.0\\\"
+DEFINES += POT_VERSION=\\\"5.7.0\\\"
 
 SRC=$$PWD
 SRC_WRAPPER=$$SRC/omx_wrapper
@@ -40,25 +40,25 @@ INCLUDEPATH += \
    $$PWD/../3rdparty/LightSmartPtr
 
 linux-rasp-pi-g++ {
-	message("Building for RPi1...");
-	FFMPEG_BUILD_DIR = ffmpeg_pi1
+   message("Building for RPi1...");
+   FFMPEG_BUILD_DIR = ffmpeg_pi1
 }
 
 linux-rasp-pi2-g++ {
-	message("Building for RPi2...");
-	FFMPEG_BUILD_DIR = ffmpeg_pi2
+   message("Building for RPi2...");
+   FFMPEG_BUILD_DIR = ffmpeg_pi2
 }
 
 linux-rpi3-g++|linux-rasp-pi3-g++ {
-	message("Building for RPi3...");
-        FFMPEG_BUILD_DIR = ffmpeg_pi3
+   message("Building for RPi3...");
+   FFMPEG_BUILD_DIR = ffmpeg_pi3
 }
 
-LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvchostif -lvcos -lrt -lv4l2
+LIBS += -lopenmaxil -lbrcmEGL -lbcm_host -lvchiq_arm -lvcos -lbrcmGLESv2 -lrt -lv4l2
 INCLUDEPATH += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/include
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
-DEFINES += CONFIG_INCLUDE_FFMPEG
+#DEFINES += CONFIG_INCLUDE_FFMPEG
 contains(DEFINES, CONFIG_INCLUDE_FFMPEG) {
 LIBS += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavformat.a \
 	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavcodec.a \
@@ -69,7 +69,7 @@ LIBS += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavformat.a \
 }
 else {
 LIBS += -L$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib \
-   -lavformat -lavcodec -lavutil -lswscale -lswresample
+   -lavformat -lavcodec -lavutil -lswscale -lswresample -lpcre
 }
 
 # For omxplayer.
@@ -125,7 +125,7 @@ DEFINES += ENABLE_IMPROVED_BUFFERING
 #DEFINES += ENABLE_OMXPLAYER_LOGS
 
 # Define this to enable watchdog.
-#DEFINES += OMX_LOCK_WATCHDOG
+DEFINES += OMX_LOCK_WATCHDOG
 
 # For omxplayer.
 QMAKE_CXXFLAGS += -std=c++11 -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS             \

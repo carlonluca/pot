@@ -181,7 +181,7 @@ signals:
 
 private slots:
     void init();
-	 bool setFilenameInt(const QString& filename);
+	 OMX_MediaStatus setFilenameInt(const QString& filename);
 	 bool setFilenameWrapper(const QString& filename);
     bool playInt();
     bool stopInt();

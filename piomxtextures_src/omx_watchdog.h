@@ -3,7 +3,7 @@
  * Author:  Luca Carlon
  * Date:    10.22.2015
  *
- * Copyright (c) 2015 Luca Carlon. All rights reserved.
+ * Copyright (c) 2015-2017 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -29,6 +29,7 @@
 +-----------------------------------------------------------------------------*/
 #include <QTimer>
 #include <QThread>
+#include <QFile>
 
 /*------------------------------------------------------------------------------
 |    OMX_WatchDog class
@@ -38,7 +39,7 @@ class OMX_Watchdog : public QObject
 {
 	Q_OBJECT
 public:
-	OMX_Watchdog(QObject* parent = 0);
+   OMX_Watchdog(QString watchdogFilePath, QObject* parent = 0);
 	virtual ~OMX_Watchdog() {}
 
 public slots:
@@ -48,7 +49,8 @@ public slots:
 
 private:
 	QTimer m_timer;
-	QThread m_thread;
+   QThread m_thread;
+   QFile m_watchdogFile;
 };
 #endif // OMX_LOCK_WATCHDOG
 #endif // OMX_WATCHDOG_H

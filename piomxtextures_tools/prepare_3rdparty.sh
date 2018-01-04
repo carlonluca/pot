@@ -1,7 +1,7 @@
 #!/bin/bash
 
 function show_help {
-	echo "Usage: prepare_3rdparty.sh <qt_src_root> pi1|pi2"
+	echo "Usage: prepare_3rdparty.sh <qt_src_root> pi1|pi2|pi3"
 	exit 0
 }
 

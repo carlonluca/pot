@@ -55,7 +55,7 @@ bool COMXCoreComponent::testOmx()
 {
 	// Try to lock and timeout in 1s.
 	log_debug("Testing OpenMAX health...");
-	const bool alive = m_mxOmx.tryAcquire();
+   const bool alive = m_mxOmx.tryAcquire(1, 1000);
 	if (alive)
 		m_mxOmx.release();
 
@@ -1283,12 +1283,23 @@ OMX_ERRORTYPE COMXCoreComponent::SetConfig(OMX_INDEXTYPE configIndex, OMX_PTR co
 
   OMX_ERRORTYPE omx_err;
 
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  lock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
+
   omx_err = OMX_SetConfig(m_handle, configIndex, configStruct);
   if(omx_err != OMX_ErrorNone) 
   {
     CLog::Log(LOGERROR, "COMXCoreComponent::SetConfig - %s failed with omx_err(0x%x)\n", 
               m_componentName.c_str(), omx_err);
   }
+
+#ifdef OMX_THREAD_UNSAFE
+  // lcarlon
+  unlock_mutex(&m_mxOmx);
+#endif // OMX_THREAD_UNSAFE
+
   return omx_err;
 }
 

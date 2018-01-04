@@ -40,6 +40,7 @@
 #include "omx_globals.h"
 #ifdef OMX_LOCK_WATCHDOG
 #include "omx_watchdog.h"
+#include "omx_staticconf.h"
 #endif // OMX_LOCK_WATCHDOG
 
 // omxplayer lib.
@@ -125,14 +126,22 @@ static void print_build_once()
 }
 
 #ifdef OMX_LOCK_WATCHDOG
+static std::once_flag flag2;
+
 /*------------------------------------------------------------------------------
 |    start_watchdog_once
 +-----------------------------------------------------------------------------*/
 static void start_watchdog_once()
 {
 	std::call_once(flag2, []() {
-		log_info("Starting watchdog...");
-		static OMX_Watchdog watchDog;
+      const QString watchdogFilePath = OMX_StaticConf::getOmxWatchdogFile();
+      if (watchdogFilePath.isEmpty()) {
+         log_verbose("No watchdog is being started without OMX_HEALTHY var set.");
+         return;
+      }
+
+      log_info("Starting watchdog on file %s...", qPrintable(watchdogFilePath));
+      static OMX_Watchdog watchDog(watchdogFilePath);
 		watchDog.startWatchdog();
 	});
 }
@@ -293,28 +302,20 @@ bool OMX_MediaProcessor::setFilename(const QString& filename)
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::setFilenameWrapper(const QString& filename)
 {
-	stopInt();
-	setMediaStatus(MEDIA_STATUS_LOADING);
-
-	if (!setFilenameInt(filename)) {
-		setMediaStatus(MEDIA_STATUS_INVALID_MEDIA);
-		return false;
-	}
-
-	setMediaStatus(MEDIA_STATUS_LOADED);
+	setMediaStatus(setFilenameInt(filename));
 	return true;
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_MediaProcessor::setFilenameInt
 +-----------------------------------------------------------------------------*/
-bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
+OMX_MediaProcessor::OMX_MediaStatus OMX_MediaProcessor::setFilenameInt(const QString& filename)
 {
 	log_verbose_func;
 
 	QMutexLocker locker(&m_sendCmd);
 	if (m_sourceUrl == filename)
-		return true;
+		return m_mediaStatus;
 
 	switch (m_state) {
 	case STATE_INACTIVE:
@@ -329,11 +330,11 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 		break;
 	}
 
-	LOG_VERBOSE(LOG_TAG, "Opening %s...", qPrintable(filename));
+	log_verbose("Opening %s...", qPrintable(filename));
 	if (filename.isEmpty() || filename.isNull() || filename.size() <= 0) {
-		log_err("Empty media URL.");
+        log_verbose("Empty media URL.");
 		m_sourceUrl = QString();
-		return false;
+		return MEDIA_STATUS_NO_MEDIA;
 	}
 
 	m_sourceUrl = filename;
@@ -346,8 +347,10 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 	//m_omx_reader = new OMX_Reader;
 	if (!m_omx_reader->Open(m_sourceUrl.toStdString(), true)) {
 		log_err("Failed to open source %s.", qPrintable(m_sourceUrl));
-		return false;
+		return MEDIA_STATUS_INVALID_MEDIA;
 	}
+
+	setMediaStatus(MEDIA_STATUS_LOADING);
 
 	// Emit a signal transmitting the matadata. Anyway, I'm not sure where to check for
 	// metadata actually changed or not... I emit the signal anyway, then the receiver
@@ -376,10 +379,10 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 	m_seekFlush       = false;
 
 	if (!m_av_clock->OMXInitialize())
-		return false;
+		return MEDIA_STATUS_UNKNOWN;
 
 	if (ENABLE_HDMI_CLOCK_SYNC && !m_av_clock->HDMIClockSync())
-		return false;
+		return MEDIA_STATUS_UNKNOWN;
 
 	m_av_clock->OMXStateIdle();
 	m_av_clock->OMXStop();
@@ -400,7 +403,7 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 	if (m_has_video) {
 		log_verbose("Opening video using OMX...");
 		if (!m_player_video->Open(m_av_clock, *m_videoConfig))
-			return false;
+			return MEDIA_STATUS_INVALID_MEDIA;
 	}
 
 #ifdef ENABLE_SUBTITLES
@@ -454,7 +457,7 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 		log_verbose("Using %s output device...", m_audioConfig->device.c_str());
 		if (!m_player_audio->Open(m_av_clock, *m_audioConfig, m_omx_reader)) {
 			log_warn("Failed to open audio.");
-			return false;
+			return MEDIA_STATUS_INVALID_MEDIA;
 		}
 
 		//m_player_audio->SetCurrentVolume(m_volume, true);
@@ -471,7 +474,7 @@ bool OMX_MediaProcessor::setFilenameInt(const QString& filename)
 		emit streamLengthChanged(streamLength);
 	}
 
-	return true;
+	return MEDIA_STATUS_LOADED;
 }
 
 /*------------------------------------------------------------------------------
@@ -741,7 +744,7 @@ void OMX_MediaProcessor::mediaDecoding()
 //#define ENABLE_PROFILE_MAIN_LOOP
 #define ENABLE_PAUSE_FOR_BUFFERING
 
-	log_verbose("Decoding thread started.");
+   log_verbose("Decoding thread started: %x", QThread::currentThreadId());
 	emit playbackStarted();
 
 	// Prealloc.
@@ -1231,6 +1234,8 @@ void OMX_MediaProcessor::closeAll()
 		m_av_clock->OMXDeinitialize();
 
 	vc_tv_show_info(0);
+
+   m_provider->free();
 
 	LOG_INFORMATION(LOG_TAG, "Cleanup done.");
 }

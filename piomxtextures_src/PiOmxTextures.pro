@@ -65,7 +65,7 @@ error("Either config as app or lib.");
 }
 
 # External
-LIBS += -lopenmaxil -lGLESv2 -lEGL -lbcm_host -lvcos -lrt -lv4l2
+LIBS += -lopenmaxil -lbrcmEGL -lbcm_host -lvchiq_arm -lvcos -lbrcmGLESv2 -lrt -lv4l2
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
 contains(DEFINES, CONFIG_INCLUDE_FFMPEG) {

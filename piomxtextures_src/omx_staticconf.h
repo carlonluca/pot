@@ -3,7 +3,7 @@
  * Author:  Luca Carlon
  * Date:    09.09.2015
  *
- * Copyright (c) 2015 Luca Carlon. All rights reserved.
+ * Copyright (c) 2015-2017 Luca Carlon. All rights reserved.
  *
  * This file is part of PiOmxTextures.
  *
@@ -25,6 +25,11 @@
 #define OMX_STATICCONF_H
 
 /*------------------------------------------------------------------------------
+|    includes
++-----------------------------------------------------------------------------*/
+#include <QString>
+
+/*------------------------------------------------------------------------------
 |    OMX_StaticConf class
 +-----------------------------------------------------------------------------*/
 class OMX_StaticConf
@@ -34,6 +39,7 @@ public:
 	static int getInterlaceQpu();
 	static int getTextureCount();
 	static bool getHalfFramerate();
+   static QString getOmxWatchdogFile();
 };
 
 #endif // OMX_STATICCONF_H

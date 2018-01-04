@@ -44,7 +44,7 @@ PLUGIN_CLASS_NAME = OpenMAXILPlayerServicePlugin
 
 include($$_PRO_FILE_PWD_/../../piomxtextures_src/piomxtextures_src.pri)
 
-LIBS += -lEGL
+LIBS += -lbrcmEGL
 
 HEADERS += \
     $$PWD/openmaxilplayercontrol.h \

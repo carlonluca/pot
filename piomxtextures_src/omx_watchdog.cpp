@@ -26,24 +26,22 @@
 |    includes
 +-----------------------------------------------------------------------------*/
 #include <QFile>
+#include <QFileInfo>
 
 #include "OMXCore.h"
 
 #include "omx_watchdog.h"
 #include "omx_logging.h"
 
-/*------------------------------------------------------------------------------
-|    definitions
-+-----------------------------------------------------------------------------*/
-#define IPC_FILE_ABS_PATH "/tmp/omx_lock"
-
 #ifdef OMX_LOCK_WATCHDOG
 /*------------------------------------------------------------------------------
 |    OMX_WatchDog::OMX_WatchDog
 +-----------------------------------------------------------------------------*/
-OMX_Watchdog::OMX_Watchdog(QObject* parent) : QObject(parent)
+OMX_Watchdog::OMX_Watchdog(QString watchdogFilePath, QObject* parent) :
+   QObject(parent)
+ , m_watchdogFile(watchdogFilePath)
 {
-	moveToThread(&m_thread);
+   moveToThread(&m_thread);
 
 	// Note that the even timer must be in a separate thread as we MUST ensure
 	// its own thread does not lock.
@@ -53,12 +51,10 @@ OMX_Watchdog::OMX_Watchdog(QObject* parent) : QObject(parent)
 
 	m_thread.start();
 
-	connect(&m_timer, SIGNAL(timeout()),
-			  this, SLOT(testOmx()));
+   connect(&m_timer, SIGNAL(timeout()), this, SLOT(testOmx()));
 
 #if 0
-	QFile f(IPC_FILE_ABS_PATH);
-	f.remove();
+   m_watchdogFile.remove();
 #endif
 }
 
@@ -83,21 +79,24 @@ void OMX_Watchdog::stopWatchdog()
 +-----------------------------------------------------------------------------*/
 void OMX_Watchdog::testOmx()
 {
+#define WATCHDOG_FILE_PATH \
+   qPrintable(QFileInfo(m_watchdogFile).absoluteFilePath())
+
 	if (!COMXCoreComponent::testOmx())
 		return;
 
 	log_verbose("Touching IPC file...");
-	QFile f(IPC_FILE_ABS_PATH);
-	if (!f.open(QIODevice::WriteOnly)) {
-		log_warn("Cannot touch file %s.", IPC_FILE_ABS_PATH);
+   if (!m_watchdogFile.open(QIODevice::WriteOnly)) {
+      log_warn("Cannot touch file %s.", WATCHDOG_FILE_PATH);
 		return;
 	}
 
-	if (!f.exists()) {
-		log_warn("Could not create file %s.", IPC_FILE_ABS_PATH);
+   if (!m_watchdogFile.exists()) {
+      log_warn("Could not create file %s.", WATCHDOG_FILE_PATH);
 		return;
 	}
 
-	f.flush();
+   m_watchdogFile.flush();
+   m_watchdogFile.close();
 }
 #endif // OMX_LOCK_WATCHDOG

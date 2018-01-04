@@ -35,6 +35,7 @@ static std::once_flag flag1;
 static std::once_flag flag2;
 static std::once_flag flag3;
 static std::once_flag flag4;
+static std::once_flag flag5;
 
 /*------------------------------------------------------------------------------
 |    OMX_StaticConf::getHalfFramerate
@@ -118,4 +119,22 @@ int OMX_StaticConf::getInterlaceQpu()
 	});
 
 	return interlaceQpu;
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_StaticConf::getOmxWatchdogFile
++-----------------------------------------------------------------------------*/
+QString OMX_StaticConf::getOmxWatchdogFile()
+{
+   static QString watchdogFile = QString();
+   std::call_once(flag5, [] {
+      QByteArray ba = qgetenv("OMX_HEALTHY");
+      if (ba.isEmpty() || ba.isNull())
+         return;
+      watchdogFile = QString(ba);
+
+      log_verbose("OMX_HEALTHY is %s", qPrintable(watchdogFile));
+   });
+
+   return watchdogFile;
 }

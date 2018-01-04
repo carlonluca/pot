@@ -56,19 +56,19 @@ OpenMAXILPlayerService::OpenMAXILPlayerService(QObject *parent):
  , m_videoRenderer(0)
  , m_videoReferenceCount(0)
 {
-    log_verbose("Instantiating QMediaService...");
+   log_verbose("Instantiating QMediaService...");
 
-    m_control             = new OpenMAXILPlayerControl(this);
-    m_metaData            = new OpenMAXILMetaDataProvider(m_control, this);
-    m_streamsControl      = new OpenMAXILStreamsControl(this);
-    m_availabilityControl = new OpenMAXILAvailabilityControl(this);
-    m_videoRenderer       = new OpenMAXILVideoRendererControl(m_control, this);
-	 m_videoProbe          = new OpenMAXILVideoProbe(this);
+   m_control             = new OpenMAXILPlayerControl(this);
+   m_metaData            = new OpenMAXILMetaDataProvider(m_control, this);
+   m_streamsControl      = new OpenMAXILStreamsControl(this);
+   m_availabilityControl = new OpenMAXILAvailabilityControl(this);
+   m_videoRenderer       = new OpenMAXILVideoRendererControl(m_control, this);
+   m_videoProbe          = new OpenMAXILVideoProbe(this);
 
-    m_control->setVideoRenderer(m_videoRenderer);
+   m_control->setVideoRenderer(m_videoRenderer);
 
-	 connect(m_videoRenderer, SIGNAL(frameReady(QVideoFrame)),
-				m_videoProbe, SIGNAL(videoFrameProbed(QVideoFrame)));
+   connect(m_videoRenderer, SIGNAL(frameReady(QVideoFrame)),
+           m_videoProbe, SIGNAL(videoFrameProbed(QVideoFrame)));
 }
 
 /*------------------------------------------------------------------------------
@@ -76,101 +76,101 @@ OpenMAXILPlayerService::OpenMAXILPlayerService(QObject *parent):
 +-----------------------------------------------------------------------------*/
 OpenMAXILPlayerService::~OpenMAXILPlayerService()
 {
-	log_dtor_func;
+   log_dtor_func;
 }
 
 QMediaControl *OpenMAXILPlayerService::requestControl(const char *name)
 {
-    qDebug("Requesting control for %s...", name);
+   qDebug("Requesting control for %s...", name);
 
-    if (qstrcmp(name, QMediaPlayerControl_iid) == 0)
-        return m_control;
+   if (qstrcmp(name, QMediaPlayerControl_iid) == 0)
+      return m_control;
 
-    if (qstrcmp(name, QMetaDataReaderControl_iid) == 0)
-        return m_metaData;
+   if (qstrcmp(name, QMetaDataReaderControl_iid) == 0)
+      return m_metaData;
 
-	 if (qstrcmp(name, QMediaVideoProbeControl_iid) == 0)
-		 return m_videoProbe;
+   if (qstrcmp(name, QMediaVideoProbeControl_iid) == 0)
+      return m_videoProbe;
 
 #if 0
-    if (qstrcmp(name, QMediaStreamsControl_iid) == 0)
-        return 0;
+   if (qstrcmp(name, QMediaStreamsControl_iid) == 0)
+      return 0;
 
-    if (qstrcmp(name, QMediaAvailabilityControl_iid) == 0)
-        return 0;
+   if (qstrcmp(name, QMediaAvailabilityControl_iid) == 0)
+      return 0;
 
-    if (qstrcmp(name, QMediaVideoProbeControl_iid) == 0) {
-        return 0;
-        //if (m_session) {
-        //    QGstreamerVideoProbeControl *probe = new QGstreamerVideoProbeControl(this);
-        //    increaseVideoRef();
-        //    m_session->addProbe(probe);
-        //    return probe;
-        //}
-        //return 0;
-    }
+   if (qstrcmp(name, QMediaVideoProbeControl_iid) == 0) {
+      return 0;
+      //if (m_session) {
+      //    QGstreamerVideoProbeControl *probe = new QGstreamerVideoProbeControl(this);
+      //    increaseVideoRef();
+      //    m_session->addProbe(probe);
+      //    return probe;
+      //}
+      //return 0;
+   }
 
-    if (qstrcmp(name, QMediaAudioProbeControl_iid) == 0) {
-        //if (m_session) {
-        //    QGstreamerAudioProbeControl *probe = new QGstreamerAudioProbeControl(this);
-        //    m_session->addProbe(probe);
-        //    return probe;
-        //}
-        return 0;
-    }
+   if (qstrcmp(name, QMediaAudioProbeControl_iid) == 0) {
+      //if (m_session) {
+      //    QGstreamerAudioProbeControl *probe = new QGstreamerAudioProbeControl(this);
+      //    m_session->addProbe(probe);
+      //    return probe;
+      //}
+      return 0;
+   }
 #endif
 
-    if (qstrcmp(name, QVideoRendererControl_iid) == 0)
-       return m_videoRenderer;
+   if (qstrcmp(name, QVideoRendererControl_iid) == 0)
+      return m_videoRenderer;
 
 #if 0
-    if (!m_videoOutput) {
-        if (qstrcmp(name, QVideoRendererControl_iid) == 0)
-            m_videoOutput = m_videoRenderer;
+   if (!m_videoOutput) {
+      if (qstrcmp(name, QVideoRendererControl_iid) == 0)
+         m_videoOutput = m_videoRenderer;
 #if defined(HAVE_XVIDEO) && defined(HAVE_WIDGETS)
-        else if (qstrcmp(name, QVideoWidgetControl_iid) == 0)
-            m_videoOutput = m_videoWidget;
-        else  if (qstrcmp(name, QVideoWindowControl_iid) == 0)
-            m_videoOutput = m_videoWindow;
+      else if (qstrcmp(name, QVideoWidgetControl_iid) == 0)
+         m_videoOutput = m_videoWidget;
+      else  if (qstrcmp(name, QVideoWindowControl_iid) == 0)
+         m_videoOutput = m_videoWindow;
 #endif
 
-        if (m_videoOutput) {
-            increaseVideoRef();
-            m_control->setVideoOutput(m_videoOutput);
-            return m_videoOutput;
-        }
-    }
+      if (m_videoOutput) {
+         increaseVideoRef();
+         m_control->setVideoOutput(m_videoOutput);
+         return m_videoOutput;
+      }
+   }
 #endif
 
-    return 0;
+   return 0;
 }
 
 void OpenMAXILPlayerService::releaseControl(QMediaControl *control)
 {
 #if 0
-    if (control == m_videoOutput) {
-        m_videoOutput = 0;
-        m_control->setVideoOutput(0);
-        decreaseVideoRef();
-    }
+   if (control == m_videoOutput) {
+      m_videoOutput = 0;
+      m_control->setVideoOutput(0);
+      decreaseVideoRef();
+   }
 
-    QGstreamerVideoProbeControl* videoProbe = qobject_cast<QGstreamerVideoProbeControl*>(control);
-    if (videoProbe) {
-        if (m_session) {
-            m_session->removeProbe(videoProbe);
-            decreaseVideoRef();
-        }
-        delete videoProbe;
-        return;
-    }
+   QGstreamerVideoProbeControl* videoProbe = qobject_cast<QGstreamerVideoProbeControl*>(control);
+   if (videoProbe) {
+      if (m_session) {
+         m_session->removeProbe(videoProbe);
+         decreaseVideoRef();
+      }
+      delete videoProbe;
+      return;
+   }
 
-    QGstreamerAudioProbeControl* audioProbe = qobject_cast<QGstreamerAudioProbeControl*>(control);
-    if (audioProbe) {
-        if (m_session)
-            m_session->removeProbe(audioProbe);
-        delete audioProbe;
-        return;
-    }
+   QGstreamerAudioProbeControl* audioProbe = qobject_cast<QGstreamerAudioProbeControl*>(control);
+   if (audioProbe) {
+      if (m_session)
+         m_session->removeProbe(audioProbe);
+      delete audioProbe;
+      return;
+   }
 #endif
 }
 

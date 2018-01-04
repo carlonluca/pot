@@ -20,6 +20,6 @@ POC_Bridge::POC_Bridge(const QString& videoId, QObject* parent) :
 +-----------------------------------------------------------------------------*/
 void POC_Bridge::onPlayerReady()
 {
-	log_info("YouTube player ready.");
+    lightlogger::log_info("YouTube player ready.");
 	emit playVideoId(m_videoId);
 }

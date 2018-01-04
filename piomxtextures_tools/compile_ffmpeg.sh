@@ -9,7 +9,14 @@
 
 # Configures and builds ffmpeg for the PiOmxTextures project.
 # Usage:
-#    ./compile_ffmpeg.sh <pin>, where pin is either pi1 or pi2.
+#    ./compile_ffmpeg.sh <pin> <build_type>, where pin is either pi1, pi2 or pi3.
+
+# pi1: build for armv6
+# pi2: build for armv7-a
+# pi3: build for armv8-a
+
+# optimized
+# generic
 
 function check_exists_dir {
    if [ ! -d $1 ]; then
@@ -24,11 +31,8 @@ if [ $# -ne 1 ]; then
    exit
 fi
 
-export PATH="$COMPILER_PATH":$PATH
-export PKG_CONFIG_PATH="$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
-
-pkg-config smbclient --cflags --libs
-pkg-config libssh --cflags --libs
+export PATH="$RPI_COMPILER_PATH":$PATH
+#export PKG_CONFIG_PATH="$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
 
 # Set CFLAGS.
 if [ "$1" == "pi1" ]; then
@@ -76,11 +80,23 @@ fi
 
 cd 3rdparty/ffmpeg
 rm -rf ffmpeg_src
-git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg_src -b n3.2.4 --depth=1
-cd ffmpeg_src;
+git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg_src -b n3.4.1 --depth=1
+cd ffmpeg_src
 
 echo "Configuring..."
 echo "Prefix to $PWD..."
+if [ "$2" == "generic" ]; then
+	./configure --sysroot=$RPI_SYSROOT \
+		--extra-cflags="$ECFLAGS" \
+		--enable-cross-compile \
+		--enable-shared \
+		--enable-static \
+		--arch=$FFMPEG_ARCH \
+		--target-os=linux \
+		--enable-nonfree \
+		--enable-gpl
+	exit
+fi
 if [ "$1" == "pi1" ]; then
 ./configure \
 --sysroot=$RPI_SYSROOT \
