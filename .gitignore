@@ -1,7 +1,7 @@
 tools/build*
 *.pro.user*
-3rdparty*/*
-3rdparty/*
+3rdparty*/ffmpeg
+3rdparty/ffmpeg
 openmaxil_backend/3rdparty/*
 piomxtextures_qt_driver/mediaplayer/.qmake.conf
 build-*

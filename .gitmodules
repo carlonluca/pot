@@ -1,0 +1,4 @@
+[submodule "3rdparty/LightLogger"]
+	path = 3rdparty/LightLogger
+	url = https://github.com/carlonluca/LightLogger.git
+	branch = master

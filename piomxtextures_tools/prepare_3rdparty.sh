@@ -14,11 +14,8 @@ fi
 THIS_DIR=$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )
 echo "SRC_DIR=$1" > "$THIS_DIR/../piomxtextures_qt_driver/mediaplayer/.qmake.conf"
 
-# Clone LightLogger.
-echo "Cloning dependency: LightLogger..."
 mkdir -p "$THIS_DIR/../3rdparty"
 cd "$THIS_DIR/../3rdparty/"
-git clone https://github.com/carlonluca/LightLogger.git --depth 1
 
 "$THIS_DIR/compile_ffmpeg.sh" $2
 
