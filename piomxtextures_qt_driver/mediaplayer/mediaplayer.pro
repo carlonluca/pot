@@ -67,3 +67,7 @@ SOURCES += \
     $$PWD/openmaxilvideoprobe.cpp
 
 OTHER_FILES += mediaplayer.json
+
+target.path = $$[QT_INSTALL_PLUGINS]/mediaservice
+
+INSTALLS += target

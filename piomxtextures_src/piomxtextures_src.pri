@@ -54,7 +54,7 @@ linux-rpi3-g++|linux-rasp-pi3-g++ {
    FFMPEG_BUILD_DIR = ffmpeg_pi3
 }
 
-LIBS += -lopenmaxil -lbrcmEGL -lbcm_host -lvchiq_arm -lvcos -lbrcmGLESv2 -lrt -lv4l2
+LIBS += -lopenmaxil -lbrcmEGL -lbcm_host -lvchostif -lvchiq_arm -lvcos -lbrcmGLESv2 -lrt -lv4l2
 INCLUDEPATH += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/include
 #LIBS += -lavformat -lavcodec -lavutil
 # Internal
