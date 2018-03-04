@@ -19,3 +19,7 @@ POT releases include builds that provide Qt Multimeida Backend, POT library, sam
 I'll keep the project up as long as I'll see interest for it. Enjoy! ;-)
 
 <span class="badge-paypal"><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=ZGPF5H6F8N7FS" title="Donate to this project using Paypal"><img src="https://img.shields.io/badge/paypal-donate-yellow.svg" alt="PayPal donate button" /></a></span>
+
+Yocto image
+===========
+There is a recipe to include POT plugin into your Yocto images: https://github.com/carlonluca/meta-pot.git.
