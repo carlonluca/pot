@@ -65,7 +65,8 @@ LIBS += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavformat.a \
 	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavutil.a \
 	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libswscale.a \
 	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libswresample.a \
-   -lz -lssl -lcrypto -lsmbclient -lssh -lbz2 -lpcre
+   -lz -lssl -lcrypto -lbz2 -lpcre
+!contains(DEFINES, CONFIG_SKIP_SSH_SMB) { LIBS += -lsmbclient -lssh }
 }
 else {
 LIBS += -L$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib \

@@ -186,6 +186,7 @@ OMX_MediaProcessor::OMX_MediaProcessor(OMX_EGLBufferProviderSh provider) :
 	m_buffer_empty(true),
 	m_pendingStop(false),
 	m_pendingPause(false),
+	m_pendingSeek(false),
 	m_subtitle_index(0),
 	m_audio_index(0),
 	m_streamLength(0),
@@ -509,6 +510,7 @@ bool OMX_MediaProcessor::playInt()
 		return false;
 	}
 
+	log_info("Play command received.");
 	if (m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_NORMAL && m_av_clock->OMXPlaySpeed() != DVD_PLAYSPEED_PAUSE) {
 		LOG_VERBOSE(LOG_TAG, "resume\n");
 		m_playspeedCurrent = playspeed_normal;
@@ -573,6 +575,7 @@ bool OMX_MediaProcessor::stopInt()
 		return false;
 	}
 
+	log_info("Stop command received.");
 	m_pendingStop = true;
 
 	// Wait for command completion.
@@ -622,20 +625,21 @@ bool OMX_MediaProcessor::pauseInt()
 		m_player_subtitles.Pause();
 #endif
 
+	log_info("Pause command received");
 	setSpeed(playspeeds[m_playspeedCurrent]);
 	m_av_clock->OMXPause();
 
 	// Wait for command completion.
 	m_mutexPending.lock();
 	if (m_pendingPause) {
-		LOG_VERBOSE(LOG_TAG, "Waiting for the pause command to finish.");
+		LOG_VERBOSE(LOG_TAG, "Waiting for the pause command to finish");
 		m_waitPendingCommand.wait(&m_mutexPending);
 	}
 	m_mutexPending.unlock();
 
 	setState(STATE_PAUSED);
 
-	log_verbose("Pause command issued.");
+	log_verbose("Pause command completed");
 	return true;
 }
 
@@ -644,11 +648,20 @@ bool OMX_MediaProcessor::pauseInt()
 +-----------------------------------------------------------------------------*/
 bool OMX_MediaProcessor::seek(qint64 position)
 {
+   return INVOKE("seekInt",
+                 INVOKE_CONN,
+                 Q_ARG(qint64, position));
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_MediaProcessor::seekInt
++-----------------------------------------------------------------------------*/
+bool OMX_MediaProcessor::seekInt(qint64 position)
+{
 	QMutexLocker locker(&m_sendCmd);
 
-	LOG_VERBOSE(LOG_TAG, "Seek %lldms.", position);
 	if (!m_av_clock)
-		return false;
+      		return false;
 
 	// Get current position in ms.
 	qint64 currentMs  = m_av_clock->OMXMediaTime(false)*1E-3;
@@ -658,8 +671,19 @@ bool OMX_MediaProcessor::seek(qint64 position)
 	if (!incrementMs)
 		return true;
 
+	log_info("Seek command to %lldms received", position);
 	m_incrMs = incrementMs;
+	m_pendingSeek = true;
 
+	// Wait for command completion.
+	m_mutexPending.lock();
+	if (m_pendingSeek) {
+		log_verbose("Waiting for the seek command to finish.");
+		m_waitPendingCommand.wait(&m_mutexPending);
+	}
+	m_mutexPending.unlock();
+
+	log_verbose("Seek command completed");
 	return true;
 }
 
@@ -830,16 +854,20 @@ void OMX_MediaProcessor::mediaDecoding()
 
 			if (m_omx_reader->SeekTime((int)seek_pos, m_incrMs < 0.0f, &startpts)) {
 				unsigned t = (unsigned)(startpts*1e-6);
-				log_info("Seek to: %02d:%02d:%02d", (t/3600), (t/60)%60, t%60);
+				log_verbose("Seeked to: %02d:%02d:%02d", (t/3600), (t/60)%60, t%60);
 				flushStreams(startpts);
+				log_debug("Streams flushed");
 			}
 
 			sentStarted = false;
 
-			if (m_omx_reader->IsEof())
+			if (m_omx_reader->IsEof()) {
+				log_debug("EOF");
 				break;
+			}
 
 			if (m_has_video && !m_player_video->Reset()) {
+				log_debug("RESET failed on seek");
 				m_incrMs = 0;
 				break;
 			}
@@ -861,6 +889,13 @@ void OMX_MediaProcessor::mediaDecoding()
 			m_packetAfterSeek = false;
 			m_seekFlush       = false;
 			m_incrMs          = 0;
+
+			m_mutexPending.lock();
+			if (UNLIKELY(m_pendingSeek)) {
+				m_waitPendingCommand.wakeAll();
+				m_pendingSeek = false;
+			}
+			m_mutexPending.unlock();
 		}
 		else if (UNLIKELY(m_packetAfterSeek && TRICKPLAY(m_av_clock->OMXPlaySpeed()))) {
 			double seek_pos     = 0;
@@ -969,11 +1004,12 @@ void OMX_MediaProcessor::mediaDecoding()
 			// Enable this to enable pause for buffering.
 			if (m_state != STATE_PAUSED && (m_omx_reader->IsEof() || m_omx_pkt || TRICKPLAY(m_av_clock->OMXPlaySpeed()) || (audio_fifo_high && video_fifo_high))) {
 				if (m_av_clock->OMXIsPaused()) {
-					log_verbose("Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p\n",
+					log_verbose("Resume %.2f,%.2f (%d,%d,%d,%d) EOF:%d PKT:%p",
 									audio_fifo, video_fifo, audio_fifo_low, video_fifo_low, audio_fifo_high, video_fifo_high, m_omx_reader->IsEof(), m_omx_pkt);
 
 					setMediaStatus(OMX_MediaStatus::MEDIA_STATUS_BUFFERED);
 					m_av_clock->OMXResume();
+					log_debug("Resume completed");
 				}
 			}
 			else if (m_state == STATE_PAUSED || audio_fifo_low || video_fifo_low)
@@ -1139,19 +1175,27 @@ void OMX_MediaProcessor::setSpeed(int iSpeed)
 +-----------------------------------------------------------------------------*/
 void OMX_MediaProcessor::flushStreams(double pts)
 {
+	log_debug("Stopping av_clock");
 	m_av_clock->OMXStop();
+
+	log_debug("Pausing av_clock");
 	m_av_clock->OMXPause();
 
 	if (m_has_video) {
+		log_verbose("Flushing");
 		m_player_video->Flush();
 		m_provider->flush();
 	}
 
-	if (m_has_audio)
+	if (m_has_audio) {
+		log_debug("Flushing audio");
 		m_player_audio->Flush();
+	}
 
-	if (pts != DVD_NOPTS_VALUE)
+	if (pts != DVD_NOPTS_VALUE) {
+		log_debug("Set media time in flushStreams");
 		m_av_clock->OMXMediaTime(pts);
+	}
 
 #ifdef ENABLE_SUBTITLES
 	if (m_has_subtitle)
@@ -1159,9 +1203,12 @@ void OMX_MediaProcessor::flushStreams(double pts)
 #endif
 
 	if (m_omx_pkt) {
+		log_debug("Freeing packet in flushStreams");
 		m_omx_reader->FreePacket(m_omx_pkt);
 		m_omx_pkt = NULL;
 	}
+
+	log_debug("flushStreams finished");
 }
 
 /*------------------------------------------------------------------------------

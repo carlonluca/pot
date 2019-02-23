@@ -144,10 +144,15 @@ public:
 		m_emptyQueue.clear();
 		m_filledQueue.clear();
 		m_currentDecoder = NULL;
-		m_currentRenderer = NULL;
+
+		// Leave the current texture in the renderer.
+		//m_currentRenderer = NULL;
 
 		m_emptyQueue.append(m_available);
-		m_semEmpty.release(TEXTURE_COUNT - m_semEmpty.available());
+		m_emptyQueue.removeAll(m_currentRenderer);
+
+		int t = m_currentRenderer ? 1 : 0;
+		m_semEmpty.release(TEXTURE_COUNT - m_semEmpty.available() - t);
 	}
 
 public slots:

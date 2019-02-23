@@ -186,6 +186,7 @@ private slots:
     bool playInt();
     bool stopInt();
     bool pauseInt();
+    bool seekInt(qint64 position);
     void mediaDecoding();
     void closeAll();
     bool cleanup();
@@ -228,7 +229,8 @@ private:
 #endif
     bool m_buffer_empty;
     bool m_pendingStop;
-	 bool m_pendingPause;
+    bool m_pendingPause;
+    bool m_pendingSeek;
 
     int m_subtitle_index;
     int m_audio_index;

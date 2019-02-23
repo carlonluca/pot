@@ -25,7 +25,7 @@ TEMPLATE = lib
 
 QT += quick multimedia
 
-OTHER_FILES += video_*
+OTHER_FILES += video*
 
 DISTFILES += \
     audio_simple.qml \

@@ -38,6 +38,7 @@
 #endif
 
 #include <omx_logging.h>
+#include <omx_staticconf.h>
 
 //#define OMX_DEBUG_EVENTS
 //#define OMX_DEBUG_EVENTHANDLER
@@ -45,8 +46,7 @@
 #ifdef OMX_THREAD_UNSAFE
 #define log_lock log_disabled
 
-// lcarlon: temporary implementation.
-QSemaphore COMXCoreComponent::m_mxOmx(2);
+QSemaphore COMXCoreComponent::m_mxOmx(OMX_StaticConf::getOmxWatchdogPermits());
 
 /*------------------------------------------------------------------------------
 |    COMXCoreComponent::testOmx
@@ -55,7 +55,7 @@ bool COMXCoreComponent::testOmx()
 {
 	// Try to lock and timeout in 1s.
 	log_debug("Testing OpenMAX health...");
-   const bool alive = m_mxOmx.tryAcquire(1, 1000);
+        const bool alive = m_mxOmx.tryAcquire(1, 1000);
 	if (alive)
 		m_mxOmx.release();
 

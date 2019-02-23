@@ -53,7 +53,7 @@
 
 #include "omx_logging.h"
 
-#define ENABLE_OMXPLAYER_LOGS
+//#define ENABLE_OMXPLAYER_LOGS
 
 /*------------------------------------------------------------------------------
 |    definitions

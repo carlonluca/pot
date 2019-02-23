@@ -39,7 +39,8 @@ public:
 	static int getInterlaceQpu();
 	static int getTextureCount();
 	static bool getHalfFramerate();
-   static QString getOmxWatchdogFile();
+	static QString getOmxWatchdogFile();
+	static int getOmxWatchdogPermits();
 };
 
 #endif // OMX_STATICCONF_H

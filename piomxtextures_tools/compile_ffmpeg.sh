@@ -9,14 +9,11 @@
 
 # Configures and builds ffmpeg for the PiOmxTextures project.
 # Usage:
-#    ./compile_ffmpeg.sh <pin> <build_type>, where pin is either pi1, pi2 or pi3.
+#    ./compile_ffmpeg.sh <pin>, where pin is either pi1, pi2 or pi3.
 
 # pi1: build for armv6
 # pi2: build for armv7-a
 # pi3: build for armv8-a
-
-# optimized
-# generic
 
 function check_exists_dir {
    if [ ! -d $1 ]; then
@@ -37,18 +34,20 @@ export PATH="$RPI_COMPILER_PATH":$PATH
 # Set CFLAGS.
 if [ "$1" == "pi1" ]; then
 	FFMPEG_ARCH=arm
-	ECFLAGS="-mfpu=vfp -mfloat-abi=hard -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog"
+	ECFLAGS="-marm -mfpu=vfp -mfloat-abi=hard -mtune=arm1176jzf-s -march=armv6zk -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog"
 elif [ "$1" == "pi2" ]; then
 	FFMPEG_ARCH=armv7-a
 	ECFLAGS="-march=armv7-a -mfpu=neon-vfpv4 -mfloat-abi=hard \
 		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog"
 elif [ "$1" == "pi3" ]; then
 	FFMPEG_ARCH=armv8-a
-	#SMBCLIENT=`pkg-config smbclient --cflags --libs`
+	SMBCLIENT=`pkg-config smbclient --cflags --libs`
 	SSH="-Wl,-rpath,$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf -Wl,-rpath,$RPI_SYSROOT/lib/arm-linux-gnueabihf"
 	ECFLAGS="-march=armv8-a -mtune=cortex-a53 -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hard \
-		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog $SSH"
-	ELDFLAGS="$SSH"
+		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog $SSH $SMBCLIENT"
+	ELDFLAGS="-Wl,-rpath-link,$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf \
+		-Wl,-rpath-link,$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/samba \
+		-Wl,-rpath-link,$RPI_SYSROOT/lib/arm-linux-gnueabihf"
 else
 	echo "Please choose either pi1 or pi2."
 	exit 1
@@ -346,7 +345,7 @@ else
 --enable-gpl \
 --enable-version3 \
 --enable-protocols \
---disable-libsmbclient \
+--enable-libsmbclient \
 --enable-libssh \
 --enable-nonfree \
 --enable-openssl \

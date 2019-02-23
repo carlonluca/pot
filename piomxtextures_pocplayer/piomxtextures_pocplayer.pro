@@ -27,7 +27,7 @@ CONFIG += -std=c++11
 
 INCLUDEPATH += $$_PRO_FILE_PWD_/../3rdparty/LightLogger
 
-SOURCES     += main.cpp \
+SOURCES += main.cpp \
     poc_qmlutils.cpp \
     poc_utils.cpp \
     poc_uptime.cpp
