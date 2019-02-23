@@ -23,7 +23,7 @@
 
 QT += core core-private gui gui-private opengl quick quick-private multimedia
 
-DEFINES += POT_VERSION=\\\"5.7.0\\\"
+DEFINES += POT_VERSION=\\\"5.7.1\\\"
 
 SRC=$$PWD
 SRC_WRAPPER=$$SRC/omx_wrapper
