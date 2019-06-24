@@ -1,0 +1,5 @@
+<RCC>
+    <qresource prefix="/">
+        <file>omx_vt_restore.sh</file>
+    </qresource>
+</RCC>

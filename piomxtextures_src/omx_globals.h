@@ -27,6 +27,8 @@
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
+#include <QString>
+#include <QRect>
 #include <EGL/egl.h>
 
 /*------------------------------------------------------------------------------
@@ -40,5 +42,17 @@ EGLContext get_global_egl_context();
 
 const char* get_egl_errstr(EGLint err);
 const char* get_egl_errstr();
+
+/*------------------------------------------------------------------------------
+|    geometry_string
++-----------------------------------------------------------------------------*/
+inline QString geometry_string(const QRect& r)
+{
+    return QStringLiteral("%1 %2 %3 %4")
+            .arg(r.x())
+            .arg(r.y())
+            .arg(r.right())
+            .arg(r.bottom());
+}
 
 #endif // OMX_GLOBALS_H
