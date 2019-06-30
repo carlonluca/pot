@@ -346,20 +346,21 @@ void OMX_VideoLayer::refreshContent()
     if (m_fillMode == Qt::KeepAspectRatio) {
         qreal r1 = full.width()/full.height();
         qreal r2 = qreal(resolution.width())/resolution.height();
+        qreal w,h,x,y;
         if (r2 >= r1) {
-            qreal w = full.width();
-            qreal h = w/r2;
-            qreal x = 0;
-            qreal y = (full.height() - h)/2;
-            videoRect = QRectF(x, y, w, h);
+            w = full.width();
+            h = w/r2;
+            x = 0;
+            y = (full.height() - h)/2;
         }
         else {
-            qreal h = full.height();
-            qreal w = h/r2;
-            qreal y = 0;
-            qreal x = (full.width() - w)/2;
-            videoRect = QRectF(x, y, w, h);
+            h = full.height();
+            w = h*r2;
+            x = (full.width() - w)/2;
+            y = 0;
         }
+
+        videoRect = QRectF(x, y, w, h);
     }
 
     // If video rect remains unaltered, nothing else is needed.
