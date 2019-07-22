@@ -15,7 +15,7 @@ For some info on how to use: http://goo.gl/TuiSyS.
 
 For a demo: https://www.youtube.com/watch?v=SeJxQN-W2uA.
 
-POT releases include builds that provide Qt Multimeida Backend, POT library, sample apps and Qt builds of most available Qt modules and, sometimes, complete firmware images (see http://goo.gl/KphzdD).
+POT releases include builds that provide Qt Multimedia Backend, POT library, sample apps and Qt builds of most available Qt modules and, sometimes, complete firmware images (see http://goo.gl/KphzdD).
 I'll keep the project up as long as I'll see interest for it. Enjoy! ;-)
 
 <span class="badge-paypal"><a href="https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=ZGPF5H6F8N7FS" title="Donate to this project using Paypal"><img src="https://img.shields.io/badge/paypal-donate-yellow.svg" alt="PayPal donate button" /></a></span>
