@@ -23,7 +23,7 @@
 
 TEMPLATE = lib
 
-VERSION = 0.5.2
+VERSION = 0.6.4
 DEFINES += VERSION=\\\"$$VERSION\\\"
 
 QT += quick qml dbus gui multimedia
@@ -39,11 +39,16 @@ INCLUDEPATH += \
         $$[QT_SYSROOT]/opt/vc/include
 
 HEADERS += \
+	omx_audio.h \
+	omx_logging_cat.h \
+	omx_video.h \
 	omx_videolayer.h \
 	omx_piomxtexturesplugin.h \
 	omx_omxplayercontroller.h
 
 SOURCES += \
+	omx_audio.cpp \
+	omx_video.cpp \
 	omx_videolayer.cpp \
 	omx_piomxtexturesplugin.cpp \
 	omx_omxplayercontroller.cpp

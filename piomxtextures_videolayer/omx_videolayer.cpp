@@ -31,7 +31,7 @@
 #include <QSGSimpleRectNode>
 
 #include "omx_videolayer.h"
-#include "omx_logging.h"
+#include "omx_logging_cat.h"
 #include "omx_globals.h"
 
 /*------------------------------------------------------------------------------
@@ -39,6 +39,8 @@
 +-----------------------------------------------------------------------------*/
 #define ASYNC(...) \
     QMetaObject::invokeMethod(__VA_ARGS__)
+
+Q_LOGGING_CATEGORY(vl, "pot.vl")
 
 /*------------------------------------------------------------------------------
 |    class OMX_VideoRectNode
@@ -100,11 +102,14 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
   , m_videoRect(boundingRect())
   , m_controller(new OMX_OmxplayerController)
   , m_fillMode(Qt::IgnoreAspectRatio)
+  , m_autoPlay(false)
 {
     setFlag(QQuickItem::ItemHasContents, true);
-    setVlState(m_controller->status());
+    setVlState(m_controller->mediaStatus());
 
-    connect(m_controller, SIGNAL(stopped()),
+    connect(m_controller, SIGNAL(interrupted()),
+            this, SIGNAL(stopped()));
+    connect(m_controller, SIGNAL(finished()),
             this, SIGNAL(stopped()));
     connect(m_controller, SIGNAL(streamLengthComputed(qint64)),
             this, SIGNAL(durationReceived(qint64)));
@@ -123,12 +128,13 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
             this, SLOT(onWidthChanged()), Qt::DirectConnection);
     connect(this, SIGNAL(heightChanged()),
             this, SLOT(onHeightChanged()), Qt::DirectConnection);
-    connect(m_controller, &OMX_OmxplayerController::statusChanged, this, [this](QMediaPlayer::MediaStatus status) {
+    connect(m_controller, &OMX_OmxplayerController::mediaStatusChanged, this, [this](QMediaPlayer::MediaStatus status) {
         setVlState(status);
         m_lastGlobalRect = QRectF();
         refreshContent();
     });
     connect(m_controller, &OMX_OmxplayerController::frameVisibleChanged, this, [this] {
+        log_debug("Refreshing...");
         update();
     });
 
@@ -187,6 +193,7 @@ int OMX_VideoLayer::videoLayer()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::setVideoLayer(int layer)
 {
+    log_debug_func;
     if (layer == m_layer)
         return;
     m_layer = layer;
@@ -212,7 +219,7 @@ void OMX_VideoLayer::setSource(QUrl source)
     m_source = source;
     emit sourceChanged();
 
-    m_controller->setFilename(source);
+    m_controller->setSource(source);
 }
 
 /*------------------------------------------------------------------------------
@@ -220,6 +227,7 @@ void OMX_VideoLayer::setSource(QUrl source)
 +-----------------------------------------------------------------------------*/
 qint64 OMX_VideoLayer::duration()
 {
+    log_debug_func;
     return m_controller->streamLength();
 }
 
@@ -228,6 +236,7 @@ qint64 OMX_VideoLayer::duration()
 +-----------------------------------------------------------------------------*/
 qint64 OMX_VideoLayer::position()
 {
+    log_debug_func;
     return m_controller->streamPosition();
 }
 
@@ -236,6 +245,7 @@ qint64 OMX_VideoLayer::position()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::play()
 {
+    log_debug_func;
     ASYNC(m_controller, "play");
 }
 
@@ -244,7 +254,26 @@ void OMX_VideoLayer::play()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::stop()
 {
+    log_debug_func;
     ASYNC(m_controller, "stop");
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_VideoLayer::pause
++-----------------------------------------------------------------------------*/
+void OMX_VideoLayer::pause()
+{
+    log_debug_func;
+    ASYNC(m_controller, "pause");
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_VideoLayer::seek
++-----------------------------------------------------------------------------*/
+void OMX_VideoLayer::seek(qint64 micros)
+{
+    log_debug_func;
+    ASYNC(m_controller, "setPosition", Q_ARG(qint64, micros));
 }
 
 /*------------------------------------------------------------------------------
@@ -252,6 +281,7 @@ void OMX_VideoLayer::stop()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::requestDuration()
 {
+    log_debug_func;
     ASYNC(m_controller, "streamLengthAsync");
 }
 
@@ -260,6 +290,7 @@ void OMX_VideoLayer::requestDuration()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::requestPosition()
 {
+    log_debug_func;
     ASYNC(m_controller, "streamPositionAsync");
 }
 
@@ -316,6 +347,26 @@ void OMX_VideoLayer::setVlState(QMediaPlayer::MediaStatus vlState)
         return;
     m_vlState = vlState;
     emit vlStateChanged(m_vlState);
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_VideoLayer::setAutoPlay
++-----------------------------------------------------------------------------*/
+void OMX_VideoLayer::setAutoPlay(bool autoPlay)
+{
+    if (m_autoPlay == autoPlay)
+        return;
+    log_debug_func;
+    m_autoPlay = autoPlay;
+    emit autoPlayChanged(m_autoPlay);
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_VideoLayer::setMuted
++-----------------------------------------------------------------------------*/
+void OMX_VideoLayer::setMuted(bool muted)
+{
+    m_controller->setMuted(muted);
 }
 
 /*------------------------------------------------------------------------------

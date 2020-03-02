@@ -21,6 +21,9 @@
  * along with PiOmxTexturesVideoLayer. If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef OMX_VIDEOLAYER_H
+#define OMX_VIDEOLAYER_H
+
 /*------------------------------------------------------------------------------
 |    includes
 +-----------------------------------------------------------------------------*/
@@ -31,7 +34,7 @@
 #include <QMediaPlayer>
 
 #include "omx_omxplayercontroller.h"
-#include "omx_logging.h"
+#include "omx_logging_cat.h"
 
 /*------------------------------------------------------------------------------
 |    OMX_VideoLayer class
@@ -48,6 +51,9 @@ class OMX_VideoLayer : public QQuickItem
     Q_PROPERTY(QSize resolution READ resolution NOTIFY resolutionChanged)
     Q_PROPERTY(QRectF videoRect READ videoRect NOTIFY videoRectChanged)
     Q_PROPERTY(bool videoFrameVisible READ videoFrameVisible NOTIFY videoFrameVisibleChanged)
+    Q_PROPERTY(bool autoPlay READ autoPlay WRITE setAutoPlay NOTIFY autoPlayChanged)
+    Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
+
 public:
     OMX_VideoLayer(QQuickItem* parent = nullptr);
     ~OMX_VideoLayer() override;
@@ -58,7 +64,7 @@ public:
     void setVideoLayer(int videoLayer);
 
     QUrl source();
-    void setSource(QUrl source);
+    virtual void setSource(QUrl source);
 
     qint64 duration();
     qint64 position();
@@ -68,10 +74,15 @@ public:
     QSize resolution() const { return m_controller->resolution(); }
     QRectF videoRect() const { return m_videoRect; }
     bool videoFrameVisible() const { return m_controller->frameVisible(); }
+    bool autoPlay() const { return m_autoPlay; }
+    bool muted() const { return m_controller->muted(); }
 
 public slots:
     void play();
     void stop();
+    void pause();
+    void seek(qint64 micros);
+
     void requestDuration();
     void requestPosition();
 
@@ -82,6 +93,8 @@ public slots:
 
     void setFillMode(Qt::AspectRatioMode fillMode);
     void setVlState(QMediaPlayer::MediaStatus vlState);
+    void setAutoPlay(bool autoPlay);
+    void setMuted(bool muted);
 
 protected:
     void geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry) override;
@@ -97,15 +110,17 @@ signals:
     void resolutionChanged(QSize resolution);
     void videoRectChanged(QRectF videoRect);
     void videoFrameVisibleChanged(bool videoFrameVisible);
+    void autoPlayChanged(bool autoPlay);
+    void mutedChanged(bool muted);
 
-private slots:
+protected slots:
     void refreshContent();
     void refreshHwSurfaceGeometry();
 
-private:
+protected:
     bool setVideoRect(const QRectF& rect);
 
-private:
+protected:
     int m_layer;
     QUrl m_source;
     QRectF m_lastGlobalRect;
@@ -114,4 +129,7 @@ private:
     OMX_OmxplayerController* m_controller;
     Qt::AspectRatioMode m_fillMode;
     QMediaPlayer::MediaStatus m_vlState;
+    bool m_autoPlay;
 };
+
+#endif

@@ -31,6 +31,7 @@
 #include <QProcess>
 #include <QUrl>
 #include <QMutex>
+#include <QWaitCondition>
 #include <QFileSystemWatcher>
 #include <QThread>
 #include <QDBusInterface>
@@ -40,13 +41,17 @@
 #include <QDebug>
 #include <QMediaPlayer>
 #include <QStateMachine>
+#include <QQueue>
+#include <QTimer>
+#include <QSemaphore>
 
 #include <functional>
 
-#include "omx_logging.h"
+#include "omx_logging_cat.h"
 
 template<typename T>
 using POT_DbusCall = std::function<QDBusReply<T>(QDBusInterface*)>;
+using POT_DbusCallVoid = std::function<QDBusReply<void>(QDBusInterface*)>;
 
 class QDBusPendingCallWatcher;
 class OMX_OmxplayerController;
@@ -95,14 +100,56 @@ struct OMX_LastInt64
 };
 
 /*------------------------------------------------------------------------------
+|    OMX_CommandProcessor class
++-----------------------------------------------------------------------------*/
+class OMX_CommandProcessor : public QThread
+{
+    Q_OBJECT
+public:
+    enum CommandType {
+        CMD_SET_SOURCE,
+        CMD_PLAY,
+        CMD_PAUSE,
+        CMD_STOP,
+        CMD_CLEAN_THREAD
+    };
+    Q_ENUM(CommandType)
+
+    struct Command {
+        Command(CommandType type, const QVariant& data) :
+            type(type), data(data) {}
+        Command(CommandType type) :
+            type(type) {}
+        CommandType type;
+        QVariant data;
+    };
+
+    OMX_CommandProcessor(OMX_OmxplayerController* controller) :
+        QThread(), m_controller(controller), m_ready(0) {}
+    void schedule(const Command& cmd);
+    void run() override;
+    void ready();
+
+private:
+    OMX_OmxplayerController* m_controller;
+    QQueue<Command> m_pending;
+    QMutex m_mutex;
+    QMutex m_executionLock;
+    QWaitCondition m_cond;
+    QSemaphore m_ready;
+};
+
+/*------------------------------------------------------------------------------
 |    OMX_OmxplayerController class
 +-----------------------------------------------------------------------------*/
 class OMX_OmxplayerController : public QObject
 {
     Q_OBJECT
-    Q_PROPERTY(QMediaPlayer::MediaStatus status READ status WRITE setStatus NOTIFY statusChanged)
+    Q_PROPERTY(QMediaPlayer::MediaStatus mediaStatus READ mediaStatus WRITE setMediaStatus NOTIFY mediaStatusChanged)
+    Q_PROPERTY(QMediaPlayer::State playbackState READ playbackState WRITE setPlaybackState NOTIFY playbackStateChanged)
     Q_PROPERTY(QSize resolution READ resolution WRITE setResolution NOTIFY resolutionChanged)
     Q_PROPERTY(bool frameVisible READ frameVisible NOTIFY frameVisibleChanged)
+    Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
 public:
     OMX_OmxplayerController(QObject* parent = nullptr);
     ~OMX_OmxplayerController();
@@ -113,18 +160,22 @@ public:
 
     static void prepareVideoLayer();
 
-    QMediaPlayer::MediaStatus status() const { return m_status; }
+    QMediaPlayer::MediaStatus mediaStatus() const { return m_status; }
+    QMediaPlayer::State playbackState() const { return m_state; }
     QSize resolution() const { return m_resolution; }
     bool frameVisible() const { return m_frameVisible; }
+    bool muted() const { return m_muted; }
 
 public slots:
     void play();
-    bool stop();
+    void stop();
+    void pause();
+    bool setPosition(qint64 microsecs);
+    void setSource(const QUrl& url);
 
     void streamLengthAsync();
     void streamPositionAsync();
 
-    bool setFilename(QUrl url);
     bool setLayer(int layer);
     void setX(qreal x);
     void setY(qreal y);
@@ -132,9 +183,11 @@ public slots:
     void setHeight(qreal h);
     void setFillMode(Qt::AspectRatioMode mode) { m_fillMode = mode; }
     void setResolution(QSize resolution);
+    void setMuted(bool muted);
 
 signals:
-    void stopped();
+    void interrupted();
+    void finished();
     void streamLengthComputed(qint64 length);
     void streamPositionComputed(qint64 position);
 
@@ -143,48 +196,66 @@ signals:
     void loadFailed();
     void playRequested();
     void playSucceeded();
-
-    void statusChanged(QMediaPlayer::MediaStatus status);
+    void pauseRequested();
+    void stopRequested();
 
     void resolutionChanged(QSize resolution);
     void frameVisibleChanged(bool visible);
 
+    void mediaStatusChanged(QMediaPlayer::MediaStatus mediaStatus);
+    void playbackStateChanged(QMediaPlayer::State playbackState);
+
+    void mutedChanged(bool muted);
+
+    void eosReceived();
+    void startReceived();
+
 private slots:
-    void updateDBusAddress();
-    void updateDBusFilePath();
     void killProcess();
     void sendGeometry();
 
     void loadInternal();
     void playInternal();
+    void pauseInternal();
+    void stopInternal();
+    bool setFilenameInternal(QUrl url);
+
     void connectIfNeeded();
 
-    void eosReceived();
-    void startReceived();
+    void eosReceived(bool failure);
+    void startReceived(bool failure);
 
 private:
-    void setStatus(QMediaPlayer::MediaStatus status);
+    void setMediaStatus(QMediaPlayer::MediaStatus mediaStatus);
+    void setPlaybackState(QMediaPlayer::State playbackState);
+
     void setFrameVisible(bool visible);
     bool isRunning();
     template<typename T> T dbusSend(
-            QDBusInterface** iface,
+            QDBusInterface* iface,
             POT_DbusCall<T> command,
             T failure);
+    bool dbusSend(QDBusInterface* iface, POT_DbusCallVoid command);
     void dbusSendAsync(
             const QString& command,
             std::function<void(QDBusPendingCallWatcher*)> lambda);
     QSize computeResolution(QUrl url);
 
-    QDBusInterface* m_dbusIfaceProps;
-    QDBusInterface* m_dbusIfacePlayer;
+    void processCommand(const OMX_CommandProcessor::Command& cmd);
+    bool isInStates(const QSet<QAbstractState*> states);
+    void waitForStates(const QSet<QAbstractState*> states);
+    QStringList readOmxplayerArguments();
+
+    OMX_CommandProcessor* m_cmdProc;
+
+    QScopedPointer<QDBusInterface> m_dbusIfaceProps;
+    QScopedPointer<QDBusInterface> m_dbusIfacePlayer;
     QThread*  m_thread;
     QMutex    m_mutex;
     QMutex    m_geometryMutex;
     QProcess* m_process;
     QUrl      m_url;
-    QString   m_dbusAddress;
-    QString   m_dbusFilePath;
-    QFileSystemWatcher* m_watcher;
+    QString   m_dbusService;
     QRect m_rect;
     Qt::AspectRatioMode m_fillMode;
 
@@ -197,7 +268,21 @@ private:
     QStateMachine* m_machine;
     bool m_frameVisible;
 
+    QMediaPlayer::State m_state;
+    bool m_muted;
+
+    QState* m_stateNoMedia;
+    QState* m_stateLoading;
+    QState* m_stateLoaded;
+    QState* m_statePlaying;
+    QState* m_stateStopping;
+    QState* m_statePaused;
+    QState* m_stateEom;
+
+    QTimer* m_dbusConnMonitor;
+
     friend class OMX_GeometryDispatcher;
+    friend class OMX_CommandProcessor;
 };
 
 #endif // OMX_OMXPLAYERCONTROLLER_H
