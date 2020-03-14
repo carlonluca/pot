@@ -23,7 +23,7 @@
 
 QT += core core-private gui gui-private opengl quick quick-private multimedia
 
-DEFINES += POT_VERSION=\\\"5.7.1\\\"
+DEFINES += POT_VERSION=\\\"5.7.3\\\"
 
 SRC=$$PWD
 SRC_WRAPPER=$$SRC/omx_wrapper
@@ -65,7 +65,7 @@ LIBS += $$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavformat.a \
 	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libavutil.a \
 	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libswscale.a \
 	$$PWD/../3rdparty/ffmpeg/$$FFMPEG_BUILD_DIR/lib/libswresample.a \
-   -lz -lssl -lcrypto -lbz2 -lpcre
+   -lz -lssl -lcrypto -lpcre
 !contains(DEFINES, CONFIG_SKIP_SSH_SMB) { LIBS += -lsmbclient -lssh }
 }
 else {

@@ -28,6 +28,7 @@ if [ $# -ne 1 ]; then
    exit
 fi
 
+export SIGBUS_PATCH="$PWD/../piomxtextures_tools/libav_sigbus.patch"
 export PATH="$RPI_COMPILER_PATH":$PATH
 #export PKG_CONFIG_PATH="$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/pkgconfig"
 
@@ -44,10 +45,9 @@ elif [ "$1" == "pi3" ]; then
 	SMBCLIENT=`pkg-config smbclient --cflags --libs`
 	SSH="-Wl,-rpath,$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf -Wl,-rpath,$RPI_SYSROOT/lib/arm-linux-gnueabihf"
 	ECFLAGS="-march=armv8-a -mtune=cortex-a53 -mfpu=crypto-neon-fp-armv8 -mfloat-abi=hard \
-		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog $SSH $SMBCLIENT"
-	ELDFLAGS="-Wl,-rpath-link,$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf \
-		-Wl,-rpath-link,$RPI_SYSROOT/usr/lib/arm-linux-gnueabihf/samba \
-		-Wl,-rpath-link,$RPI_SYSROOT/lib/arm-linux-gnueabihf"
+		-funsafe-math-optimizations -lm -mno-apcs-stack-check -mstructure-size-boundary=32 -mno-sched-prolog $SSH $SMBCLIENT \
+		-I$RPI_SYSROOT/usr/include/samba-4.0"
+	ELDFLAGS="$SSH $SMBCLIENT"
 else
 	echo "Please choose either pi1 or pi2."
 	exit 1
@@ -81,6 +81,9 @@ cd 3rdparty/ffmpeg
 rm -rf ffmpeg_src
 git clone https://github.com/FFmpeg/FFmpeg.git ffmpeg_src -b n3.4.1 --depth=1
 cd ffmpeg_src
+
+echo "Patching..."
+patch -p1 < $SIGBUS_PATCH
 
 echo "Configuring..."
 echo "Prefix to $PWD..."
