@@ -363,7 +363,8 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
             this, &OMX_OmxplayerController::connectIfNeeded);
 
     m_process = new QProcess;
-    connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [] {
+	connect(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), this, [this] {
+		setFrameVisible(false);
         log_verbose("omx process closed");
     });
     connect(m_process, &QProcess::stateChanged, this, [this] (QProcess::ProcessState state) {
@@ -792,10 +793,11 @@ void OMX_OmxplayerController::playInternal()
         return;
     }
 
-    QStringList customArgs = readOmxplayerArguments();
+	QStringList customArgs = readOmxplayerArguments();
+	QString layer = readOmxLayer();
 
     QStringList args = QStringList()
-            << "--layer" << "-128"
+			<< "--layer" << layer
             << "--dbus_name" << m_dbusService
             << "--vol" << (m_muted ? "-6000" : "0")
             << "--win"
@@ -1247,7 +1249,20 @@ QStringList OMX_OmxplayerController::readOmxplayerArguments()
         return QStringList();
 
     QString argString = QString(data);
-    return argString.split(" ", QString::SkipEmptyParts);
+	return argString.split(" ", QString::SkipEmptyParts);
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_OmxplayerController::readOmxLayer
++-----------------------------------------------------------------------------*/
+QString OMX_OmxplayerController::readOmxLayer()
+{
+	const QString defaultLayer = QStringLiteral("-128");
+
+	QByteArray data = qgetenv("POT_LAYER");
+	if (data.isEmpty())
+		return defaultLayer;
+	return QString(data);
 }
 
 /*------------------------------------------------------------------------------

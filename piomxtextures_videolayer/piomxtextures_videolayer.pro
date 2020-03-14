@@ -23,7 +23,7 @@
 
 TEMPLATE = lib
 
-VERSION = 0.6.4
+VERSION = 0.6.5
 DEFINES += VERSION=\\\"$$VERSION\\\"
 
 QT += quick qml dbus gui multimedia

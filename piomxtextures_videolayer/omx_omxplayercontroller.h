@@ -245,6 +245,7 @@ private:
     bool isInStates(const QSet<QAbstractState*> states);
     void waitForStates(const QSet<QAbstractState*> states);
     QStringList readOmxplayerArguments();
+	QString readOmxLayer();
 
     OMX_CommandProcessor* m_cmdProc;
 
