@@ -1,0 +1,107 @@
+#!/bin/bash
+#
+# OMXPlayer launcher script.
+#
+
+OMXPLAYER_DIR=`dirname $0`
+OMXPLAYER_BIN="$OMXPLAYER_DIR/omxplayer.bin"
+OMXPLAYER_LIBS="/opt/vc/lib"
+
+if [ -e "$OMXPLAYER_DIR/ffmpeg_compiled" ]; then
+    OMXPLAYER_LIBS="$OMXPLAYER_LIBS:$OMXPLAYER_DIR/ffmpeg_compiled/usr/local/lib"
+else
+    OMXPLAYER_LIBS="$OMXPLAYER_LIBS:/usr/lib/omxplayer"
+fi
+
+refresh_regex='(|.* )(-r|--refresh)( .*|$)'
+audio_regex='.*\.(mp3|wav|wma|cda|ogg|ogm|aac|ac3|flac)( .*|$)'
+
+fbset_bin=`which fbset 2> /dev/null`
+xset_bin=`which xset 2> /dev/null`
+xrefresh_bin=`which xrefresh 2> /dev/null`
+
+if [ -z $NOREFRESH ] || [ "$NOREFRESH" == "0" ]; then
+    if [[ $@ =~ $refresh_regex ]] && [[ ! $@ =~ $audio_regex ]]; then
+        check_failed=0
+
+        if [ -z $fbset_bin ]; then
+            echo "WARNING: You are going to run omxplayer with -r/--refresh and you don't have fbset installed, this can cause black screen when it finishes playing."
+            check_failed=1
+        fi
+
+        if [ ! -z $DISPLAY ]; then
+            if [ -z $xset_bin ] || [ -z $xrefresh_bin ]; then
+                echo "WARNING: You are going to run omxplayer with -r/--refresh and you don't have xset and xrefresh installed (x11-xserver-utils package on Debian/Raspbian), this can cause black screen when it finishes playing."
+                check_failed=1
+            fi
+        fi
+
+        if [ "$check_failed" == "1" ]; then
+            read -sn 1 -p "Press any key to continue or Ctrl-C to quit."
+            echo
+        fi
+    fi
+fi
+
+DBUS_CMD="dbus-daemon --fork --print-address 5 --print-pid 6 --session"
+OMXPLAYER_DBUS_ADDR="/tmp/omxplayerdbus.${USER:-root}"
+OMXPLAYER_DBUS_PID="/tmp/omxplayerdbus.${USER:-root}.pid"
+
+if [ ! -s "$OMXPLAYER_DBUS_PID" ] || ! pgrep -f "$DBUS_CMD" -F "$OMXPLAYER_DBUS_PID" >/dev/null; then
+	#echo "starting dbus for the first time" >&2
+	exec 5> "$OMXPLAYER_DBUS_ADDR"
+	exec 6> "$OMXPLAYER_DBUS_PID"
+	$DBUS_CMD
+	until [ -s "$OMXPLAYER_DBUS_ADDR" ]; do
+		echo "waiting for dbus address to appear" >&2
+		sleep .2
+	done
+fi
+
+DBUS_SESSION_BUS_ADDRESS=`cat $OMXPLAYER_DBUS_ADDR`
+DBUS_SESSION_BUS_PID=`cat $OMXPLAYER_DBUS_PID`
+
+export DBUS_SESSION_BUS_ADDRESS
+export DBUS_SESSION_BUS_PID
+
+LD_LIBRARY_PATH="$OMXPLAYER_LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" $OMXPLAYER_BIN "$@"
+RESULT=$?
+
+if [ ! -z $NOREFRESH ] && [ "$NOREFRESH" == "1" ]; then
+    exit $RESULT
+fi
+
+if [[ $@ =~ $audio_regex ]]; then
+    exit $RESULT
+fi
+
+if [[ $@ =~ $refresh_regex ]]; then
+    if [ ! -z $fbset_bin ]; then
+        DEPTH2=`$fbset_bin | head -3 | tail -1 | cut -d " " -f 10`
+
+        if [ "$DEPTH2" == "8" ]; then
+            DEPTH1=16
+        elif [ "$DEPTH2" == "16" ] || [ "$DEPTH2" == "32" ]; then
+            DEPTH1=8
+        else
+            DEPTH1=8
+            DEPTH2=16
+        fi
+
+        $fbset_bin -depth $DEPTH1 > /dev/null 2>&1
+        $fbset_bin -depth $DEPTH2 > /dev/null 2>&1
+    fi
+
+    if [ ! -z $xset_bin ] && [ ! -z $xrefresh_bin ]; then
+        if [ -z $DISPLAY ]; then
+            DISPLAY=":0"
+        fi
+
+        $xset_bin -display $DISPLAY -q > /dev/null 2>&1
+        if [ "$?" == "0" ]; then
+            $xrefresh_bin -display $DISPLAY > /dev/null 2>&1
+        fi
+    fi
+fi
+
+exit $RESULT

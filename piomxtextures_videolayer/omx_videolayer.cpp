@@ -29,6 +29,7 @@
 #include <QRectF>
 #include <QColor>
 #include <QSGSimpleRectNode>
+#include <QLineF>
 
 #include "omx_videolayer.h"
 #include "omx_logging_cat.h"
@@ -41,6 +42,24 @@
     QMetaObject::invokeMethod(__VA_ARGS__)
 
 Q_LOGGING_CATEGORY(vl, "pot.vl")
+
+/*------------------------------------------------------------------------------
+|    convert_orientation
++-----------------------------------------------------------------------------*/
+inline OMX_OmxplayerController::Orientation convert_orientation(OMX_VideoLayer::Orientation orientation)
+{
+	switch (orientation) {
+	case OMX_VideoLayer::ROT_90:
+		return OMX_OmxplayerController::ROT_90;
+	case OMX_VideoLayer::ROT_180:
+		return OMX_OmxplayerController::ROT_180;
+	case OMX_VideoLayer::ROT_270:
+		return OMX_OmxplayerController::ROT_270;
+	case OMX_VideoLayer::ROT_0:
+	default:
+		return OMX_OmxplayerController::ROT_0;
+	}
+}
 
 /*------------------------------------------------------------------------------
 |    class OMX_VideoRectNode
@@ -106,6 +125,7 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
 {
     setFlag(QQuickItem::ItemHasContents, true);
     setVlState(m_controller->mediaStatus());
+	setOrientation(ROT_0);
 
     connect(m_controller, SIGNAL(interrupted()),
             this, SIGNAL(stopped()));
@@ -237,7 +257,19 @@ qint64 OMX_VideoLayer::duration()
 qint64 OMX_VideoLayer::position()
 {
     log_debug_func;
-    return m_controller->streamPosition();
+	return m_controller->streamPosition();
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_VideoLayer::setOrientation
++-----------------------------------------------------------------------------*/
+void OMX_VideoLayer::setOrientation(OMX_VideoLayer::Orientation orientation)
+{
+	if (m_orientation == orientation)
+		return;
+	m_orientation = orientation;
+	m_controller->setOrientation(convert_orientation(orientation));
+	emit orientationChanged();
 }
 
 /*------------------------------------------------------------------------------
@@ -372,9 +404,17 @@ void OMX_VideoLayer::setMuted(bool muted)
 /*------------------------------------------------------------------------------
 |    OMX_VideoLayer::geometryChanged
 +-----------------------------------------------------------------------------*/
+#if QT_VERSION_MAJOR > 5
+void OMX_VideoLayer::geometryChange(const QRectF& newGeometry, const QRectF& oldGeometry)
+#else
 void OMX_VideoLayer::geometryChanged(const QRectF& newGeometry, const QRectF& oldGeometry)
+#endif
 {
+#if QT_VERSION_MAJOR > 5
+    QQuickItem::geometryChange(newGeometry, oldGeometry);
+#else
     QQuickItem::geometryChanged(newGeometry, oldGeometry);
+#endif
     refreshContent();
 }
 
@@ -392,32 +432,33 @@ void OMX_VideoLayer::refreshContent()
         return; // TODO
     }
 
-    QRectF full = boundingRect();
-    QRectF videoRect = boundingRect();
-    if (m_fillMode == Qt::KeepAspectRatio) {
-        qreal r1 = full.width()/full.height();
-        qreal r2 = qreal(resolution.width())/resolution.height();
-        qreal w,h,x,y;
-        if (r2 >= r1) {
-            w = full.width();
-            h = w/r2;
-            x = 0;
-            y = (full.height() - h)/2;
-        }
-        else {
-            h = full.height();
-            w = h*r2;
-            x = (full.width() - w)/2;
-            y = 0;
-        }
+	QRectF full = boundingRect();
+	QRectF videoRect = boundingRect();
+	if (m_fillMode == Qt::KeepAspectRatio) {
+		qreal r1 = full.width()/full.height();
+		qreal r2 = qreal(resolution.width())/resolution.height();
+		qreal w,h,x,y;
+		if (r2 >= r1) {
+			w = full.width();
+			h = w/r2;
+			x = 0;
+			y = (full.height() - h)/2;
+		}
+		else {
+			h = full.height();
+			w = h*r2;
+			x = (full.width() - w)/2;
+			y = 0;
+		}
 
-        videoRect = QRectF(x, y, w, h);
-    }
+		videoRect = QRectF(x, y, w, h);
+	}
 
-    // If video rect remains unaltered, nothing else is needed.
-    if (!setVideoRect(videoRect))
-        return;
-    refreshHwSurfaceGeometry();
+	// If video rect remains unaltered, nothing else is needed.
+	if (!setVideoRect(videoRect))
+		return;
+	refreshHwSurfaceGeometry();
+
     ASYNC(this, "update");
 }
 
@@ -426,18 +467,19 @@ void OMX_VideoLayer::refreshContent()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::refreshHwSurfaceGeometry()
 {
-    QRectF rect = videoRect();
-    QPointF globalTopLeft = mapToScene(rect.topLeft());
-    QRectF globalRect(globalTopLeft, rect.size());
-    if (m_lastGlobalRect == globalRect)
-        return;
+	QRectF globalRect = computeGlobalRect(videoRect());
+	if (m_lastGlobalRect == globalRect)
+		return;
 
-    m_controller->setX(globalRect.x());
-    m_controller->setY(globalRect.y());
-    m_controller->setWidth(globalRect.width());
-    m_controller->setHeight(globalRect.height());
+	m_controller->setX(globalRect.x());
+	m_controller->setY(globalRect.y());
+	m_controller->setWidth(globalRect.width());
+	m_controller->setHeight(globalRect.height());
 
-    m_lastGlobalRect = globalRect;
+	m_lastGlobalRect = globalRect;
+
+	qDebug() << "Local rect:" << videoRect();
+	qDebug() << "Global rect:" << globalRect;
 }
 
 /*------------------------------------------------------------------------------
@@ -449,5 +491,39 @@ bool OMX_VideoLayer::setVideoRect(const QRectF& rect)
         return false;
     m_videoRect = rect;
     emit videoRectChanged(rect);
-    return true;
+	return true;
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_VideoLayer::computeGlobalTopLeft
++-----------------------------------------------------------------------------*/
+QRectF OMX_VideoLayer::computeGlobalRect(const QRectF& localRect)
+{
+	// Find distance from ref.
+	qreal minx = std::numeric_limits<qreal>::min();
+	qreal miny = std::numeric_limits<qreal>::min();
+	QPointF ref(minx, miny);
+	QList<QPointF> points = QList<QPointF>()
+			<< localRect.topLeft()
+			<< localRect.bottomLeft()
+			<< localRect.bottomRight()
+			<< localRect.topRight();
+
+	QList<QPair<QPointF, qreal>> pointDists;
+	foreach (const QPointF& point, points) {
+		const QPointF global = mapToGlobal(point);
+		const qreal dist = QLineF(ref, global).length();
+		pointDists.append(QPair<QPointF, qreal>(global, dist));
+	}
+
+	auto minmax = std::minmax_element(pointDists.begin(), pointDists.end(), [] (
+									  const QPair<QPointF, qreal>& p1,
+									  const QPair<QPointF, qreal>& p2) -> bool {
+		return p1.second < p2.second;
+	});
+
+	auto min = minmax.first;
+	auto max = minmax.second;
+
+	return QRectF(min->first, max->first);
 }

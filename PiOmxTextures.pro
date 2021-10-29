@@ -31,6 +31,7 @@ SUBDIRS = \
 	piomxtextures_app \
 	piomxtextures_pocplayer \
 	piomxtextures_samples \
+	piomxtextures_videolayer \
 	piomxtextures_qmlutils \
 	piomxtextures_pocplayer_widget
 

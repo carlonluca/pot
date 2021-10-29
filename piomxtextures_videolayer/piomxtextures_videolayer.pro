@@ -23,10 +23,14 @@
 
 TEMPLATE = lib
 
-VERSION = 0.6.5
+VERSION = 0.8.0
 DEFINES += VERSION=\\\"$$VERSION\\\"
 
 QT += quick qml dbus gui multimedia
+greaterThan(QT_MAJOR_VERSION, 5) {
+    QT += statemachine
+}
+
 CONFIG += qt plugin
 DESTDIR = imports/VideoLayer
 
@@ -35,6 +39,7 @@ QMAKE_LFLAGS += -rdynamic
 INCLUDEPATH += \
 	$$_PRO_FILE_PWD_/../3rdparty/LightLogger \
 	$$_PRO_FILE_PWD_/../3rdparty/LightSmartPtr \
+        $$_PRO_FILE_PWD_/../3rdparty/lqtutils \
         $$_PRO_FILE_PWD_/../piomxtextures_src \
         $$[QT_SYSROOT]/opt/vc/include
 

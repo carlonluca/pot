@@ -84,6 +84,24 @@ inline bool is_connected(QDBusInterface* iface)
 }
 
 /*------------------------------------------------------------------------------
+|    orientation_cmd_value
++-----------------------------------------------------------------------------*/
+inline QString orientation_cmd_value(OMX_OmxplayerController::Orientation orientation)
+{
+	switch (orientation) {
+	case OMX_OmxplayerController::ROT_90:
+		return QStringLiteral("90");
+	case OMX_OmxplayerController::ROT_180:
+		return QStringLiteral("180");
+	case OMX_OmxplayerController::ROT_270:
+		return QStringLiteral("270");
+	case OMX_OmxplayerController::ROT_0:
+	default:
+		return QStringLiteral("0");
+	}
+}
+
+/*------------------------------------------------------------------------------
 |    prepare_dispmanx
 +-----------------------------------------------------------------------------*/
 #if 0
@@ -324,7 +342,6 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
   , m_dbusIfaceProps(nullptr)
   , m_dbusIfacePlayer(nullptr)
   , m_thread(new QThread)
-  , m_mutex(QMutex::Recursive)
   , m_rect(QPoint(0, 0), QGuiApplication::primaryScreen()->size())
   , m_fillMode(Qt::IgnoreAspectRatio)
   , m_lastDuration({-1, -1})
@@ -332,6 +349,8 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
   , m_status(QMediaPlayer::NoMedia)
   , m_frameVisible(false)
   , m_muted(false)
+  , m_vol(0)
+  , m_orientation(ROT_0)
   , m_stateNoMedia(new QState)
   , m_stateLoading(new QState)
   , m_stateLoaded(new QState)
@@ -793,13 +812,15 @@ void OMX_OmxplayerController::playInternal()
         return;
     }
 
-	QStringList customArgs = readOmxplayerArguments();
-	QString layer = readOmxLayer();
+    m_vol = (m_muted ? -6000 : 0);
 
+    QStringList customArgs = readOmxplayerArguments();
+    QString layer = readOmxLayer();
     QStringList args = QStringList()
-			<< "--layer" << layer
+            << "--layer" << layer
             << "--dbus_name" << m_dbusService
-            << "--vol" << (m_muted ? "-6000" : "0")
+            << "--vol" << QString::number(m_vol)
+            << "--orientation" << orientation_cmd_value(m_orientation)
             << "--win"
             << geometry_string(m_rect)
             << customArgs
@@ -939,23 +960,35 @@ void OMX_OmxplayerController::setResolution(QSize resolution)
 +-----------------------------------------------------------------------------*/
 void OMX_OmxplayerController::setMuted(bool muted)
 {
-    if (m_muted == muted)
-        return;
+    bool changed = false;
 
-    qCDebug(vl) << Q_FUNC_INFO << muted;
-    m_muted = muted;
+    if (m_muted != muted) {
+        qCDebug(vl) << Q_FUNC_INFO << muted;
+        m_muted = muted;
+        dbusSend(m_dbusIfacePlayer.get(), [muted] (QDBusInterface* iface) -> QDBusReply<void> {
+            return iface->call(muted ? "Mute" : "Unmute");
+        });
+        changed = true;
+    }
 
-    dbusSend(m_dbusIfacePlayer.get(), [muted] (QDBusInterface* iface) -> QDBusReply<void> {
-        return iface->call(muted ? "Mute" : "Unmute");
-    });
+    int expectedVol = (muted ? -6000 : 0);
+    if (m_vol != expectedVol) {
+        qCDebug(vl) << Q_FUNC_INFO << expectedVol;
+        m_vol = expectedVol;
+        dbusSend(m_dbusIfaceProps.get(), [expectedVol] (QDBusInterface* iface) -> QDBusReply<void> {
+            return iface->call("Volume", qPow(10, expectedVol/2000.0));
+        });
+        changed = true;
+    }
 
-    emit mutedChanged(m_muted);
+    if (changed)
+        emit mutedChanged(m_muted);
 }
 
 /*------------------------------------------------------------------------------
 |    OMX_OmxplayerController::setPlaybackState
 +-----------------------------------------------------------------------------*/
-void OMX_OmxplayerController::setPlaybackState(QMediaPlayer::State state)
+void OMX_OmxplayerController::setPlaybackState(OMX_MediaPlayerState state)
 {
     if (m_state == state)
         return;
@@ -1249,7 +1282,11 @@ QStringList OMX_OmxplayerController::readOmxplayerArguments()
         return QStringList();
 
     QString argString = QString(data);
+#if QT_VERSION_MAJOR > 5
+    return argString.split(" ", Qt::SkipEmptyParts);
+#else
 	return argString.split(" ", QString::SkipEmptyParts);
+#endif
 }
 
 /*------------------------------------------------------------------------------
@@ -1274,7 +1311,7 @@ void OMX_OmxplayerController::killProcess()
         QProcess::execute("pkill", QStringList()
                         << "--signal" << "SIGINT"
                         << "-P"
-                        << QString::number(m_process->pid()));
+                        << QString::number(m_process->processId()));
         m_process->kill();
         m_process->waitForFinished();
     }

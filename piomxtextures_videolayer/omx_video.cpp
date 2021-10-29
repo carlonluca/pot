@@ -11,7 +11,7 @@ OMX_Video::OMX_Video(QQuickItem* parent) :
   , m_playbackState(static_cast<MediaPlayer::PlaybackState>(m_controller->playbackState()))
   , m_status(static_cast<MediaPlayer::Status>(m_controller->mediaStatus()))
 {
-    connect(m_controller, &OMX_OmxplayerController::playbackStateChanged, this, [this] (QMediaPlayer::State state) {
+    connect(m_controller, &OMX_OmxplayerController::playbackStateChanged, this, [this] (OMX_MediaPlayerState state) {
         setPlaybackState(state);
         if (state == QMediaPlayer::PlayingState)
             emit playing();
@@ -50,9 +50,9 @@ void OMX_Video::seek(qint64 millis)
 /*------------------------------------------------------------------------------
 |    OMX_Video::setPlaybackState
 +-----------------------------------------------------------------------------*/
-void OMX_Video::setPlaybackState(QMediaPlayer::State state)
+void OMX_Video::setPlaybackState(OMX_MediaPlayerState state)
 {
-    if (state == static_cast<QMediaPlayer::State>(m_playbackState))
+    if (state == static_cast<OMX_MediaPlayerState>(m_playbackState))
         return;
     m_playbackState = static_cast<MediaPlayer::PlaybackState>(state);
     emit playbackStateChanged(m_playbackState);

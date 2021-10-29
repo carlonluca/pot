@@ -17,7 +17,9 @@ class MediaPlayer : public QObject
 public:
     enum Status
     {
+#if QT_VERSION_MAJOR <= 5
         UnknownStatus = QMediaPlayer::UnknownMediaStatus,
+#endif
         NoMedia       = QMediaPlayer::NoMedia,
         Loading       = QMediaPlayer::LoadingMedia,
         Loaded        = QMediaPlayer::LoadedMedia,
@@ -42,7 +44,9 @@ public:
         FormatError    = QMediaPlayer::FormatError,
         NetworkError   = QMediaPlayer::NetworkError,
         AccessDenied   = QMediaPlayer::AccessDeniedError,
+#if QT_VERSION_MAJOR <= 5
         ServiceMissing = QMediaPlayer::ServiceMissingError
+#endif
     };
 };
 
@@ -70,7 +74,7 @@ signals:
     void errorChanged(MediaPlayer::Error error);
 
 private:
-    void setPlaybackState(QMediaPlayer::State state);
+    void setPlaybackState(OMX_MediaPlayerState state);
     void setStatus(QMediaPlayer::MediaStatus status);
 
 private:

@@ -46,6 +46,7 @@
 #include <QSemaphore>
 
 #include <functional>
+#include <lqtutils_threading.h>
 
 #include "omx_logging_cat.h"
 
@@ -139,18 +140,32 @@ private:
     QSemaphore m_ready;
 };
 
+#if QT_VERSION_MAJOR > 5
+typedef QMediaPlayer::PlaybackState OMX_MediaPlayerState;
+#else
+typedef QMediaPlayer::State OMX_MediaPlayerState;
+#endif
+
 /*------------------------------------------------------------------------------
 |    OMX_OmxplayerController class
 +-----------------------------------------------------------------------------*/
 class OMX_OmxplayerController : public QObject
 {
-    Q_OBJECT
+	Q_OBJECT
     Q_PROPERTY(QMediaPlayer::MediaStatus mediaStatus READ mediaStatus WRITE setMediaStatus NOTIFY mediaStatusChanged)
-    Q_PROPERTY(QMediaPlayer::State playbackState READ playbackState WRITE setPlaybackState NOTIFY playbackStateChanged)
+    Q_PROPERTY(OMX_MediaPlayerState playbackState READ playbackState WRITE setPlaybackState NOTIFY playbackStateChanged)
     Q_PROPERTY(QSize resolution READ resolution WRITE setResolution NOTIFY resolutionChanged)
     Q_PROPERTY(bool frameVisible READ frameVisible NOTIFY frameVisibleChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
 public:
+	enum Orientation {
+		ROT_0,
+		ROT_90,
+		ROT_180,
+		ROT_270
+	};
+	Q_ENUM(Orientation)
+
     OMX_OmxplayerController(QObject* parent = nullptr);
     ~OMX_OmxplayerController();
 
@@ -161,10 +176,11 @@ public:
     static void prepareVideoLayer();
 
     QMediaPlayer::MediaStatus mediaStatus() const { return m_status; }
-    QMediaPlayer::State playbackState() const { return m_state; }
+    OMX_MediaPlayerState playbackState() const { return m_state; }
     QSize resolution() const { return m_resolution; }
     bool frameVisible() const { return m_frameVisible; }
     bool muted() const { return m_muted; }
+	void setOrientation(Orientation orientation) { m_orientation = orientation; }
 
 public slots:
     void play();
@@ -203,7 +219,7 @@ signals:
     void frameVisibleChanged(bool visible);
 
     void mediaStatusChanged(QMediaPlayer::MediaStatus mediaStatus);
-    void playbackStateChanged(QMediaPlayer::State playbackState);
+    void playbackStateChanged(OMX_MediaPlayerState playbackState);
 
     void mutedChanged(bool muted);
 
@@ -227,7 +243,7 @@ private slots:
 
 private:
     void setMediaStatus(QMediaPlayer::MediaStatus mediaStatus);
-    void setPlaybackState(QMediaPlayer::State playbackState);
+    void setPlaybackState(OMX_MediaPlayerState playbackState);
 
     void setFrameVisible(bool visible);
     bool isRunning();
@@ -252,7 +268,7 @@ private:
     QScopedPointer<QDBusInterface> m_dbusIfaceProps;
     QScopedPointer<QDBusInterface> m_dbusIfacePlayer;
     QThread*  m_thread;
-    QMutex    m_mutex;
+    LQTRecursiveMutex m_mutex;
     QMutex    m_geometryMutex;
     QProcess* m_process;
     QUrl      m_url;
@@ -269,8 +285,10 @@ private:
     QStateMachine* m_machine;
     bool m_frameVisible;
 
-    QMediaPlayer::State m_state;
+    OMX_MediaPlayerState m_state;
     bool m_muted;
+    int m_vol;
+    Orientation m_orientation;
 
     QState* m_stateNoMedia;
     QState* m_stateLoading;

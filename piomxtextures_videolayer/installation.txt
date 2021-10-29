@@ -1,0 +1,1 @@
+To install position the template PiOmxTexturesVideoLayer into [QT_INSTALL_DIR]/qml and place the lib into it.

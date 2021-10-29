@@ -2,3 +2,6 @@
 	path = 3rdparty/LightLogger
 	url = https://github.com/carlonluca/LightLogger.git
 	branch = master
+[submodule "3rdparty/lqtutils"]
+	path = 3rdparty/lqtutils
+	url = https://github.com/carlonluca/lqtutils.git

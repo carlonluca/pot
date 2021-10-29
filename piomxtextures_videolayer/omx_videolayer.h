@@ -42,6 +42,16 @@
 class OMX_VideoLayer : public QQuickItem
 {
     Q_OBJECT
+public:
+	enum Orientation {
+		ROT_0,
+		ROT_90,
+		ROT_180,
+		ROT_270
+	};
+	Q_ENUM(Orientation)
+
+private:
     Q_PROPERTY(int videoLayer READ videoLayer WRITE setVideoLayer NOTIFY videoLayerChanged)
     Q_PROPERTY(QUrl source READ source WRITE setSource NOTIFY sourceChanged)
     Q_PROPERTY(qint64 duration READ duration)
@@ -53,6 +63,7 @@ class OMX_VideoLayer : public QQuickItem
     Q_PROPERTY(bool videoFrameVisible READ videoFrameVisible NOTIFY videoFrameVisibleChanged)
     Q_PROPERTY(bool autoPlay READ autoPlay WRITE setAutoPlay NOTIFY autoPlayChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
+	Q_PROPERTY(Orientation orientation READ orientation WRITE setOrientation NOTIFY orientationChanged)
 
 public:
     OMX_VideoLayer(QQuickItem* parent = nullptr);
@@ -76,6 +87,9 @@ public:
     bool videoFrameVisible() const { return m_controller->frameVisible(); }
     bool autoPlay() const { return m_autoPlay; }
     bool muted() const { return m_controller->muted(); }
+	Orientation orientation() const { return m_orientation; }
+
+	void setOrientation(Orientation orientation);
 
 public slots:
     void play();
@@ -97,7 +111,13 @@ public slots:
     void setMuted(bool muted);
 
 protected:
+#if QT_VERSION_MAJOR > 5
+    void geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+#else
     void geometryChanged(const QRectF &newGeometry, const QRectF &oldGeometry) override;
+#endif
+	bool setVideoRect(const QRectF& rect);
+	QRectF computeGlobalRect(const QRectF& localRect);
 
 signals:
     void videoLayerChanged();
@@ -112,13 +132,11 @@ signals:
     void videoFrameVisibleChanged(bool videoFrameVisible);
     void autoPlayChanged(bool autoPlay);
     void mutedChanged(bool muted);
+	void orientationChanged();
 
 protected slots:
     void refreshContent();
     void refreshHwSurfaceGeometry();
-
-protected:
-    bool setVideoRect(const QRectF& rect);
 
 protected:
     int m_layer;
@@ -130,6 +148,7 @@ protected:
     Qt::AspectRatioMode m_fillMode;
     QMediaPlayer::MediaStatus m_vlState;
     bool m_autoPlay;
+	Orientation m_orientation;
 };
 
 #endif
