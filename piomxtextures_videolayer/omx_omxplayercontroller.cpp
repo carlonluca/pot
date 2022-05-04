@@ -408,6 +408,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
         setMediaStatus(QMediaPlayer::NoMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
         m_cmdProc->ready();
+        qCDebug(vl) << "STATE_NO_MEDIA settled";
     });
     m_stateNoMedia->addTransition(this, SIGNAL(loadRequested()), m_stateLoading);
 
@@ -418,6 +419,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
         setPlaybackState(QMediaPlayer::StoppedState);
         killProcess();
         loadInternal();
+        qCDebug(vl) << "STATE_LOADING settled";
     });
     m_stateLoading->addTransition(this, SIGNAL(loadSucceeded()), m_stateLoaded);
     m_stateLoading->addTransition(this, SIGNAL(loadFailed()), m_stateNoMedia);
@@ -429,16 +431,18 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
         killProcess();
         setMediaStatus(QMediaPlayer::LoadedMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
+        qCDebug(vl) << "STATE_LOADED settled";
     });
     m_stateLoaded->addTransition(this, SIGNAL(playRequested()), m_statePlaying);
     m_stateLoaded->addTransition(this, SIGNAL(loadRequested()), m_stateLoading);
 
     // Playing.
     connect(m_statePlaying, &QState::entered, [this] {
-        log_verbose("State entered: PLAYING");
+        log_verbose("State entered: STATE_PLAYING");
         playInternal();
         setMediaStatus(QMediaPlayer::BufferedMedia);
         setPlaybackState(QMediaPlayer::PlayingState);
+        qCDebug(vl) << "STATE_PLAYING settled";
     });
     m_statePlaying->addTransition(this, SIGNAL(finished()), m_stateEom);
     m_statePlaying->addTransition(this, SIGNAL(interrupted()), m_stateLoaded);
@@ -447,27 +451,30 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
     m_statePlaying->addTransition(this, SIGNAL(stopRequested()), m_stateStopping);
 
     connect(m_stateStopping, &QState::entered, [this] {
-        log_verbose("State entered: STOPPING");
+        log_verbose("State entered: STATE_STOPPING");
         stopInternal();
         emit interrupted();
+        qCDebug(vl) << "STATE_STOPPED settled";
     });
     m_stateStopping->addTransition(this, SIGNAL(interrupted()), m_stateLoaded);
 
     // Paused.
     connect(m_statePaused, &QState::entered, [this] {
-        log_verbose("State entered: PAUSED");
+        log_verbose("State entered: STATE_PAUSED");
         pauseInternal();
         setMediaStatus(QMediaPlayer::BufferedMedia);
         setPlaybackState(QMediaPlayer::PausedState);
+        qCDebug(vl) << "STATE_PAUSED settled";
     });
     m_statePaused->addTransition(this, SIGNAL(playRequested()), m_statePlaying);
     m_statePaused->addTransition(this, SIGNAL(stopRequested()), m_stateLoaded);
 
     // EOM.
     connect(m_stateEom, &QState::entered, [this] {
-        log_verbose("State entered: EOM");
+        log_verbose("State entered: STATE_EOM");
         setMediaStatus(QMediaPlayer::EndOfMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
+        qCDebug(vl) << "STATE_EOM settled";
     });
     m_stateEom->addTransition(this, SIGNAL(loadRequested()), m_stateLoading);
     m_stateEom->addTransition(this, SIGNAL(playRequested()), m_statePlaying);
@@ -1217,38 +1224,26 @@ void OMX_OmxplayerController::processCommand(const OMX_CommandProcessor::Command
     switch (cmd.type) {
     case OMX_CommandProcessor::CMD_PLAY: {
         emit playRequested();
-        QSet<QAbstractState*> states { m_statePaused, m_stateLoaded };
-        if (isInStates(states))
-            waitForStates(QSet<QAbstractState*> { m_statePlaying });
         break;
     }
     case OMX_CommandProcessor::CMD_STOP: {
         emit stopRequested();
-        QSet<QAbstractState*> states { m_statePlaying, m_statePaused, m_stateEom };
-        if (isInStates(states))
-            waitForStates(QSet<QAbstractState*> { m_stateLoaded });
         break;
     }
     case OMX_CommandProcessor::CMD_PAUSE: {
         emit pauseRequested();
-        QSet<QAbstractState*> states { m_statePlaying };
-        if (isInStates(states))
-            waitForStates(QSet<QAbstractState*> { m_statePaused });
         break;
     }
     case OMX_CommandProcessor::CMD_SET_SOURCE: {
         qCDebug(vl) << cmd.data.toUrl();
         if (!setFilenameInternal(cmd.data.toUrl()))
             break;
-        QSet<QAbstractState*> states { m_stateNoMedia, m_stateLoading, m_stateLoaded, m_statePlaying, m_stateEom };
-        if (isInStates(states))
-            waitForStates(QSet<QAbstractState*> { m_stateLoaded });
         break;
     }
     case OMX_CommandProcessor::CMD_CLEAN_THREAD: {}
     }
 
-    qCDebug(vl) << "Command completed:" << cmd.type;
+    qCDebug(vl) << "Command signal sent:" << cmd.type;
 }
 
 /*------------------------------------------------------------------------------
