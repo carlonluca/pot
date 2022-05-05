@@ -449,6 +449,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
     m_statePlaying->addTransition(this, SIGNAL(pauseRequested()), m_statePaused);
     m_statePlaying->addTransition(this, SIGNAL(loadRequested()), m_stateStopping);
     m_statePlaying->addTransition(this, SIGNAL(stopRequested()), m_stateStopping);
+    m_statePlaying->addTransition(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), m_stateStopping);
 
     connect(m_stateStopping, &QState::entered, [this] {
         log_verbose("State entered: STATE_STOPPING");
@@ -472,6 +473,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
     // EOM.
     connect(m_stateEom, &QState::entered, [this] {
         log_verbose("State entered: STATE_EOM");
+        killProcess();
         setMediaStatus(QMediaPlayer::EndOfMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
         qCDebug(vl) << "STATE_EOM settled";
