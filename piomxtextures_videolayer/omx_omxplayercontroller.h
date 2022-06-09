@@ -49,6 +49,7 @@
 #include <lqtutils_threading.h>
 
 #include "omx_logging_cat.h"
+#include "../3rdparty/lqtutils/lqtutils_prop.h"
 
 template<typename T>
 using POT_DbusCall = std::function<QDBusReply<T>(QDBusInterface*)>;
@@ -157,6 +158,7 @@ class OMX_OmxplayerController : public QObject
     Q_PROPERTY(QSize resolution READ resolution WRITE setResolution NOTIFY resolutionChanged)
     Q_PROPERTY(bool frameVisible READ frameVisible NOTIFY frameVisibleChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
+    L_RW_PROP_AS(bool, loop, false)
 public:
 	enum Orientation {
 		ROT_0,

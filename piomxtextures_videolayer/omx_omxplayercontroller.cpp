@@ -49,10 +49,11 @@
 
 #include <sys/xattr.h>
 
+#include "../piomxtextures_src/omx_globals.h"
+#include "../3rdparty/lqtutils/lqtutils_string.h"
 #include "omx_omxplayercontroller.h"
 #include "omx_piomxtexturesplugin.h"
 #include "omx_logging_cat.h"
-#include "omx_globals.h"
 
 /*------------------------------------------------------------------------------
 |    definitions
@@ -823,8 +824,10 @@ void OMX_OmxplayerController::playInternal()
             << "--orientation" << orientation_cmd_value(m_orientation)
             << "--win"
             << geometry_string(m_rect)
-            << customArgs
-            << m_url.toLocalFile();
+            << customArgs;
+    if (m_loop)
+            args << QSL("--loop");
+    args << m_url.toLocalFile();
 
     qCDebug(vl) << "omxplayer cmd line:" << args;
     m_process->start(PLAYER_COMMAND, args);

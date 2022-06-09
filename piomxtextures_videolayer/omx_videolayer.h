@@ -35,6 +35,7 @@
 
 #include "omx_omxplayercontroller.h"
 #include "omx_logging_cat.h"
+#include "../3rdparty/lqtutils/lqtutils_prop.h"
 
 /*------------------------------------------------------------------------------
 |    OMX_VideoLayer class
@@ -64,6 +65,7 @@ private:
     Q_PROPERTY(bool autoPlay READ autoPlay WRITE setAutoPlay NOTIFY autoPlayChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
 	Q_PROPERTY(Orientation orientation READ orientation WRITE setOrientation NOTIFY orientationChanged)
+    L_RW_PROP_AS(bool, loop, false)
 
 public:
     OMX_VideoLayer(QQuickItem* parent = nullptr);

@@ -31,9 +31,9 @@
 #include <QSGSimpleRectNode>
 #include <QLineF>
 
+#include "../piomxtextures_src/omx_globals.h"
 #include "omx_videolayer.h"
 #include "omx_logging_cat.h"
-#include "omx_globals.h"
 
 /*------------------------------------------------------------------------------
 |    definitions
@@ -123,6 +123,11 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
   , m_fillMode(Qt::IgnoreAspectRatio)
   , m_autoPlay(false)
 {
+    connect(this, &OMX_VideoLayer::loopChanged, this, [this] {
+        m_controller->set_loop(loop());
+    });
+    m_loop = m_controller->loop();
+
     setFlag(QQuickItem::ItemHasContents, true);
     setVlState(m_controller->mediaStatus());
 	setOrientation(ROT_0);

@@ -45,54 +45,60 @@
 +-----------------------------------------------------------------------------*/
 class OMX_PiOmxTexturesPlugin : public QQmlExtensionPlugin
 {
-   Q_OBJECT
-   Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QQmlExtensionInterface")
+    Q_OBJECT
+    Q_PLUGIN_METADATA(IID "org.qt-project.Qt.QQmlExtensionInterface")
 
 public:
-   OMX_PiOmxTexturesPlugin(QObject* parent = nullptr);
+    OMX_PiOmxTexturesPlugin(QObject* parent = nullptr);
 
     void registerTypes(const char* uri) {
+        registerLibraryTypes(uri);
+    }
+
+    static void registerLibraryTypes(const char* uri) {
+#ifdef VERSION
         log_info("PiOmxTexturesVideoLayer version %s built %s, %s.",
-                    VERSION, __DATE__, __TIME__);
+                 VERSION, __DATE__, __TIME__);
+#endif
 
-      log_verbose("Registering OMX_VideoLayer QML type...");
-      Q_ASSERT(uri == QLatin1String("PiOmxTexturesVideoLayer"));
-      qmlRegisterType<OMX_VideoLayer>(uri, 0, 1, "POT_VideoLayer");
-      qmlRegisterType<OMX_Video>(uri, 0, 1, "POT_Video");
-      qmlRegisterType<OMX_Audio>(uri, 0, 1, "POT_Audio");
-      qmlRegisterType<OMX_Video>(uri, 0, 1, "Video");
-      qmlRegisterType<OMX_Audio>(uri, 0, 1, "Audio");
-      qmlRegisterType<MediaPlayer>(uri, 0, 1, "MediaPlayer");
+        log_verbose("Registering OMX_VideoLayer QML type...");
+        Q_ASSERT(uri == QLatin1String("PiOmxTexturesVideoLayer"));
+        qmlRegisterType<OMX_VideoLayer>(uri, 0, 1, "POT_VideoLayer");
+        qmlRegisterType<OMX_Video>(uri, 0, 1, "POT_Video");
+        qmlRegisterType<OMX_Audio>(uri, 0, 1, "POT_Audio");
+        qmlRegisterType<OMX_Video>(uri, 0, 1, "Video");
+        qmlRegisterType<OMX_Audio>(uri, 0, 1, "Audio");
+        qmlRegisterType<MediaPlayer>(uri, 0, 1, "MediaPlayer");
 
-      // Spawn dbus-daemon.
-      QProcess* dbusDaemon = new QProcess;
-      connect(qApp, &QCoreApplication::aboutToQuit,
-              dbusDaemon, &QProcess::kill);
-      dbusDaemon->start(QStringLiteral("dbus-daemon"), QStringList()
-                        << QStringLiteral("--session")
-                        << QStringLiteral("--print-address"));
-      dbusDaemon->waitForReadyRead();
+        // Spawn dbus-daemon.
+        QProcess* dbusDaemon = new QProcess;
+        connect(qApp, &QCoreApplication::aboutToQuit,
+                dbusDaemon, &QProcess::kill);
+        dbusDaemon->start(QStringLiteral("dbus-daemon"), QStringList()
+                          << QStringLiteral("--session")
+                          << QStringLiteral("--print-address"));
+        dbusDaemon->waitForReadyRead();
 
-      QString address = dbusDaemon->readAllStandardOutput();
-      if (address.isNull()) {
-          qCritical("Failed to execute dbus-daemon");
-          qApp->exit(1);
-      }
+        QString address = dbusDaemon->readAllStandardOutput();
+        if (address.isNull()) {
+            qCritical("Failed to execute dbus-daemon");
+            qApp->exit(1);
+        }
 
-      dbusAddress = address.trimmed();
+        dbusAddress = address.trimmed();
 
-      log_debug("Update dbus address to: %s.", qPrintable(dbusAddress));
-      qputenv("DBUS_SESSION_BUS_ADDRESS", dbusAddress.toLocal8Bit());
+        log_debug("Update dbus address to: %s.", qPrintable(dbusAddress));
+        qputenv("DBUS_SESSION_BUS_ADDRESS", dbusAddress.toLocal8Bit());
 
-      QFile f("/tmp/omxplayerdbus.pi");
-      if (!f.open(QIODevice::WriteOnly)) {
-          qCritical("Failed to store dbus address");
-          qApp->exit(1);
-      }
+        QFile f("/tmp/omxplayerdbus.pi");
+        if (!f.open(QIODevice::WriteOnly)) {
+            qCritical("Failed to store dbus address");
+            qApp->exit(1);
+        }
 
-      QTextStream s(&f);
-      s << address;
-      s.flush();
+        QTextStream s(&f);
+        s << address;
+        s.flush();
     }
 
     static QString dbusAddress;
