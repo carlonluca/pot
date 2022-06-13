@@ -1071,17 +1071,15 @@ void OMX_OmxplayerController::connectIfNeeded()
                 bus));
 
     qCInfo(vl) << "Connecting signals";
-    if (!bus.connect(m_dbusService, "/redv/omx", "redv.omx.eos", "eos", this, SLOT(eosDbusReceived())))
-        qCWarning(vl) << "Failed to connect eos signal";
-    if (!bus.connect(m_dbusService, "/redv/omx", "redv.omx.started", "started", this, SLOT(startDbusReceived())))
-        qCWarning(vl) << "Failed to connect started signal";
+    bus.connect(m_dbusService, "/redv/omx", "redv.omx.eos", "eos", this, SLOT(eosDbusReceived()));
+    bus.connect(m_dbusService, "/redv/omx", "redv.omx.started", "started", this, SLOT(startDbusReceived()));
 
-    //QTimer::singleShot(0, this, [this] {
-    //    const POT_DbusCall<bool> f = [] (QDBusInterface* iface) -> QDBusReply<bool> {
-    //        return iface->call(QStringLiteral("Rendering"));
-    //    };
-    //    setFrameVisible(dbusSend<bool>(m_dbusIfaceProps.get(), f, 0));
-    //});
+    QTimer::singleShot(0, this, [this] {
+        const POT_DbusCall<bool> f = [] (QDBusInterface* iface) -> QDBusReply<bool> {
+            return iface->call(QStringLiteral("Rendering"));
+        };
+        setFrameVisible(dbusSend<bool>(m_dbusIfaceProps.get(), f, 0));
+    });
 }
 
 /*------------------------------------------------------------------------------
@@ -1179,7 +1177,7 @@ QSize OMX_OmxplayerController::computeResolution(QUrl url)
     QSize size;
     if (getxattr(pathData.data(), "user.width", reinterpret_cast<void*>(&size.rwidth()), sizeof(int)) != -1) {
         if (getxattr(pathData.data(), "user.height", reinterpret_cast<void*>(&size.rheight()), sizeof(int)) != -1) {
-            log_info("Found size in xattr: %dx%d", size.width(), size.height());
+            log_debug("Found size in xattr: %dx%d", size.width(), size.height());
             return size;
         }
     }
