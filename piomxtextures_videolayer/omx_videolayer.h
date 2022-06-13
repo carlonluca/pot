@@ -64,7 +64,8 @@ private:
     Q_PROPERTY(bool videoFrameVisible READ videoFrameVisible NOTIFY videoFrameVisibleChanged)
     Q_PROPERTY(bool autoPlay READ autoPlay WRITE setAutoPlay NOTIFY autoPlayChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
-	Q_PROPERTY(Orientation orientation READ orientation WRITE setOrientation NOTIFY orientationChanged)
+    Q_PROPERTY(Orientation orientation READ orientation WRITE setOrientation NOTIFY orientationChanged)
+    L_RO_PROP_AS(OMX_MediaPlayerState, playbackState, OMX_MediaPlayerState::StoppedState)
     L_RW_PROP_AS(bool, loop, false)
 
 public:
@@ -94,10 +95,11 @@ public:
 	void setOrientation(Orientation orientation);
 
 public slots:
-    void play();
+    void play(int position = 0);
     void stop();
     void pause();
     void seek(qint64 micros);
+    void resume();
 
     void requestDuration();
     void requestPosition();

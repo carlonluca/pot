@@ -109,6 +109,7 @@ class OMX_CommandProcessor : public QThread
     Q_OBJECT
 public:
     enum CommandType {
+        CMD_NONE,
         CMD_SET_SOURCE,
         CMD_PLAY,
         CMD_PAUSE,
@@ -122,6 +123,8 @@ public:
             type(type), data(data) {}
         Command(CommandType type) :
             type(type) {}
+        Command() :
+            type(CommandType::CMD_NONE) {}
         CommandType type;
         QVariant data;
     };
@@ -185,7 +188,7 @@ public:
 	void setOrientation(Orientation orientation) { m_orientation = orientation; }
 
 public slots:
-    void play();
+    void play(int position = 0);
     void stop();
     void pause();
     bool setPosition(qint64 microsecs);
@@ -233,7 +236,7 @@ private slots:
     void sendGeometry();
 
     void loadInternal();
-    void playInternal();
+    void playInternal(int position);
     void pauseInternal();
     void stopInternal();
     bool setFilenameInternal(QUrl url);
@@ -301,6 +304,8 @@ private:
     QState* m_stateEom;
 
     QTimer* m_dbusConnMonitor;
+
+    OMX_CommandProcessor::Command m_lastPlayCommand;
 
     friend class OMX_GeometryDispatcher;
     friend class OMX_CommandProcessor;

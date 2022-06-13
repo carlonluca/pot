@@ -437,7 +437,8 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
     // Playing.
     connect(m_statePlaying, &QState::entered, [this] {
         log_verbose("State entered: PLAYING");
-        playInternal();
+        int position = m_lastPlayCommand.data.isNull() ? 0 : m_lastPlayCommand.data.toInt();
+        playInternal(position);
         setMediaStatus(QMediaPlayer::BufferedMedia);
         setPlaybackState(QMediaPlayer::PlayingState);
     });
@@ -569,9 +570,11 @@ bool OMX_OmxplayerController::setLayer(int layer)
 /*------------------------------------------------------------------------------
 |    OMX_OmxplayerController::play
 +-----------------------------------------------------------------------------*/
-void OMX_OmxplayerController::play()
+void OMX_OmxplayerController::play(int position)
 {
-    m_cmdProc->schedule(OMX_CommandProcessor::Command(OMX_CommandProcessor::CMD_PLAY));
+    OMX_CommandProcessor::Command cmd(OMX_CommandProcessor::CMD_PLAY);
+    cmd.data = position;
+    m_cmdProc->schedule(cmd);
 }
 
 /*------------------------------------------------------------------------------
@@ -797,7 +800,7 @@ void OMX_OmxplayerController::loadInternal()
 /*------------------------------------------------------------------------------
 |    OMX_OmxplayerController::playInternal
 +-----------------------------------------------------------------------------*/
-void OMX_OmxplayerController::playInternal()
+void OMX_OmxplayerController::playInternal(int position)
 {
     if (playbackState() == QMediaPlayer::PausedState) {
         const POT_DbusCallVoid f = [] (QDBusInterface* iface) -> QDBusReply<void> {
@@ -824,7 +827,8 @@ void OMX_OmxplayerController::playInternal()
             << "--orientation" << orientation_cmd_value(m_orientation)
             << "--win"
             << geometry_string(m_rect)
-            << customArgs;
+            << customArgs
+            << QSL("-l") << QString::number(qRound(position/1000.0));
     if (m_loop)
             args << QSL("--loop");
     args << m_url.toLocalFile();
@@ -1219,6 +1223,7 @@ void OMX_OmxplayerController::processCommand(const OMX_CommandProcessor::Command
 {
     switch (cmd.type) {
     case OMX_CommandProcessor::CMD_PLAY: {
+        m_lastPlayCommand = cmd;
         emit playRequested();
         QSet<QAbstractState*> states { m_statePaused, m_stateLoaded };
         if (isInStates(states))
@@ -1248,7 +1253,10 @@ void OMX_OmxplayerController::processCommand(const OMX_CommandProcessor::Command
             waitForStates(QSet<QAbstractState*> { m_stateLoaded });
         break;
     }
-    case OMX_CommandProcessor::CMD_CLEAN_THREAD: {}
+    case OMX_CommandProcessor::CMD_CLEAN_THREAD:
+        break;
+    case OMX_CommandProcessor::CMD_NONE:
+        break;
     }
 
     qCDebug(vl) << "Command completed:" << cmd.type;

@@ -126,7 +126,11 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
     connect(this, &OMX_VideoLayer::loopChanged, this, [this] {
         m_controller->set_loop(loop());
     });
+    connect(m_controller, &OMX_OmxplayerController::playbackStateChanged, this, [this] {
+        set_playbackState(m_controller->playbackState());
+    });
     m_loop = m_controller->loop();
+    m_playbackState = m_controller->playbackState();
 
     setFlag(QQuickItem::ItemHasContents, true);
     setVlState(m_controller->mediaStatus());
@@ -280,10 +284,10 @@ void OMX_VideoLayer::setOrientation(OMX_VideoLayer::Orientation orientation)
 /*------------------------------------------------------------------------------
 |    OMX_VideoLayer::play
 +-----------------------------------------------------------------------------*/
-void OMX_VideoLayer::play()
+void OMX_VideoLayer::play(int position)
 {
     log_debug_func;
-    ASYNC(m_controller, "play");
+    ASYNC(m_controller, "play", Q_ARG(int, position));
 }
 
 /*------------------------------------------------------------------------------
@@ -311,6 +315,15 @@ void OMX_VideoLayer::seek(qint64 micros)
 {
     log_debug_func;
     ASYNC(m_controller, "setPosition", Q_ARG(qint64, micros));
+}
+
+/*------------------------------------------------------------------------------
+|    OMX_VideoLayer::resume
++-----------------------------------------------------------------------------*/
+void OMX_VideoLayer::resume()
+{
+    log_debug_func;
+    ASYNC(m_controller, "play", Q_ARG(int, 0));
 }
 
 /*------------------------------------------------------------------------------

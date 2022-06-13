@@ -62,7 +62,6 @@ public:
 #endif
 
         log_verbose("Registering OMX_VideoLayer QML type...");
-        Q_ASSERT(uri == QLatin1String("PiOmxTexturesVideoLayer"));
         qmlRegisterType<OMX_VideoLayer>(uri, 0, 1, "POT_VideoLayer");
         qmlRegisterType<OMX_Video>(uri, 0, 1, "POT_Video");
         qmlRegisterType<OMX_Audio>(uri, 0, 1, "POT_Audio");
