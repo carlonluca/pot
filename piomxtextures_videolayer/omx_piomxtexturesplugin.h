@@ -89,7 +89,7 @@ public:
         log_debug("Update dbus address to: %s.", qPrintable(dbusAddress));
         qputenv("DBUS_SESSION_BUS_ADDRESS", dbusAddress.toLocal8Bit());
 
-        QFile f("/tmp/omxplayerdbus.pi");
+        QFile f("/tmp/omxplayerdbus.touch");
         if (!f.open(QIODevice::WriteOnly)) {
             qCritical("Failed to store dbus address");
             qApp->exit(1);

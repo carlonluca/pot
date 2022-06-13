@@ -360,6 +360,8 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
   , m_statePaused(new QState)
   , m_stateEom(new QState)
 {
+    log_debug_func;
+
     static int index = 0;
     static QMutex generateIndex;
     {
@@ -572,6 +574,7 @@ bool OMX_OmxplayerController::setLayer(int layer)
 +-----------------------------------------------------------------------------*/
 void OMX_OmxplayerController::play(int position)
 {
+    log_debug_func;
     OMX_CommandProcessor::Command cmd(OMX_CommandProcessor::CMD_PLAY);
     cmd.data = position;
     m_cmdProc->schedule(cmd);
@@ -884,13 +887,13 @@ void OMX_OmxplayerController::stopInternal()
 /*------------------------------------------------------------------------------
 |    OMX_OmxplayerController::eosReceived
 +-----------------------------------------------------------------------------*/
-void OMX_OmxplayerController::eosReceived(bool failure)
+void OMX_OmxplayerController::eosDbusReceived()
 {
-    log_debug_func;
+    qCDebug(vl) << Q_FUNC_INFO;
 
-    if (failure)
-        emit interrupted();
-    else
+    //if (failure)
+    //    emit interrupted();
+    //else
         emit finished();
 
     setFrameVisible(false);
@@ -899,11 +902,10 @@ void OMX_OmxplayerController::eosReceived(bool failure)
 /*------------------------------------------------------------------------------
 |    OMX_OmxplayerController::startReceived
 +-----------------------------------------------------------------------------*/
-void OMX_OmxplayerController::startReceived(bool failure)
+void OMX_OmxplayerController::startDbusReceived()
 {
-    Q_UNUSED(failure)
+    qCDebug(vl) << Q_FUNC_INFO;
 
-    log_debug_func;
     setFrameVisible(true);
 }
 
@@ -1068,15 +1070,18 @@ void OMX_OmxplayerController::connectIfNeeded()
                 DBUS_MP_SERVICE ".Player",
                 bus));
 
-    bus.connect(m_dbusService, "/redv/omx", "redv.omx.eos", "eos", this, SLOT(eosReceived(bool)));
-    bus.connect(m_dbusService, "/redv/omx", "redv.omx.started", "started", this, SLOT(startReceived(bool)));
+    qCInfo(vl) << "Connecting signals";
+    if (!bus.connect(m_dbusService, "/redv/omx", "redv.omx.eos", "eos", this, SLOT(eosDbusReceived())))
+        qCWarning(vl) << "Failed to connect eos signal";
+    if (!bus.connect(m_dbusService, "/redv/omx", "redv.omx.started", "started", this, SLOT(startDbusReceived())))
+        qCWarning(vl) << "Failed to connect started signal";
 
-    QTimer::singleShot(0, this, [this] {
-        const POT_DbusCall<bool> f = [] (QDBusInterface* iface) -> QDBusReply<bool> {
-            return iface->call(QStringLiteral("Rendering"));
-        };
-        setFrameVisible(dbusSend<bool>(m_dbusIfaceProps.get(), f, 0));
-    });
+    //QTimer::singleShot(0, this, [this] {
+    //    const POT_DbusCall<bool> f = [] (QDBusInterface* iface) -> QDBusReply<bool> {
+    //        return iface->call(QStringLiteral("Rendering"));
+    //    };
+    //    setFrameVisible(dbusSend<bool>(m_dbusIfaceProps.get(), f, 0));
+    //});
 }
 
 /*------------------------------------------------------------------------------
@@ -1209,9 +1214,9 @@ QSize OMX_OmxplayerController::computeResolution(QUrl url)
     int height = heightString.toInt();
 
     if (setxattr(pathData.data(), "user.width", reinterpret_cast<void*>(&width), sizeof(int), 0))
-        qWarning() << "Failed to set xattr";
+        qCWarning(vl) << "Failed to set xattr";
     if (setxattr(pathData.data(), "user.height", reinterpret_cast<void*>(&height), sizeof(int), 0))
-        qWarning() << "Failed to set xattr";
+        qCWarning(vl) << "Failed to set xattr";
 
     return QSize(width, height);
 }

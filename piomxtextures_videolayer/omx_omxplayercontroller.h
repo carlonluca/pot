@@ -243,8 +243,8 @@ private slots:
 
     void connectIfNeeded();
 
-    void eosReceived(bool failure);
-    void startReceived(bool failure);
+    void eosDbusReceived();
+    void startDbusReceived();
 
 private:
     void setMediaStatus(QMediaPlayer::MediaStatus mediaStatus);
