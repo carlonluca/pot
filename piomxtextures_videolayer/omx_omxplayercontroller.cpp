@@ -833,7 +833,7 @@ void OMX_OmxplayerController::playInternal(int position)
             << customArgs
             << QSL("-l") << QString::number(qRound(position/1000.0));
     if (m_loop)
-            args << QSL("--loop");
+        args << QSL("--loop");
     args << m_url.toLocalFile();
 
     qCDebug(vl) << "omxplayer cmd line:" << args;
