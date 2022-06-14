@@ -1230,7 +1230,7 @@ void OMX_OmxplayerController::processCommand(const OMX_CommandProcessor::Command
     case OMX_CommandProcessor::CMD_PLAY: {
         m_lastPlayCommand = cmd;
         emit playRequested();
-        QSet<QAbstractState*> states { m_statePaused, m_stateLoaded };
+        QSet<QAbstractState*> states { m_statePaused, m_stateLoaded, m_stateEom };
         if (isInStates(states))
             waitForStates(QSet<QAbstractState*> { m_statePlaying });
         break;
@@ -1253,7 +1253,7 @@ void OMX_OmxplayerController::processCommand(const OMX_CommandProcessor::Command
         qCDebug(vl) << cmd.data.toUrl();
         if (!setFilenameInternal(cmd.data.toUrl()))
             break;
-        QSet<QAbstractState*> states { m_stateNoMedia, m_stateLoading, m_stateLoaded, m_statePlaying, m_stateEom };
+        QSet<QAbstractState*> states { m_stateNoMedia, m_stateLoaded, m_statePlaying, m_stateEom };
         if (isInStates(states))
             waitForStates(QSet<QAbstractState*> { m_stateLoaded });
         break;
@@ -1284,6 +1284,7 @@ void OMX_OmxplayerController::waitForStates(const QSet<QAbstractState*> states)
     foreach (QAbstractState* state, states) {
         connect(state, &QAbstractState::entered,
                 &loop, &QEventLoop::quit);
+        QTimer::singleShot(5000, &loop, &QEventLoop::quit);
     }
     loop.exec();
 }
