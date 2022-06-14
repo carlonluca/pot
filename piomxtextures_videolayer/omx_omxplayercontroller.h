@@ -162,7 +162,8 @@ class OMX_OmxplayerController : public QObject
     Q_PROPERTY(bool frameVisible READ frameVisible NOTIFY frameVisibleChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     L_RW_PROP_AS(bool, loop, false)
-    L_RW_PROP_AS(bool, prebuffer, false)
+    L_RW_PROP_AS(bool, waitForPlayAtBeginning, false)
+    L_RW_PROP_AS(bool, waitForPlayAtEnd, false)
 public:
 	enum Orientation {
 		ROT_0,
@@ -230,6 +231,7 @@ signals:
     void mutedChanged(bool muted);
 
     void eosReceived();
+    void eosWaitingReceived();
     void startReceived();
 
 private slots:

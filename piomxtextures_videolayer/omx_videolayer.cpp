@@ -129,15 +129,19 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
     connect(m_controller, &OMX_OmxplayerController::playbackStateChanged, this, [this] {
         set_playbackState(m_controller->playbackState());
     });
-    connect(this, &OMX_VideoLayer::prebufferChanged, this, [this] {
-        m_controller->set_prebuffer(prebuffer());
+    connect(this, &OMX_VideoLayer::waitForPlayAtBeginningChanged, this, [this] {
+        m_controller->set_waitForPlayAtBeginning(waitForPlayAtBeginning());
+    });
+    connect(this, &OMX_VideoLayer::waitForPlayAtEndChanged, this, [this] {
+        m_controller->set_waitForPlayAtEnd(waitForPlayAtEnd());
     });
     connect(this, &OMX_VideoLayer::objectNameChanged, this, [this] {
         m_controller->setObjectName(objectName());
     });
     m_loop = m_controller->loop();
     m_playbackState = m_controller->playbackState();
-    m_prebuffer = m_controller->prebuffer();
+    m_waitForPlayAtBeginning = m_controller->waitForPlayAtBeginning();
+    m_waitForPlayAtEnd = m_controller->waitForPlayAtEnd();
     m_controller->setObjectName(objectName());
 
     setFlag(QQuickItem::ItemHasContents, true);
@@ -156,6 +160,8 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
             this, SIGNAL(resolutionChanged(QSize)));
     connect(m_controller, SIGNAL(frameVisibleChanged(bool)),
             this, SIGNAL(videoFrameVisibleChanged(bool)));
+    connect(m_controller, SIGNAL(eosWaitingReceived()),
+            this, SIGNAL(eosWaitingReceived()));
 
     connect(this, SIGNAL(xChanged()),
             this, SLOT(onXChanged()), Qt::DirectConnection);

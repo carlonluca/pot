@@ -67,7 +67,8 @@ private:
     Q_PROPERTY(Orientation orientation READ orientation WRITE setOrientation NOTIFY orientationChanged)
     L_RO_PROP_AS(OMX_MediaPlayerState, playbackState, OMX_MediaPlayerState::StoppedState)
     L_RW_PROP_AS(bool, loop, false)
-    L_RW_PROP_AS(bool, prebuffer, false)
+    L_RW_PROP_AS(bool, waitForPlayAtBeginning, false)
+    L_RW_PROP_AS(bool, waitForPlayAtEnd, false)
 
 public:
     OMX_VideoLayer(QQuickItem* parent = nullptr);
@@ -138,6 +139,7 @@ signals:
     void autoPlayChanged(bool autoPlay);
     void mutedChanged(bool muted);
 	void orientationChanged();
+    void eosWaitingReceived();
 
 protected slots:
     void refreshContent();

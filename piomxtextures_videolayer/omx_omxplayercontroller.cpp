@@ -835,8 +835,10 @@ void OMX_OmxplayerController::playInternal(int position)
             << geometry_string(m_rect)
             << customArgs
             << QSL("-l") << QString::number(qRound(position/1000.0));
-    if (m_prebuffer)
+    if (m_waitForPlayAtBeginning)
         args << QSL("--wait-for-play-at-beginning");
+    if (m_waitForPlayAtEnd)
+        args << QSL("--wait-for-play-at-end");
     if (m_loop)
         args << QSL("--loop");
     args << m_url.toLocalFile();
@@ -852,7 +854,7 @@ void OMX_OmxplayerController::playInternal(int position)
 
     QTimer::singleShot(0, this, SLOT(connectIfNeeded()));
 
-    if (m_prebuffer)
+    if (m_waitForPlayAtBeginning)
         emit pauseRequested();
 }
 
@@ -1078,9 +1080,12 @@ void OMX_OmxplayerController::connectIfNeeded()
                 DBUS_MP_SERVICE ".Player",
                 bus));
 
-    qCInfo(vl) << "Connecting signals";
-    bus.connect(m_dbusService, "/redv/omx", "redv.omx.eos", "eos", this, SLOT(eosDbusReceived()));
-    bus.connect(m_dbusService, "/redv/omx", "redv.omx.started", "started", this, SLOT(startDbusReceived()));
+    bus.connect(m_dbusService, QSL("/redv/omx"), QSL("redv.omx.eos"), QSL("eos"),
+                this, SLOT(eosDbusReceived()));
+    bus.connect(m_dbusService, QSL("/redv/omx"), QSL("redv.omx.started"), QSL("started"),
+                this, SLOT(startDbusReceived()));
+    bus.connect(m_dbusService, QSL("/redv/omx"), QSL("redv.omx.eos"), QSL("eosWaiting"),
+                this, SIGNAL(eosWaitingReceived()));
 
     QTimer::singleShot(0, this, [this] {
         const POT_DbusCall<bool> f = [] (QDBusInterface* iface) -> QDBusReply<bool> {
