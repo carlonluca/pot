@@ -296,7 +296,7 @@ void OMX_GeometryDispatcher::dispose()
 +-----------------------------------------------------------------------------*/
 void OMX_CommandProcessor::schedule(const OMX_CommandProcessor::Command& cmd)
 {
-    qCDebug(vl) << Q_FUNC_INFO << cmd.type;
+    qCDebug(vl) << m_controller->objectName() << Q_FUNC_INFO << cmd.type;
     QMutexLocker locker(&m_mutex);
     m_pending.enqueue(cmd);
     m_cond.wakeOne();
@@ -321,7 +321,7 @@ void OMX_CommandProcessor::run()
         if (isInterruptionRequested())
             return;
 
-        qCDebug(vl) << "Processing command" << cmd.type;
+        qCDebug(vl) << m_controller->objectName() << "Processing command" << cmd.type;
         m_controller->processCommand(cmd);
     }
 }
@@ -367,7 +367,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
     {
         generateIndex.lock();
         m_dbusService = QString("org.mpris.MediaPlayer2.instance%0.omxplayer").arg(index++);
-        qCDebug(vl) << "Service: " << m_dbusService;
+        qCDebug(vl) << objectName() << "Service: " << m_dbusService;
         generateIndex.unlock();
     }
 
@@ -407,7 +407,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
 
     // No media.
     connect(m_stateNoMedia, &QState::entered, [this] {
-        log_verbose("State entered: STATE_NO_MEDIA");
+        qCDebug(vl) << objectName() << "State entered: STATE_NO_MEDIA";
         setMediaStatus(QMediaPlayer::NoMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
         m_cmdProc->ready();
@@ -416,7 +416,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
 
     // Loading.
     connect(m_stateLoading, &QState::entered, [this] {
-        log_verbose("State entered: STATE_LOADING");
+        qCDebug(vl) << objectName() << ("State entered: STATE_LOADING");
         setMediaStatus(QMediaPlayer::LoadingMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
         killProcess();
@@ -428,7 +428,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
 
     // Loaded.
     connect(m_stateLoaded, &QState::entered, [this] {
-        log_verbose("State entered: STATE_LOADED");
+        qCDebug(vl) << objectName() << ("State entered: STATE_LOADED");
         killProcess();
         setMediaStatus(QMediaPlayer::LoadedMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
@@ -438,7 +438,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
 
     // Playing.
     connect(m_statePlaying, &QState::entered, [this] {
-        log_verbose("State entered: PLAYING");
+        qCDebug(vl) << objectName() << ("State entered: PLAYING");
         int position = m_lastPlayCommand.data.isNull() ? 0 : m_lastPlayCommand.data.toInt();
         playInternal(position);
         setMediaStatus(QMediaPlayer::BufferedMedia);
@@ -452,7 +452,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
     m_statePlaying->addTransition(m_process, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished), m_stateStopping);
 
     connect(m_stateStopping, &QState::entered, [this] {
-        log_verbose("State entered: STOPPING");
+        qCDebug(vl) << objectName() << ("State entered: STOPPING");
         stopInternal();
         emit interrupted();
     });
@@ -460,7 +460,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
 
     // Paused.
     connect(m_statePaused, &QState::entered, [this] {
-        log_verbose("State entered: PAUSED");
+        qCDebug(vl) << objectName() << ("State entered: PAUSED");
         pauseInternal();
         setMediaStatus(QMediaPlayer::BufferedMedia);
         setPlaybackState(QMediaPlayer::PausedState);
@@ -470,7 +470,7 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
 
     // EOM.
     connect(m_stateEom, &QState::entered, [this] {
-        log_verbose("State entered: EOM");
+        qCDebug(vl) << objectName() << ("State entered: EOM");
         killProcess();
         setMediaStatus(QMediaPlayer::EndOfMedia);
         setPlaybackState(QMediaPlayer::StoppedState);
@@ -808,6 +808,7 @@ void OMX_OmxplayerController::loadInternal()
 void OMX_OmxplayerController::playInternal(int position)
 {
     if (playbackState() == QMediaPlayer::PausedState) {
+        log_verbose("Resuming %s...", qPrintable(m_dbusService));
         const POT_DbusCallVoid f = [] (QDBusInterface* iface) -> QDBusReply<void> {
             return iface->call("Play");
         };
@@ -834,11 +835,13 @@ void OMX_OmxplayerController::playInternal(int position)
             << geometry_string(m_rect)
             << customArgs
             << QSL("-l") << QString::number(qRound(position/1000.0));
+    if (m_prebuffer)
+        args << QSL("--wait-for-play-at-beginning");
     if (m_loop)
         args << QSL("--loop");
     args << m_url.toLocalFile();
 
-    qCDebug(vl) << "omxplayer cmd line:" << args;
+    qCDebug(vl) << objectName() << "omxplayer cmd line:" << args;
     m_process->start(PLAYER_COMMAND, args);
     if (m_process->waitForStarted(5000))
         emit playSucceeded();
@@ -848,6 +851,9 @@ void OMX_OmxplayerController::playInternal(int position)
     }
 
     QTimer::singleShot(0, this, SLOT(connectIfNeeded()));
+
+    if (m_prebuffer)
+        emit pauseRequested();
 }
 
 /*------------------------------------------------------------------------------
@@ -881,7 +887,7 @@ void OMX_OmxplayerController::stopInternal()
         emit interrupted();
         break;
     case QProcess::NotRunning:
-        qCDebug(vl, "Cannot stop, process already dead");
+        qCDebug(vl) << objectName() << "Cannot stop, process already dead";
         break;
     }
 }
@@ -891,7 +897,7 @@ void OMX_OmxplayerController::stopInternal()
 +-----------------------------------------------------------------------------*/
 void OMX_OmxplayerController::eosDbusReceived()
 {
-    qCDebug(vl) << Q_FUNC_INFO;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
 
     //if (failure)
     //    emit interrupted();
@@ -906,7 +912,7 @@ void OMX_OmxplayerController::eosDbusReceived()
 +-----------------------------------------------------------------------------*/
 void OMX_OmxplayerController::startDbusReceived()
 {
-    qCDebug(vl) << Q_FUNC_INFO;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
 
     setFrameVisible(true);
 }
@@ -974,7 +980,7 @@ void OMX_OmxplayerController::setMuted(bool muted)
     bool changed = false;
 
     if (m_muted != muted) {
-        qCDebug(vl) << Q_FUNC_INFO << muted;
+        qCDebug(vl) << objectName() << Q_FUNC_INFO << muted;
         m_muted = muted;
         dbusSend(m_dbusIfacePlayer.get(), [muted] (QDBusInterface* iface) -> QDBusReply<void> {
             return iface->call(muted ? "Mute" : "Unmute");
@@ -984,7 +990,7 @@ void OMX_OmxplayerController::setMuted(bool muted)
 
     int expectedVol = (muted ? -6000 : 0);
     if (m_vol != expectedVol) {
-        qCDebug(vl) << Q_FUNC_INFO << expectedVol;
+        qCDebug(vl) << objectName() << Q_FUNC_INFO << expectedVol;
         m_vol = expectedVol;
         dbusSend(m_dbusIfaceProps.get(), [expectedVol] (QDBusInterface* iface) -> QDBusReply<void> {
             return iface->call("Volume", qPow(10, expectedVol/2000.0));
@@ -1026,7 +1032,7 @@ void OMX_OmxplayerController::setFrameVisible(bool visible)
     if (m_frameVisible == visible)
         return;
 
-    qCDebug(vl) << Q_FUNC_INFO << visible;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO << visible;
     m_frameVisible = visible;
     emit frameVisibleChanged(visible);
 }
@@ -1250,7 +1256,6 @@ void OMX_OmxplayerController::processCommand(const OMX_CommandProcessor::Command
         break;
     }
     case OMX_CommandProcessor::CMD_SET_SOURCE: {
-        qCDebug(vl) << cmd.data.toUrl();
         if (!setFilenameInternal(cmd.data.toUrl()))
             break;
         QSet<QAbstractState*> states { m_stateNoMedia, m_stateLoaded, m_statePlaying, m_stateEom };
@@ -1264,7 +1269,7 @@ void OMX_OmxplayerController::processCommand(const OMX_CommandProcessor::Command
         break;
     }
 
-    qCDebug(vl) << "Command completed:" << cmd.type;
+    qCDebug(vl) << objectName() << "Command completed:" << cmd.type;
 }
 
 /*------------------------------------------------------------------------------

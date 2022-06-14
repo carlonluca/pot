@@ -129,8 +129,16 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
     connect(m_controller, &OMX_OmxplayerController::playbackStateChanged, this, [this] {
         set_playbackState(m_controller->playbackState());
     });
+    connect(this, &OMX_VideoLayer::prebufferChanged, this, [this] {
+        m_controller->set_prebuffer(prebuffer());
+    });
+    connect(this, &OMX_VideoLayer::objectNameChanged, this, [this] {
+        m_controller->setObjectName(objectName());
+    });
     m_loop = m_controller->loop();
     m_playbackState = m_controller->playbackState();
+    m_prebuffer = m_controller->prebuffer();
+    m_controller->setObjectName(objectName());
 
     setFlag(QQuickItem::ItemHasContents, true);
     setVlState(m_controller->mediaStatus());
@@ -222,7 +230,7 @@ int OMX_VideoLayer::videoLayer()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::setVideoLayer(int layer)
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     if (layer == m_layer)
         return;
     m_layer = layer;
@@ -244,7 +252,7 @@ void OMX_VideoLayer::setSource(QUrl source)
 {
     if (m_source == source)
         return;
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     m_source = source;
     emit sourceChanged();
 
@@ -256,7 +264,7 @@ void OMX_VideoLayer::setSource(QUrl source)
 +-----------------------------------------------------------------------------*/
 qint64 OMX_VideoLayer::duration()
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     return m_controller->streamLength();
 }
 
@@ -265,7 +273,7 @@ qint64 OMX_VideoLayer::duration()
 +-----------------------------------------------------------------------------*/
 qint64 OMX_VideoLayer::position()
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
 	return m_controller->streamPosition();
 }
 
@@ -286,7 +294,7 @@ void OMX_VideoLayer::setOrientation(OMX_VideoLayer::Orientation orientation)
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::play(int position)
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     ASYNC(m_controller, "play", Q_ARG(int, position));
 }
 
@@ -295,7 +303,7 @@ void OMX_VideoLayer::play(int position)
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::stop()
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     ASYNC(m_controller, "stop");
 }
 
@@ -304,7 +312,7 @@ void OMX_VideoLayer::stop()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::pause()
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     ASYNC(m_controller, "pause");
 }
 
@@ -313,7 +321,7 @@ void OMX_VideoLayer::pause()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::seek(qint64 micros)
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     ASYNC(m_controller, "setPosition", Q_ARG(qint64, micros));
 }
 
@@ -322,7 +330,7 @@ void OMX_VideoLayer::seek(qint64 micros)
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::resume()
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     ASYNC(m_controller, "play", Q_ARG(int, 0));
 }
 
@@ -331,7 +339,7 @@ void OMX_VideoLayer::resume()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::requestDuration()
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     ASYNC(m_controller, "streamLengthAsync");
 }
 
@@ -340,7 +348,7 @@ void OMX_VideoLayer::requestDuration()
 +-----------------------------------------------------------------------------*/
 void OMX_VideoLayer::requestPosition()
 {
-    log_debug_func;
+    qCDebug(vl) << objectName() << Q_FUNC_INFO;
     ASYNC(m_controller, "streamPositionAsync");
 }
 
@@ -495,9 +503,6 @@ void OMX_VideoLayer::refreshHwSurfaceGeometry()
 	m_controller->setHeight(globalRect.height());
 
 	m_lastGlobalRect = globalRect;
-
-	qDebug() << "Local rect:" << videoRect();
-	qDebug() << "Global rect:" << globalRect;
 }
 
 /*------------------------------------------------------------------------------

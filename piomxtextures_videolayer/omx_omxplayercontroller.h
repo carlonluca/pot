@@ -162,6 +162,7 @@ class OMX_OmxplayerController : public QObject
     Q_PROPERTY(bool frameVisible READ frameVisible NOTIFY frameVisibleChanged)
     Q_PROPERTY(bool muted READ muted WRITE setMuted NOTIFY mutedChanged)
     L_RW_PROP_AS(bool, loop, false)
+    L_RW_PROP_AS(bool, prebuffer, false)
 public:
 	enum Orientation {
 		ROT_0,
