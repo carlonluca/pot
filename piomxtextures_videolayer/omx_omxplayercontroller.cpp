@@ -828,10 +828,9 @@ void OMX_OmxplayerController::playInternal(int position)
             << "--dbus_name" << m_dbusService
             << "--vol" << QString::number(m_vol)
             << "--orientation" << orientation_cmd_value(m_orientation)
-            << "--win"
+            << "--win" << geometry_string(m_rect)
             << QSL("--adev") << QSL("alsa")
             << QSL("--no-osd")
-            << geometry_string(m_rect)
             << customArgs
             << QSL("-l") << QString::number(qRound(position/1000.0));
     if (m_waitForPlayAtBeginning)
@@ -840,7 +839,7 @@ void OMX_OmxplayerController::playInternal(int position)
         args << QSL("--wait-for-play-at-end");
     if (m_loop)
         args << QSL("--loop");
-    if (m_mute)
+    if (m_muted)
         args << QSL("-n") << QSL("-1");
     args << m_url.toLocalFile();
 
