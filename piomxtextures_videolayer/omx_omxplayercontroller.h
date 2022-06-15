@@ -164,6 +164,7 @@ class OMX_OmxplayerController : public QObject
     L_RW_PROP_AS(bool, loop, false)
     L_RW_PROP_AS(bool, waitForPlayAtBeginning, false)
     L_RW_PROP_AS(bool, waitForPlayAtEnd, false)
+    L_RW_PROP_AS(int, videoLayer, -128)
 public:
 	enum Orientation {
 		ROT_0,
@@ -199,7 +200,6 @@ public slots:
     void streamLengthAsync();
     void streamPositionAsync();
 
-    bool setLayer(int layer);
     void setX(qreal x);
     void setY(qreal y);
     void setWidth(qreal w);
@@ -269,7 +269,6 @@ private:
     bool isInStates(const QSet<QAbstractState*> states);
     void waitForStates(const QSet<QAbstractState*> states);
     QStringList readOmxplayerArguments();
-	QString readOmxLayer();
 
     OMX_CommandProcessor* m_cmdProc;
 

@@ -395,6 +395,13 @@ OMX_OmxplayerController::OMX_OmxplayerController(QObject* parent) :
         else
             m_dbusConnMonitor->stop();
     });
+    connect(this, &OMX_OmxplayerController::videoLayerChanged, this, [this] {
+        qint64 layer = videoLayer();
+        const POT_DbusCallVoid f = [layer] (QDBusInterface* iface) -> QDBusReply<void> {
+            return iface->call("SetLayer", QVariant(layer));
+        };
+        dbusSend(m_dbusIfacePlayer.data(), f);
+    });
 
     m_cmdProc->start();
 
@@ -556,19 +563,6 @@ bool OMX_OmxplayerController::setFilenameInternal(QUrl url)
     emit loadRequested();
 
     return true;
-}
-
-/*------------------------------------------------------------------------------
-|    OMX_OmxplayerController::setLayer
-+-----------------------------------------------------------------------------*/
-bool OMX_OmxplayerController::setLayer(int layer)
-{
-    QMutexLocker locker(&m_mutex);
-    Q_UNUSED(layer)
-
-    // TODO: Implement.
-
-    return false;
 }
 
 /*------------------------------------------------------------------------------
@@ -825,7 +819,7 @@ void OMX_OmxplayerController::playInternal(int position)
     m_vol = (m_muted ? -6000 : 0);
 
     QStringList customArgs = readOmxplayerArguments();
-    QString layer = readOmxLayer();
+    QString layer = QString::number(m_videoLayer);
     QStringList args = QStringList()
             << "--layer" << layer
             << "--dbus_name" << m_dbusService
@@ -1314,19 +1308,6 @@ QStringList OMX_OmxplayerController::readOmxplayerArguments()
 #else
 	return argString.split(" ", QString::SkipEmptyParts);
 #endif
-}
-
-/*------------------------------------------------------------------------------
-|    OMX_OmxplayerController::readOmxLayer
-+-----------------------------------------------------------------------------*/
-QString OMX_OmxplayerController::readOmxLayer()
-{
-	const QString defaultLayer = QStringLiteral("-128");
-
-	QByteArray data = qgetenv("POT_LAYER");
-	if (data.isEmpty())
-		return defaultLayer;
-	return QString(data);
 }
 
 /*------------------------------------------------------------------------------

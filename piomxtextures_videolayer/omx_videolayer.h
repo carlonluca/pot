@@ -146,7 +146,6 @@ protected slots:
     void refreshHwSurfaceGeometry();
 
 protected:
-    int m_layer;
     QUrl m_source;
     QRectF m_lastGlobalRect;
     QRectF m_videoRect;

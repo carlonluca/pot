@@ -117,7 +117,6 @@ private:
 +-----------------------------------------------------------------------------*/
 OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
     QQuickItem(parent)
-  , m_layer(0)
   , m_videoRect(boundingRect())
   , m_controller(new OMX_OmxplayerController)
   , m_fillMode(Qt::IgnoreAspectRatio)
@@ -162,6 +161,8 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
             this, SIGNAL(videoFrameVisibleChanged(bool)));
     connect(m_controller, SIGNAL(eosWaitingReceived()),
             this, SIGNAL(eosWaitingReceived()));
+    connect(m_controller, SIGNAL(videoLayerChanged()),
+            this, SIGNAL(videoLayerChanged()));
 
     connect(this, SIGNAL(xChanged()),
             this, SLOT(onXChanged()), Qt::DirectConnection);
@@ -228,7 +229,7 @@ QSGNode* OMX_VideoLayer::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
 +-----------------------------------------------------------------------------*/
 int OMX_VideoLayer::videoLayer()
 {
-    return m_layer;
+    return m_controller->videoLayer();
 }
 
 /*------------------------------------------------------------------------------
@@ -237,10 +238,7 @@ int OMX_VideoLayer::videoLayer()
 void OMX_VideoLayer::setVideoLayer(int layer)
 {
     qCDebug(vl) << objectName() << Q_FUNC_INFO;
-    if (layer == m_layer)
-        return;
-    m_layer = layer;
-    emit videoLayerChanged();
+    m_controller->set_videoLayer(layer);
 }
 
 /*------------------------------------------------------------------------------
