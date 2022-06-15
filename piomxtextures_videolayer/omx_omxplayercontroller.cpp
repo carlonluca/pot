@@ -816,6 +816,9 @@ void OMX_OmxplayerController::playInternal(int position)
         return;
     }
 
+    if (position > 1000)
+        position = position - 1000;
+
     m_vol = (m_muted ? -6000 : 0);
 
     QStringList customArgs = readOmxplayerArguments();
@@ -826,6 +829,8 @@ void OMX_OmxplayerController::playInternal(int position)
             << "--vol" << QString::number(m_vol)
             << "--orientation" << orientation_cmd_value(m_orientation)
             << "--win"
+            << QSL("--adev") << QSL("alsa")
+            << QSL("--no-osd")
             << geometry_string(m_rect)
             << customArgs
             << QSL("-l") << QString::number(qRound(position/1000.0));
@@ -835,6 +840,8 @@ void OMX_OmxplayerController::playInternal(int position)
         args << QSL("--wait-for-play-at-end");
     if (m_loop)
         args << QSL("--loop");
+    if (m_mute)
+        args << QSL("-n") << QSL("-1");
     args << m_url.toLocalFile();
 
     qCDebug(vl) << objectName() << "omxplayer cmd line:" << args;
@@ -984,6 +991,7 @@ void OMX_OmxplayerController::setMuted(bool muted)
         changed = true;
     }
 
+#if 0
     int expectedVol = (muted ? -6000 : 0);
     if (m_vol != expectedVol) {
         qCDebug(vl) << objectName() << Q_FUNC_INFO << expectedVol;
@@ -993,6 +1001,7 @@ void OMX_OmxplayerController::setMuted(bool muted)
         });
         changed = true;
     }
+#endif
 
     if (changed)
         emit mutedChanged(m_muted);
