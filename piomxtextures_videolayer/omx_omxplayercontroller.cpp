@@ -829,10 +829,11 @@ void OMX_OmxplayerController::playInternal(int position)
             << "--vol" << QString::number(m_vol)
             << "--orientation" << orientation_cmd_value(m_orientation)
             << "--win" << geometry_string(m_rect)
-            << QSL("--adev") << QSL("alsa")
             << QSL("--no-osd")
             << customArgs
             << QSL("-l") << QString::number(qRound(position/1000.0));
+    if (m_useAlsa)
+        args << QSL("--adev") << QSL("alsa");
     if (m_waitForPlayAtBeginning)
         args << QSL("--wait-for-play-at-beginning");
     if (m_waitForPlayAtEnd)

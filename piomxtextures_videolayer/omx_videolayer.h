@@ -69,6 +69,7 @@ private:
     L_RW_PROP_AS(bool, loop, false)
     L_RW_PROP_AS(bool, waitForPlayAtBeginning, false)
     L_RW_PROP_AS(bool, waitForPlayAtEnd, false)
+    L_RW_PROP_AS(bool, useAlsa, false)
     L_RW_PROP_AS(int, volume, 0)
 
 public:

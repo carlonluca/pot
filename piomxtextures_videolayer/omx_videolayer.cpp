@@ -137,11 +137,15 @@ OMX_VideoLayer::OMX_VideoLayer(QQuickItem* parent) :
     connect(this, &OMX_VideoLayer::objectNameChanged, this, [this] {
         m_controller->setObjectName(objectName());
     });
+    connect(this, &OMX_VideoLayer::useAlsaChanged, this, [this] {
+        m_controller->set_useAlsa(useAlsa());
+    });
     m_loop = m_controller->loop();
     m_playbackState = m_controller->playbackState();
     m_waitForPlayAtBeginning = m_controller->waitForPlayAtBeginning();
     m_waitForPlayAtEnd = m_controller->waitForPlayAtEnd();
     m_controller->setObjectName(objectName());
+    m_controller->set_useAlsa(useAlsa());
 
     setFlag(QQuickItem::ItemHasContents, true);
     setVlState(m_controller->mediaStatus());
